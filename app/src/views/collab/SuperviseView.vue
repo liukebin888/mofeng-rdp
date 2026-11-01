@@ -41,7 +41,7 @@
     <el-dialog v-model="dialog" title="新建督办" width="440px">
       <el-form label-position="top" size="small">
         <el-form-item label="督办事项"><el-input v-model="form.title" placeholder="须明确事项" /></el-form-item>
-        <el-form-item label="责任人"><el-input v-model="form.owner" placeholder="责任人" /></el-form-item>
+        <el-form-item label="责任人"><PersonSelect v-model="form.owner" placeholder="输入姓名或首拼（如 zlq → 周立群）" /></el-form-item>
         <el-form-item label="时限"><el-input v-model="form.due" placeholder="YYYY-MM-DD" /></el-form-item>
       </el-form>
       <template #footer>
@@ -56,6 +56,7 @@
 import { computed, reactive, ref } from 'vue'
 import PageHeader from '@/components/PageHeader.vue'
 import KpiCard from '@/components/KpiCard.vue'
+import PersonSelect from '@/components/PersonSelect.vue'
 import { useAppStore } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
 import type { SuperviseActionType } from '@/domain/collabEngine'

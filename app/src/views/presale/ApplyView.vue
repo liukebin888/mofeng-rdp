@@ -29,7 +29,9 @@
               <el-input v-model="form.platform" placeholder="平台（自由文本）" style="flex: 1" />
             </div>
           </el-form-item>
-          <el-form-item label="负责人"><el-input v-model="form.owner" /></el-form-item>
+          <el-form-item label="负责人">
+            <PersonSelect v-model="form.owner" placeholder="输入姓名或首拼（如 zlq → 周立群）" @select="onOwnerSelect" />
+          </el-form-item>
           <el-form-item label="起止日期">
             <div class="row" style="width: 100%">
               <el-input v-model="form.start" />
@@ -123,10 +125,12 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import PageHeader from '@/components/PageHeader.vue'
+import PersonSelect from '@/components/PersonSelect.vue'
 import { useAppStore } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
 import { grade, LEVEL_DESC } from '@/domain/grading'
 import type { GradingInput, Level } from '@/domain/types'
+import type { PersonCandidate } from '@/domain/personSearch'
 
 const store = useAppStore()
 const { te } = useI18n()
@@ -149,6 +153,15 @@ function fillDemo(level: 'L1' | 'L3') {
     Object.assign(input, { asil: 'B', cal: 2, selfDev: 'FULL', newArch: true, customerSafety: false })
   } else {
     Object.assign(input, { asil: 'QM', cal: 0, selfDev: 'PARAM_ONLY', newArch: false, customerSafety: false })
+  }
+}
+
+/** 负责人选中后：自动带入部门/岗位信息（回写项目负责人扩展信息） */
+const ownerMeta = ref<PersonCandidate | null>(null)
+function onOwnerSelect(person: PersonCandidate) {
+  ownerMeta.value = person.id ? person : null
+  if (person.id) {
+    store.notify('info', `已带入负责人 ${person.name}：${[person.dept, person.post].filter(Boolean).join(' · ') || '（无挂靠）'}`)
   }
 }
 

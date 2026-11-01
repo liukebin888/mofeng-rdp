@@ -96,7 +96,7 @@
               </el-select>
             </el-form-item>
             <el-form-item label="名称" required><el-input v-model="orgForm.name" /></el-form-item>
-            <el-form-item label="负责人"><el-input v-model="orgForm.leaderName" /></el-form-item>
+            <el-form-item label="负责人"><PersonSelect v-model="orgForm.leaderName" placeholder="输入姓名或首拼（如 zlq → 周立群）" /></el-form-item>
             <el-form-item label="所属系统">
               <el-select v-model="orgForm.system" style="width: 100%" clearable>
                 <el-option label="研发系统" value="研发系统" />
@@ -179,6 +179,7 @@
 import { computed, ref, reactive } from 'vue'
 import PageHeader from '@/components/PageHeader.vue'
 import KpiCard from '@/components/KpiCard.vue'
+import PersonSelect from '@/components/PersonSelect.vue'
 import { useAppStore } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
 import { buildOrgTree, POST_TRACKS, LEVEL_LEADER_TITLE, trackOf, countBySystem } from '@/domain/org'

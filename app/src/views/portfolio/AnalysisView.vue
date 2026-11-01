@@ -48,7 +48,7 @@
         <div class="panel-title" style="margin-top: 12px">登记决策</div>
         <el-form label-position="top" size="small">
           <el-form-item label="取舍理由"><el-input v-model="dec.reason" placeholder="为何取舍" /></el-form-item>
-          <el-form-item label="决策人"><el-input v-model="dec.decider" placeholder="决策人" /></el-form-item>
+          <el-form-item label="决策人"><PersonSelect v-model="dec.decider" placeholder="输入姓名或首拼（如 zlq → 周立群）" /></el-form-item>
           <el-form-item label="备选方案"><el-input v-model="dec.alternatives" placeholder="备选方案" /></el-form-item>
           <el-form-item label="影响项目">
             <el-select v-model="dec.affectedProjectIds" multiple style="width: 100%">
@@ -95,6 +95,7 @@
 import { computed, reactive } from 'vue'
 import PageHeader from '@/components/PageHeader.vue'
 import KpiCard from '@/components/KpiCard.vue'
+import PersonSelect from '@/components/PersonSelect.vue'
 import { useAppStore } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
 import { DISCOUNT_RATE } from '@/domain/portfolioFinance'
