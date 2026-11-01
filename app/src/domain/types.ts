@@ -967,3 +967,48 @@ export interface EffortDeviation {
   week: string
 }
 
+/** 组织层级（TEN-009：六级组织，比 SRS 的 4 级更细，覆盖集团→公司→中心→部门→科室→小组） */
+export type OrgLevel = 'group' | 'company' | 'center' | 'department' | 'section' | 'team'
+
+/** 组织节点（parentId 自关联成树；每个层级对应固定负责人岗位） */
+export interface OrgNode {
+  id: string
+  name: string
+  level: OrgLevel
+  parentId: string | null
+  /** 负责人岗位（该层级负责人，如集团=总裁、公司=总经理、中心=执行总监…） */
+  leaderTitle?: string
+  /** 负责人姓名（挂靠到人员） */
+  leaderName?: string
+  /** 所属系统（研发系统 / 制造系统 / 职能系统 / 集团…） */
+  system?: string
+  /** 排序 */
+  order: number
+}
+
+/** 岗位序列（技术管理岗 / 技术岗 / 项目管理岗 / 软件岗） */
+export type PostTrack = 'tech-mgmt' | 'tech' | 'project' | 'software'
+
+/** 岗位序列定义 */
+export interface PostTrackDef {
+  track: PostTrack
+  name: string
+  /** 序列内岗位等级（从高到低） */
+  levels: string[]
+}
+
+/** 人员挂靠（一人可挂多个组织 + 多个岗位，权限取并集） */
+export interface OrgMembership {
+  userId: string
+  userName: string
+  orgId: string
+  /** 岗位序列 */
+  track: PostTrack
+  /** 岗位等级（如 首席总工/总工/主任工程师/主管工程师） */
+  postLevel: string
+  /** 是否主职（一人可跨组织兼职，主职唯一） */
+  primary: boolean
+  /** 在职状态（离职后组织关系失效，历史保留） */
+  active: boolean
+}
+

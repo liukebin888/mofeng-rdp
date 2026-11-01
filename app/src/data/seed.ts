@@ -42,12 +42,14 @@ import type {
   TraceLink,
   UdfDef,
   WbsNode,
-  WhatIfScenario
+  WhatIfScenario,
+  OrgNode,
+  OrgMembership
 } from '@/domain/types'
 import { ROLES } from '@/domain/rbac'
 import type { FlowDefinition, FlowInstance } from '@/domain/flowEngine'
 
-export const SEED_VERSION = 'mofeng.rdp.v1.0.6'
+export const SEED_VERSION = 'mofeng.rdp.v1.0.7'
 const TENANT = 'T-1001'
 
 export interface SeedUser {
@@ -88,6 +90,79 @@ function buildUsers(): SeedUser[] {
     dept: ['项目管理部', '研发中心', '质量部', '采购部', '制造部', 'IT'][i % 6],
     account: `mofeng.${r.code.toLowerCase()}`
   }))
+}
+
+/**
+ * 组织架构（TEN-009 六级组织：集团→公司→中心→部门→科室→小组）
+ * 中心归属：电子/结构/工艺/模具/项目管理 5 中心 → 研发系统；制造/计划物流 2 中心 → 制造系统；
+ * 市场/采购/质量/财务/人力资源/企业管理/总经办 → 职能系统。
+ */
+function buildOrgNodes(): OrgNode[] {
+  const c = (id: string, name: string, system: string, order: number, leaderName?: string): OrgNode => ({
+    id, name, level: 'center', parentId: 'C', system, leaderTitle: '执行总监', leaderName, order
+  })
+  return [
+    { id: 'G', name: '魔程集团', level: 'group', parentId: null, leaderTitle: '总裁', leaderName: '陈志远', system: '集团', order: 1 },
+    { id: 'C', name: '魔程汽车电子有限公司', level: 'company', parentId: 'G', leaderTitle: '总经理', leaderName: '林静', order: 1 },
+    // 研发系统（5 中心）
+    c('ELEC', '电子研发中心', '研发系统', 1, '周立群'),
+    c('STRU', '结构研发中心', '研发系统', 2, '吴敏'),
+    c('PROC', '工艺技术中心', '研发系统', 3, '赵启明'),
+    c('MOLD', '模具中心', '研发系统', 4, '钱伟'),
+    c('PMO', '项目管理中心', '研发系统', 5, '孙烨'),
+    // 制造系统（2 中心）
+    c('MFG', '制造中心', '制造系统', 6, '李文杰'),
+    c('LOG', '计划物流中心', '制造系统', 7, '郑昊'),
+    // 职能系统（7 中心）
+    c('MKT', '市场中心', '职能系统', 8, '王琳'),
+    c('PUR', '采购中心', '职能系统', 9, '冯磊'),
+    c('QA', '质量中心', '职能系统', 10, '何晓东'),
+    c('FIN', '财务中心', '职能系统', 11, '徐宁'),
+    c('HR', '人力资源中心', '职能系统', 12, '马强'),
+    c('ADM', '企业管理中心', '职能系统', 13, '顾晨'),
+    c('EXEC', '总经办', '职能系统', 14, '沈雅'),
+    // 部门（电子研发中心下属，示范三级下钻）
+    { id: 'ELEC-D1', name: '电子硬件部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', leaderName: '许国栋', order: 1 },
+    { id: 'ELEC-D2', name: '电子软件部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 2 },
+    { id: 'STRU-D1', name: '结构设计部', level: 'department', parentId: 'STRU', leaderTitle: '总监', order: 1 },
+    { id: 'PROC-D1', name: '工艺工程部', level: 'department', parentId: 'PROC', leaderTitle: '总监', order: 1 },
+    { id: 'MKT-D1', name: '销售部', level: 'department', parentId: 'MKT', leaderTitle: '总监', order: 1 },
+    // 科室（电子硬件部下）
+    { id: 'ELEC-D1-S1', name: '硬件设计一科', level: 'section', parentId: 'ELEC-D1', leaderTitle: '高级经理', order: 1 },
+    { id: 'ELEC-D1-S2', name: '硬件测试科', level: 'section', parentId: 'ELEC-D1', leaderTitle: '高级经理', order: 2 },
+    // 小组（硬件设计一科下）
+    { id: 'ELEC-D1-S1-T1', name: '电源小组', level: 'team', parentId: 'ELEC-D1-S1', leaderTitle: '经理', order: 1 },
+    { id: 'ELEC-D1-S1-T2', name: '车身控制小组', level: 'team', parentId: 'ELEC-D1-S1', leaderTitle: '经理', order: 2 }
+  ]
+}
+
+/** 人员挂靠（跨组织兼职 + 岗位序列；U-004 吴敏兼职电子软件部 + 制造中心） */
+function buildOrgMemberships(users: SeedUser[]): OrgMembership[] {
+  const u = (id: string) => users.find((x) => x.id === id)!
+  const m = (userId: string, orgId: string, track: OrgMembership['track'], postLevel: string, primary = false): OrgMembership => ({
+    userId, userName: u(userId).name, orgId, track, postLevel, primary, active: true
+  })
+  return [
+    m('U001', 'G', 'tech-mgmt', '首席总工', true),
+    m('U002', 'C', 'tech-mgmt', '总工', true),
+    m('U003', 'ELEC', 'tech', '资深高级工程师', true),
+    m('U004', 'ELEC-D2', 'tech', '高级工程师', true),
+    m('U004', 'MFG', 'project', '项目工程师', false), // 跨组织兼职
+    m('U005', 'STRU', 'tech', '工程师', true),
+    m('U006', 'PROC', 'tech', '高级工程师', true),
+    m('U007', 'MOLD', 'tech', '资深工程师', true),
+    m('U008', 'PMO', 'project', '项目工程师', true),
+    m('U009', 'QA', 'tech-mgmt', '主任工程师', true),
+    m('U010', 'PUR', 'tech', '工程师', true),
+    m('U011', 'MFG', 'tech', '工程师', true),
+    m('U012', 'FIN', 'tech-mgmt', '主管工程师', true),
+    m('U013', 'HR', 'software', '系统工程', true),
+    m('U014', 'LOG', 'project', '项目助理工程师', true),
+    m('U015', 'MKT', 'project', '项目管理员', true),
+    m('U016', 'ADM', 'tech-mgmt', '主任工程师', true),
+    m('U017', 'EXEC', 'software', '架构师', true),
+    m('U018', 'ELEC-D1-S1-T1', 'software', '网络工程师', true)
+  ]
 }
 
 const actor = (u: SeedUser, projectId?: string): ActorContext => ({
@@ -401,6 +476,8 @@ export function buildSeed() {
   const { reqs, links } = buildRequirements()
   const suppliers = buildSuppliers()
   const boms = buildBom()
+  const orgNodes = buildOrgNodes()
+  const orgMemberships = buildOrgMemberships(users)
 
   const risks: RiskItem[] = [
     { id: 'RK1', projectId: 'P-001', code: 'RSK-018', title: '双路旋变信号共因失效', failureMode: '两路信号同时受同一干扰源影响', cause: '走线并行走同一屏蔽层', consequence: '助力误判，ASIL B 不可接受', trigger: 'EMC 辐射抗扰度试验 200V/m', severity: 7, occurrence: 6, detection: 6, strategy: '改分层走线 + 增加独立滤波，DV 阶段验证', owner: '赵启明', status: '缓解中' },
@@ -732,6 +809,8 @@ export function buildSeed() {
       { code: 'T-1003', name: '魔程新能源（子公司）', type: '子租户', isolation: 'SCHEMA', parentCode: 'T-1001', sharedMetrics: ['项目数', '风险敞口'] }
     ],
     users,
+    orgNodes,
+    orgMemberships,
     projects: projects.map((p) => ({ ...p, schemeLinked, quoteLinked }) as Project),
     wbs,
     reqs,

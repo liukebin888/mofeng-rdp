@@ -137,6 +137,10 @@ export const useAppStore = defineStore('app', () => {
   const users = computed<SeedUser[]>(() => data.value.users)
   const currentUser = computed(() => users.value.find((u) => u.id === userId.value) || users.value[0])
 
+  // —— 组织架构（TEN-009 六级组织树 + 岗位序列 + 人员挂靠）——
+  const orgNodes = computed(() => (data.value.orgNodes ?? []) as import('@/domain/types').OrgNode[])
+  const orgMemberships = computed(() => (data.value.orgMemberships ?? []) as import('@/domain/types').OrgMembership[])
+
   // —— 多租户隔离（TEN-002/TEN-004）：当前租户上下文 + 可见项目 ——
   const tenants = computed(() => (data.value.tenants ?? []) as import('@/domain/tenant').Tenant[])
   /** 当前租户上下文：tenantId 由入口（登录态）强制注入，业务代码禁止从入参取 */
@@ -1970,6 +1974,8 @@ export const useAppStore = defineStore('app', () => {
     currentUser,
     currentProject,
     actor,
+    orgNodes,
+    orgMemberships,
     tenants,
     tenantContext,
     visibleProjects,
