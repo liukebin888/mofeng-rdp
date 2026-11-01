@@ -139,3 +139,43 @@ SOLUTION 12.2 已裁定：**R1 单一部署单元，模块化单体**。核心�
 1. **B1-1 起步**：搭建 Java 工程骨架（Spring Boot 3.2.5 + Maven 多模块），按 ARC-001 四层分层建包，落地受控对象统一基类。
 2. 先建「分层依赖扫描」静态门禁（ArchUnit），确保领域层纯净性从一开始就被流水线守住。
 3. 领域规则迁移采用「同一套 744 例测试」作为护栏，先迁一个代表性引擎（如 grading 分级判定）验证迁移模式，再批量推进。
+
+---
+
+## 6. 迁移模式验证结论（2026-11-02，grading 首迁完成）
+
+**结论**：TS 纯函数引擎 → Java 领域纯对象的迁移模式**已验证可行**，以「同一套测试用例」为唯一验收判据，一致率 100%。
+
+### 6.1 迁移对象与结果
+
+| 项 | 内容 |
+|---|---|
+| 迁移引擎 | grading 分级引擎（SRS 附录 C 14 行真值表 + 6 条裁定规则 CLS-001~007） |
+| 前端权威 | `app/src/domain/grading.ts`（`GRADING_TABLE_VERSION = APX-C-2026.11`） |
+| Java 实现 | `backend/mofeng-domain/.../grading/` 包：`GradingEngine` + 值对象 `Asil`/`SelfDev`/`Level`/`GradingInput`/`NormalizedInput` |
+| 验收判据 | 与 `app/tests/domain.spec.ts`「分级引擎」同构的 14 行真值表用例 + 缺项阻断用例 + 裁定规则用例，结果一致率 100% |
+| 测试结果 | 领域层合计 18 例全过（ControlledObjectTest 8 + DomainLayerArchitectureTest 5 + GradingEngineTest 5），BUILD SUCCESS |
+
+### 6.2 迁移模式（可复用于其余 69 引擎）
+
+1. **值对象先行**：把 TS 的 `enum`/`interface` 拆成独立 Java `enum`/不可变值对象（如 `Asil`/`SelfDev`/`Level`），保持语义同构。
+2. **真值表即权威**：`GRADING_ROWS` 用 `List.of(...)` 逐行一一对应 TS 数组，`Predicate<NormalizedInput>` 承接 `match` 函数，**顺序即优先级，命中即返回**——守住 CLS-002「只允许查表」铁律。
+3. **裁定规则独立**：`validate()` 产出 6 条 `Check`（code/name/ok/note），与定级解耦，用于发现口径冲突与越级。
+4. **留痕可复算**：`snapshotHash` 用 JDK 内置 SHA-256，与前端 `hashOf` 语义对齐（确定性、可逐位复算）。
+5. **领域纯净性**：全部落在 `mofeng-domain` 模块，零框架依赖，由 `DomainLayerArchitectureTest`（ArchUnit）构建期守护。
+
+### 6.3 迁移中修正的两个口径要点
+
+- **CLS-005「分解不降级」方向**：`rank(level) <= rank(parentLevel)`（rank 越小管控越严）。父项目 L1、子项目判 L2（更松）→ **违反**，应 fail；同等级/更严才通过。初版测试断言写反，已按 TS 权威修正。
+- **JDK 版本漂移**：pom 锁定 17，但本机只有 JDK 21。JDK 21 向后兼容编译 target 17，当前用 JDK 21 跑通；上线前需在 CI 锁定 JDK 17 镜像避免「17 编译、21 运行」的隐性漂移。
+
+### 6.4 后续批量迁移清单（设计者直接执行）
+
+其余 69 个引擎按「先值对象、再真值表/规则、后一致性测试」三段落批量推进，每批以「对应 spec.ts 用例全过」为完成判据：
+
+- **批次 1（安全/变更）**：gate（SOD/放行）、baseline（哈希链）、audit（审计链）、change（ECR 闭环）、risk/riskQuant
+- **批次 2（进度/资源）**：schedule（CPM/成环）、pmc、resourcePool/resourcePlan/resourceConflict、overallocation、bottleneck
+- **批次 3（供应链/质量）**：supplier、sample、defect、softwareVersion、requirement、trace、evm
+- **批次 4（横切/治理）**：rbac、tenant、projectControl、naming、cipher、password、compliance、governanceConfig 等
+
+> 迁移顺序遵循「高风险管控优先」（安全/变更/追溯）→「支撑能力」→「横切治理」。
