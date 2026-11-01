@@ -189,6 +189,7 @@ export const MENUS: MenuGroup[] = [
       { path: '/system/audit', title: '审计日志', desc: '七元组 + 哈希链', comp: v('system/AuditLogView') },
       { path: '/system/dict', title: '分类码与 UDF', desc: '自定义字段扩展点', comp: v('system/DictView') },
       { path: '/system/calendar', title: '三层日历', desc: '企业/项目/资源 + 例外日（TEN-015）', comp: v('system/CalendarView') },
+      { path: '/system/ops', title: '运维监控', desc: 'SLO + 监控告警 + 限流熔断 + 配额预警 + 变更审批', comp: v('system/OpsMonitorView') },
       { path: '/system/data', title: '数据与版本', desc: '种子重置与 schema 版本', comp: v('system/OrgView') }
     ]
   }

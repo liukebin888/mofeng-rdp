@@ -154,6 +154,7 @@ export const zhCN: Dict = {
   'menu.item./system/audit': '审计日志',
   'menu.item./system/dict': '分类码与 UDF',
   'menu.item./system/calendar': '三层日历',
+  'menu.item./system/ops': '运维监控',
   'menu.item./system/data': '数据与版本',
   'menu.item./ai/assist': '智能辅助工作台'
 }
@@ -304,6 +305,7 @@ export const enUS: Dict = {
   'menu.item./system/audit': 'Audit Log',
   'menu.item./system/dict': 'Code Dict & UDF',
   'menu.item./system/calendar': 'Three-tier Calendar',
+  'menu.item./system/ops': 'Ops & Monitoring',
   'menu.item./system/data': 'Data & Version',
   'menu.item./ai/assist': 'AI Assistance Workbench'
 }
