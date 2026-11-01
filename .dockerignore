@@ -1,0 +1,12 @@
+# Docker 构建上下文排除（.dockerignore）
+node_modules
+dist
+dist-ssr
+.git
+.workbuddy
+server/data
+*.log
+.env
+.env.*
+coverage
+.vite

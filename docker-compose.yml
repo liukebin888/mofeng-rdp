@@ -1,0 +1,43 @@
+# MOFENG-RDP 一键编排：前端 nginx + 后端 Node
+# 启动：docker compose up -d --build
+# 访问：http://localhost:8080  （前端），后端经 nginx /api 反向代理，无需直接暴露
+
+services:
+  # —— 后端服务 ——
+  mofeng-server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: mofeng-rdp-server
+    environment:
+      - PORT=8787
+      - HOST=0.0.0.0
+    volumes:
+      - mofeng-data:/app/data          # 持久化 state/audit（挂载命名卷，容器重建数据不丢）
+    restart: unless-stopped
+    networks:
+      - mofeng-net
+    # 仅内网暴露，由 nginx 反向代理，不直接映射宿主机端口（如需直连可取消注释）
+    # ports:
+    #   - "8787:8787"
+
+  # —— 前端服务 ——
+  mofeng-web:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.web
+    container_name: mofeng-rdp-web
+    ports:
+      - "8080:80"                       # 宿主机 8080 -> 容器 80
+    depends_on:
+      - mofeng-server
+    restart: unless-stopped
+    networks:
+      - mofeng-net
+
+volumes:
+  mofeng-data:
+
+networks:
+  mofeng-net:
+    driver: bridge

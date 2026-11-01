@@ -7,6 +7,7 @@
 - 根目录 `app/`（前端）、`server/`（Node 后端 index.js，零依赖，端口 8787）、`spec/`（SRS）、`docs/`（架构/测试报告/规格冲突清单）。
 - 前端 dev 端口 5178，preview/e2e 端口 4180，后端 8787。
 - 四层架构：views → application(store) → domain ← infra。domain 零 DOM/零 vue/pinia，可被 vitest 直接调用。
+- **Git 仓库**：已建立，分支 main，远程 origin = https://github.com/liukebin888/mofeng-rdp.git（已跟踪 origin/main）。提交身份 留总 <liuzong@mofeng.com>（项目级）。.gitignore 排除 node_modules/dist/server/data/.env/密钥。后续 `git add -A && git commit && git push` 即可。
 
 ## 门禁铁律（完成六门禁才算闭环）
 1. `npx vue-tsc --noEmit` 0 error
