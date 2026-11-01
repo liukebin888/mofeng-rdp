@@ -39,7 +39,8 @@ export const MENUS: MenuGroup[] = [
     items: [
       { path: '/presale/apply', title: '立项申请', desc: '五项分级输入 + 技术方案↔报价关联', comp: v('presale/ApplyView') },
       { path: '/presale/review', title: '立项评审', desc: 'Gate1 准入逐条校验', comp: v('presale/ApplyView') },
-      { path: '/presale/scheme', title: '技术方案与报价', desc: '方案版本与报价单关联（C-02）', comp: v('presale/SchemeView') }
+      { path: '/presale/scheme', title: '技术方案与报价', desc: '方案版本与报价单关联（C-02）', comp: v('presale/SchemeView') },
+      { path: '/presale/flow', title: '前期审批流程', desc: '前期交申请→报价→立项 三流程固定次序', comp: v('presale/PreSaleFlowView') }
     ]
   },
   {

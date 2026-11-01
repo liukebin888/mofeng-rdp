@@ -47,7 +47,7 @@ import type {
 import { ROLES } from '@/domain/rbac'
 import type { FlowDefinition, FlowInstance } from '@/domain/flowEngine'
 
-export const SEED_VERSION = 'mofeng.rdp.v1.0.5'
+export const SEED_VERSION = 'mofeng.rdp.v1.0.6'
 const TENANT = 'T-1001'
 
 export interface SeedUser {
@@ -837,6 +837,72 @@ export function buildSeed() {
         ],
         enabled: true,
         version: 1
+      },
+      // ⑤ 项目前期 · 前期交申请（市场客户经理发起 → 市场总监审核 → 三中心总监会签 → 总经理批准）
+      {
+        id: 'DEF-PRE-1',
+        code: 'FLOW-PRE-1',
+        name: '前期交申请',
+        formFields: [
+          { key: 'customer', label: '客户' },
+          { key: 'productLine', label: '产品线' },
+          { key: 'budget', label: '预估金额' }
+        ],
+        startNodeId: 'p1',
+        nodes: [
+          { id: 'p1', name: '发起', type: 'start' },
+          { id: 'p2', name: '市场总监审核', type: 'approve', approverRole: '市场总监', slaHours: 24, escalateToRole: '总经理' },
+          { id: 'p3', name: '三中心总监会签', type: 'sign', signMode: 'all', signRoles: ['电子研发中心总监', '结构研发中心总监', '工艺技术中心总监'], slaHours: 48, escalateToRole: '总经理' },
+          { id: 'p4', name: '总经理批准', type: 'approve', approverRole: '总经理', slaHours: 24 },
+          { id: 'p5', name: '结束', type: 'end' }
+        ],
+        enabled: true,
+        version: 1
+      },
+      // ⑥ 项目前期 · 项目/产品报价（并行填报 + 财务汇总 + 总经理批准）
+      {
+        id: 'DEF-PRE-2',
+        code: 'FLOW-PRE-2',
+        name: '项目/产品报价',
+        formFields: [
+          { key: 'productLine', label: '产品线' },
+          { key: 'electronBom', label: '电子BOM金额' },
+          { key: 'structureBom', label: '结构BOM金额' },
+          { key: 'processQuote', label: '过程报价' },
+          { key: 'procurementPrice', label: '采购价格' },
+          { key: 'financeSummary', label: '财务汇总' }
+        ],
+        startNodeId: 'q1',
+        nodes: [
+          { id: 'q1', name: '发起（市场客户经理）', type: 'start' },
+          { id: 'q2', name: '四角色并行填报', type: 'sign', signMode: 'all', signRoles: ['电子研发工程师', '结构研发工程师', '工艺技术工艺师', '采购部'], slaHours: 72, escalateToRole: '市场总监' },
+          { id: 'q3', name: '财务汇总核对', type: 'approve', approverRole: '财务部', slaHours: 24, escalateToRole: '总经理' },
+          { id: 'q4', name: '总经理批准报价', type: 'approve', approverRole: '总经理', slaHours: 24 },
+          { id: 'q5', name: '结束', type: 'end' }
+        ],
+        enabled: true,
+        version: 1
+      },
+      // ⑦ 项目前期 · 立项申请（市场客户经理发起 → 市场总监审核 → 八部门会签 → 总经理批准）
+      {
+        id: 'DEF-PRE-3',
+        code: 'FLOW-PRE-3',
+        name: '立项申请',
+        formFields: [
+          { key: 'name', label: '项目名称' },
+          { key: 'customer', label: '客户' },
+          { key: 'productLine', label: '产品线' }
+        ],
+        startNodeId: 'b1',
+        nodes: [
+          { id: 'b1', name: '发起', type: 'start' },
+          { id: 'b2', name: '市场总监审核', type: 'approve', approverRole: '市场总监', slaHours: 24, escalateToRole: '总经理' },
+          { id: 'b3', name: '八部门会签', type: 'sign', signMode: 'all', signRoles: ['电子研发中心', '结构研发中心', '工艺技术中心', '模具中心', '项目管理中心', '制造中心', '计划物流中心', '质量中心'], slaHours: 72, escalateToRole: '总经理' },
+          { id: 'b4', name: '总经理批准', type: 'approve', approverRole: '总经理', slaHours: 24 },
+          { id: 'b5', name: '结束', type: 'end' }
+        ],
+        enabled: true,
+        version: 1
       }
     ] as FlowDefinition[],
     flowInstances: [
@@ -858,6 +924,17 @@ export function buildSeed() {
       {
         id: 'F4', defId: 'DEF-HOUR', defCode: 'FLOW-HOUR', title: '2026-W43 工时单审核（8 人）', submitter: '何晓东',
         form: { week: 'W43' }, currentNodeId: 'h2', status: '运行中', passedNodeIds: ['h1'], history: [],
+        nodeEnteredAt: '2026-11-01T09:00:00+08:00', escalated: false, addedSigners: [], createdAt: '2026-11-01T09:00:00+08:00'
+      },
+      // 项目前期三流程实例（演示）
+      {
+        id: 'PRE-1-001', defId: 'DEF-PRE-1', defCode: 'FLOW-PRE-1', title: 'XX 客户电驱控制器项目前期交申请', submitter: '市场客户经理 王芳',
+        form: { customer: 'XX 新能源', productLine: '电驱控制器', budget: 1280000 }, currentNodeId: 'p2', status: '运行中', passedNodeIds: ['p1'], history: [],
+        nodeEnteredAt: '2026-11-01T08:30:00+08:00', escalated: false, addedSigners: [], createdAt: '2026-11-01T08:30:00+08:00'
+      },
+      {
+        id: 'PRE-2-001', defId: 'DEF-PRE-2', defCode: 'FLOW-PRE-2', title: 'XX 客户电驱控制器报价', submitter: '市场客户经理 王芳',
+        form: { productLine: '电驱控制器' }, currentNodeId: 'q2', status: '运行中', passedNodeIds: ['q1'], history: [],
         nodeEnteredAt: '2026-11-01T09:00:00+08:00', escalated: false, addedSigners: [], createdAt: '2026-11-01T09:00:00+08:00'
       }
     ] as FlowInstance[],

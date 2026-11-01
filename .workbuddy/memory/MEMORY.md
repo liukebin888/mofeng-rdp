@@ -8,6 +8,7 @@
 - 前端 dev 端口 5178，preview/e2e 端口 4180，后端 8787。
 - 四层架构：views → application(store) → domain ← infra。domain 零 DOM/零 vue/pinia，可被 vitest 直接调用。
 - **Git 仓库**：已建立，分支 main，远程 origin = https://github.com/liukebin888/mofeng-rdp.git（已跟踪 origin/main）。提交身份 留总 <liuzong@mofeng.com>（项目级）。.gitignore 排除 node_modules/dist/server/data/.env/密钥。后续 `git add -A && git commit && git push` 即可。
+- **部署（Docker 化）**：server/Dockerfile（Node 20-alpine 零依赖、非 root、HEALTHCHECK、数据卷）、deploy/Dockerfile.web（多阶段 vite→nginx + SPA 回退 + /api 反代）、deploy/nginx.conf、docker-compose.yml（前端:8080 + 后端仅内网 + 命名卷 mofeng-data）、.dockerignore。部署手册 docs/DEPLOYMENT.md。启动 `docker compose up -d --build`。后端构建上下文 context=./server（非根目录）。
 
 ## 门禁铁律（完成六门禁才算闭环）
 1. `npx vue-tsc --noEmit` 0 error

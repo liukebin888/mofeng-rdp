@@ -272,12 +272,19 @@ export function approveNode(inst: FlowInstance, def: FlowDefinition, input: Appr
   }
   const candidates = staticNext(def, node.id)
   if (candidates.length === 0) {
-    // end 节点之后的结束：此处 node 是 end 前最后一个审批节点
+    // 已是最后一个审批节点（其后无节点）：结束
     next = { ...next, status: '已完成', finishedAt: now }
   } else {
-    next = { ...next, currentNodeId: candidates[0], nodeEnteredAt: now }
-    // 若推进到分支节点，立即求值继续推进
-    next = advanceThroughBranch(next, def, new Date(now))
+    const targetId = candidates[0]
+    const targetNode = getNode(def, targetId)
+    if (targetNode?.type === 'end') {
+      // 推进目标为 end 节点：直接完成，不再停在 end 等待额外审批
+      next = { ...next, currentNodeId: targetId, status: '已完成', finishedAt: now }
+    } else {
+      next = { ...next, currentNodeId: targetId, nodeEnteredAt: now }
+      // 若推进到分支节点，立即求值继续推进
+      next = advanceThroughBranch(next, def, new Date(now))
+    }
   }
   return next
 }

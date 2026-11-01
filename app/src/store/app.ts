@@ -1858,6 +1858,33 @@ export const useAppStore = defineStore('app', () => {
     notify('success', next.status === '已完成' ? `${inst.title} 流程已走完` : `${inst.title} 已推进至下一节点`)
   }
 
+  /** 以指定角色会签（供多部门会签演示：引擎 signNode 支持 signRole 参数） */
+  function signAsFlow(id: string, role: string, name?: string) {
+    const inst = data.value.flowInstances.find((x) => x.id === id)
+    if (!inst) return
+    const def = flowDef(inst.defId)
+    if (!def) return
+    const node = getNode(def, inst.currentNodeId)
+    if (!node || node.type !== 'sign') {
+      notify('warning', '当前节点非会签节点')
+      return
+    }
+    const res = signNode(inst, def, { approverRole: role, approverName: name ?? role, signRole: role })
+    inst.history = res.inst.history
+    const sigs = res.inst.history.length ? res.inst.history[res.inst.history.length - 1].signatures : undefined
+    if (res.nodePassed) {
+      // 会签全通过：推进到下一节点
+      const next = approveNode(inst, def, { approverRole: role, approverName: name ?? role })
+      Object.assign(inst, next)
+      log('APPROVE', '流程', id, { nodeId: node.id, signRole: role, passed: true, to: next.currentNodeId })
+      notify('success', `${node.name} 已会签通过，推进至下一节点`)
+    } else {
+      log('APPROVE', '流程', id, { nodeId: node.id, signRole: role, partial: true })
+      notify('info', `${node.name} 会签进行中（${sigs?.length ?? 0}/${node.signRoles?.length ?? 0}）`)
+    }
+    persist()
+  }
+
   /** 审批驳回：退回发起人 */
   function rejectFlow(id: string, note = '') {
     const inst = data.value.flowInstances.find((x) => x.id === id)
@@ -2133,6 +2160,7 @@ export const useAppStore = defineStore('app', () => {
     flowInstances,
     launchFlow,
     approveFlow,
+    signAsFlow,
     rejectFlow,
     escalateFlow,
     addSignFlow,
