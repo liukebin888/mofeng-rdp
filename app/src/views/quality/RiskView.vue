@@ -47,11 +47,14 @@
 
       <div class="panel">
         <div class="panel-title">漏洞台账（高危 0 方可结项 C-33）</div>
-        <div v-for="v in vulns" :key="v.code" class="crow">
-          <span class="mono">{{ v.code }}</span>
-          <span>{{ v.name }}</span>
-          <span class="tag" :class="v.level === '高' ? 'fail' : v.level === '中' ? 'cond' : 'ok'">{{ te(v.level) }}</span>
+        <div v-for="v in vulns" :key="v.vulnId" class="crow">
+          <span class="mono">{{ v.vulnId }}</span>
+          <span>{{ v.remediation }}</span>
+          <span class="tag" :class="v.cvss >= 7 ? 'fail' : v.cvss >= 4 ? 'cond' : 'ok'">{{ 'CVSS ' + v.cvss }}</span>
           <span class="dim">{{ te(v.status) }}</span>
+        </div>
+        <div class="src-note" style="margin-top: 8px">
+          漏洞关闭须复测通过（QMS-004）；AI 调用关闭接口被拒，关闭留痕到人。
         </div>
       </div>
     </div>
@@ -127,12 +130,7 @@ const red = computed(() => store.projectRisks.filter((r) => rpn(r) >= 200))
 const noStrategy = computed(() => red.value.filter((r) => !r.strategy))
 const incomplete = computed(() => store.projectRisks.filter((r) => !completeness(r).ok))
 const closed = computed(() => store.projectRisks.filter((r) => r.status === '已关闭'))
-const vulns = [
-  { code: 'VUL-014', name: '诊断服务缺少会话超时', level: '中', status: '已评估接受' },
-  { code: 'VUL-018', name: '调试口未在量产件关闭', level: '中', status: '修复中' },
-  { code: 'VUL-021', name: '刷写包验签可绕过（低版本）', level: '中', status: '已修复待验证' },
-  { code: 'VUL-026', name: '日志含 VIN 明文', level: '低', status: '已修复' }
-]
+const vulns = computed(() => store.data.defects.vulns.map((v) => ({ ...v, level: v.cvss >= 7 ? '高' : v.cvss >= 4 ? '中' : '低' })))
 const zoneLabel = (v: number) => (zone(v) === 'red' ? '红区' : zone(v) === 'orange' ? '橙区' : zone(v) === 'yellow' ? '黄区' : '绿区')
 const zoneColor = (v: number) => (zone(v) === 'red' ? '#f87171' : zone(v) === 'orange' ? '#fbbf24' : zone(v) === 'yellow' ? '#93c5fd' : '#4ade80')
 

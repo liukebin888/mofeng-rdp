@@ -59,8 +59,10 @@ import { ROLES } from '@/domain/rbac'
 import type { FlowDefinition, FlowInstance } from '@/domain/flowEngine'
 import type { ComplianceItem } from '@/domain/compliance'
 import type { AiCorpusItem, AiSwitchConfig, AiCallLog } from '@/domain/aiAssist'
+import type { VulnerabilityItem, Issue8D } from '@/domain/defect'
+import type { Sci, CompatibilityRecord, ReleaseSignoff } from '@/domain/softwareVersion'
 
-export const SEED_VERSION = 'mofeng.rdp.v1.0.15'
+export const SEED_VERSION = 'mofeng.rdp.v1.0.16'
 const TENANT = 'T-1001'
 
 export interface SeedUser {
@@ -780,6 +782,34 @@ export function buildSeed() {
     { id: 'SM3', projectId: 'P-001', code: 'SMP-OTS-01', type: 'OTS', qty: 30, needDate: '2027-02-26', gate: 'G4', status: '计划中', ebomVersion: 'V1.3' }
   ]
 
+  // —— 漏洞台账 + 8D（QMS-003/004/005）——
+  const defects: { vulns: VulnerabilityItem[]; issues8D: Issue8D[] } = {
+    vulns: [
+      { id: 'VU1', vulnId: 'VUL-014', cvss: 5.3, affectedVersion: 'V2.3.0', remediation: '诊断服务增加会话超时与锁定', status: '已关闭', retestConclusion: '通过', retestedBy: '吴敏', retestedAt: '2026-10-20' },
+      { id: 'VU2', vulnId: 'VUL-018', cvss: 6.1, affectedVersion: 'V2.3.1', remediation: '量产件关闭调试口并熔断', status: '修复中' },
+      { id: 'VU3', vulnId: 'VUL-021', cvss: 7.5, affectedVersion: 'V2.3.0', remediation: '刷写包 SM2 验签强制校验', status: '已修复待验证', retestConclusion: '通过', retestedBy: '赵启明', retestedAt: '2026-10-28' },
+      { id: 'VU4', vulnId: 'VUL-026', cvss: 3.7, affectedVersion: 'V2.3.1', remediation: '日志脱敏 VIN', status: '已关闭', retestConclusion: '通过', retestedBy: '吴敏', retestedAt: '2026-10-25' }
+    ],
+    issues8D: [
+      { id: '8D1', projectId: 'P-001', tag: '不合格', stage: 'DV 试验', batch: 'B-2026-03', rootCause: 'MOSFET 驱动电阻取值偏大导致开关损耗过高', rootCauseVerified: true, completedSteps: ['D1 组建团队', 'D2 描述问题', 'D3 临时遏制措施', 'D4 根本原因分析', 'D5 选择与验证纠正措施', 'D6 实施纠正措施', 'D7 预防再发生', 'D8 祝贺与关闭'], status: '已关闭' },
+      { id: '8D2', projectId: 'P-001', tag: '客户投诉', stage: '装车', batch: 'B-2026-04', rootCause: '连接器端子压接高度超差', rootCauseVerified: false, completedSteps: ['D1 组建团队', 'D2 描述问题', 'D3 临时遏制措施', 'D4 根本原因分析'], status: '开放' }
+    ]
+  }
+
+  // —— 软件配置项 SCI + 兼容记录 + 发布双签（VER-001/008/009/015）——
+  const softwareVersions: { scis: Sci[]; compat: CompatibilityRecord[]; signoff: ReleaseSignoff } = {
+    scis: [
+      { id: 'SCI1', code: 'SCI-1000', name: '主控 MCU 固件', architectureIds: ['ARCH-001'], securityReqIds: ['R17'] },
+      { id: 'SCI2', code: 'SCI-1001', name: '刷写 Bootloader', architectureIds: ['ARCH-002'], securityReqIds: ['R18'] },
+      { id: 'SCI3', code: 'SCI-1002', name: '诊断数据库 ODX', architectureIds: ['ARCH-003'], securityReqIds: ['R17'] }
+    ],
+    compat: [
+      { versionId: 'V2.3.1', hardwareVersions: ['HW-REV-A', 'HW-REV-B'], busTypes: ['CAN', 'CAN-FD'], rollbackPlan: '双分区回滚脚本已验证，回滚时长 <10 分钟' },
+      { versionId: 'V2.3.0', hardwareVersions: ['HW-REV-A'], busTypes: ['CAN'] }
+    ],
+    signoff: { rndSignedBy: '郑昊', qualitySignedBy: '沈雅' }
+  }
+
   const hours: HourRecord[] = [
     { id: 'H1', projectId: 'P-001', userId: 'U003', userName: '周立群', week: '2026-W43', taskId: 'w09', hours: 38, status: '已审核' },
     { id: 'H2', projectId: 'P-001', userId: 'U003', userName: '周立群', week: '2026-W43', taskId: 'w10', hours: 12, status: '已提交' },
@@ -1180,6 +1210,8 @@ export function buildSeed() {
     deliverables,
     docs,
     samples,
+    defects,
+    softwareVersions,
     hours,
     baselines,
     retros,

@@ -9,8 +9,8 @@
     <div class="grid grid-4" style="margin-bottom: 12px">
       <KpiCard label="软件配置项" :value="sci.length" unit="项" />
       <KpiCard label="当前量产版本" :value="latestVersion" zone="brand" sub="SCI-1000 主控固件" />
-      <KpiCard label="签名校验" :value="'强制'" zone="ok" sub="SEC-002：未签名固件禁止启动" />
-      <KpiCard label="刷写记录" :value="flashRecords.length" unit="条" />
+      <KpiCard label="发布双签" :value="signoff.complete ? '已齐' : '缺签'" :zone="signoff.complete ? 'ok' : 'danger'" sub="VER-009：研发 + 质量" />
+      <KpiCard label="兼容与回滚" :value="compatCheck.allowed ? '可刷写' : '阻断'" :zone="compatCheck.allowed ? 'ok' : 'danger'" sub="VER-008：兼容记录 + 回滚方案" />
     </div>
 
     <div class="grid" style="grid-template-columns: 1.2fr 1fr; align-items: start">
@@ -22,10 +22,12 @@
           <el-table-column prop="version" label="版本" width="76" />
           <el-table-column prop="hash" label="哈希（前 8 位）" width="110"><template #default="{ row }"><span class="mono">{{ row.hash }}</span></template></el-table-column>
           <el-table-column label="签名" width="70"><template #default="{ row }"><span class="tag" :class="row.signed ? 'ok' : 'fail'">{{ row.signed ? '已签名' : '未签名' }}</span></template></el-table-column>
+          <el-table-column label="完整性" width="80"><template #default="{ row }"><span class="tag" :class="row.complete ? 'ok' : 'danger'">{{ row.complete ? '齐全' : '缺字段' }}</span></template></el-table-column>
           <el-table-column prop="baseline" label="基线" width="70" />
         </el-table>
         <div class="src-note" style="margin-top: 8px">
           软件版本须纳入受控基线（C-20）；刷写包签名校验用 SM2，哈希用 SM3（国密 TLS 迁移要求）。
+          SCI 完整性按 VER-001 校验（须关联架构与安全需求各 ≥1）；发布双签 VER-009、兼容回滚 VER-008 由领域引擎实时判据。
         </div>
       </div>
 
@@ -49,16 +51,32 @@ import KpiCard from '@/components/KpiCard.vue'
 import { useAppStore } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
 import { shortHash, hashOf } from '@/domain/hash'
+import { sciCompleteness, releaseSignoffComplete, flashingAllowed } from '@/domain/softwareVersion'
 
 const store = useAppStore()
 const { te } = useI18n()
 
-const sci = ref([
-  { code: 'SCI-1000', name: '主控 MCU 固件', version: 'V2.3.1', hash: shortHash(hashOf({ name: '主控固件', v: '2.3.1', nonce: 7 })), signed: true, baseline: 'BL-SW-03' },
-  { code: 'SCI-1001', name: '刷写 Bootloader', version: 'V1.0.4', hash: shortHash(hashOf({ name: 'Bootloader', v: '1.0.4', nonce: 3 })), signed: true, baseline: 'BL-SW-03' },
-  { code: 'SCI-1002', name: '诊断数据库 ODX', version: 'V3.0.0', hash: shortHash(hashOf({ name: 'ODX', v: '3.0.0', nonce: 11 })), signed: false, baseline: 'BL-SW-03' }
-])
+// SCI 台账从 seed 驱动，并叠加机制层判据（VER-001/008/009）
+const sci = computed(() =>
+  store.data.softwareVersions.scis.map((s) => {
+    const check = sciCompleteness(s)
+    return {
+      ...s,
+      version: s.code === 'SCI-1000' ? 'V2.3.1' : s.code === 'SCI-1001' ? 'V1.0.4' : 'V3.0.0',
+      hash: shortHash(hashOf({ name: s.name, v: s.code, nonce: s.id.length })),
+      signed: s.securityReqIds.length > 0,
+      baseline: 'BL-SW-03',
+      complete: check.complete,
+      missing: check.missing
+    }
+  })
+)
 const latestVersion = computed(() => sci.value.find((s) => s.code === 'SCI-1000')?.version || '—')
+
+// VER-009 发布双签（研发 + 质量）判据
+const signoff = computed(() => releaseSignoffComplete(store.data.softwareVersions.signoff))
+// VER-008 兼容与回滚：无兼容记录/缺回滚方案刷写被拒
+const compatCheck = computed(() => flashingAllowed(store.data.softwareVersions.compat[0]))
 
 const flashRecords = ref([
   { time: '2026-10-26 14:32', sn: 'VIN-08821', version: 'V2.3.1', ok: true },
