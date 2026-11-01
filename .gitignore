@@ -35,3 +35,7 @@ Thumbs.db
 
 # 测试覆盖率
 coverage/
+
+# 探针运行时产物（数据侧基准与巡检结果，可由 probe 脚本确定性重算）
+app/shots/probe-expected.json
+app/shots/probe-consistency-result.json

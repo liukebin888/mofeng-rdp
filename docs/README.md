@@ -48,6 +48,7 @@ npm run typecheck    # vue-tsc --noEmit，应为 0 error
 npm run test         # vitest，领域层 + 修复回归单测（542 例）
 npm run smoke        # 全路由冒烟（77/77），截图落 shots/
 npm run e2e          # 交互点击级回归（11 链路 31 断言），需先起 preview
+npm run probe        # 跨视图 UI-数据一致性探针（三维度 40/40），需先起 preview
 node server/test-isolation.cjs  # 隔离面验收脚本（对象存储 + 异步任务，12 断言）
 ```
 

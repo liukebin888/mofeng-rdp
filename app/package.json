@@ -11,7 +11,9 @@
     "typecheck": "vue-tsc --noEmit",
     "test": "vitest run --no-file-parallelism",
     "smoke": "node scripts/smoke.cjs",
-    "e2e": "node scripts/e2e-click.cjs"
+    "e2e": "node scripts/e2e-click.cjs",
+    "probe:compute": "vite-node scripts/probe-compute.mts",
+    "probe": "vite-node scripts/probe-compute.mts && node scripts/probe-consistency.cjs"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",

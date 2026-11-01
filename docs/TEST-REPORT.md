@@ -1616,3 +1616,50 @@ SRS 第 12 章的三个 P1/P2 项此前**完全落空**：
 - **命名规则无结构化约束不拦截**（向后兼容）；`resolveApprover` 未匹配返回 `matched=false` 不静默。
 - **新增用户必须写入 users**：否则 `orgMemberships` 的 `userName` 反查 `u(userId)!` 会 undefined 崩溃。
 - **主数据下拉与基础数据菜单同源**：`ApplyView` 用 `store.customers/productLines`，避免自由文本与主数据脱节。
+
+## 三十八、跨视图 UI-数据一致性探针巡检（实现方，2026-11-01）
+
+### 38.1 落空判定
+
+- 既有 smoke.cjs 仅检测 82 路由「渲染存在性」（有正文 + 无 console error），qa-ui-check.cjs 仅抽查 8 个核心页面 KPI，二者之间缺一层「同一数据在多视图呈现是否自洽」的系统性巡检——同一指标（加权完成率/SPI/安全覆盖率/控制点分布/审计条数等）分散在多个视图，存在「单页看着对、跨页口径漂移」的盲区。
+
+### 38.2 修复内容
+
+- 新增 `scripts/probe-compute.mts`：数据侧复算基准，用 buildSeed + 同源 domain 引擎算「跨视图同源实体」权威值（shared 24 项 + counts 33 项 + gates + portfolio），输出 `shots/probe-expected.json`。关键修正：EVM 的 PV 用 `plannedValue(wbs, bac, statusDayOf(wbs))`（CPM 早时间 + 统计日算 BCWS），与 store 同源，废弃 qa-compute 遗留的 `budget×0.66` 自造比例。
+- 新增 `scripts/probe-consistency.cjs`：UI 巡检探针，遍历 16 个代表性视图，用统一 KPI 卡结构（`.kpi > .label / .value .num`）抓取 label→num，做三维度比对。
+- `package.json` 加 `probe:compute` / `probe` 脚本（一键复跑）。
+
+### 38.3 三维度定义与覆盖
+
+| 维度 | 含义 | 覆盖 |
+|---|---|---|
+| ① 数据→UI 投影 | 权威值在视图 KPI 卡呈现正确 | 16 视图 32 个 total>0 断言 |
+| ② 跨视图一致 | 同一指标在多视图呈现相同 | 8 个同源组（加权完成率/SPI/CPI/安全覆盖率/L4阻断/断链/在册项目/审计条数） |
+| ③ 明细↔汇总 | 汇总数 vs 明细行数 | 组织节点 91 / 用户 54 / 客户 10 / 产品线 30 等与 seed counts 对账 |
+
+### 38.4 防「零缺陷假阳性」中间指标披露（铁律）
+
+- `requests`：实际打开的页面数（16）。
+- `totalsGt0`：期望值 >0 的断言数（32），排除「本应 0 却 0」的弱断言。
+- `contentChanged`：参与比对且值非空的字段去重数（37），排除恒空死锚点。
+- 三者任一为 0 即判探针失效 `probeValid:false`。
+
+### 38.5 回退验证（探针「有牙齿」自证）
+
+- 人为篡改数据侧基准 `weightedPercent` 68.96→99.99 后，探针立即捕获 3 处失败（台账/WBS/驾驶舱三处 KPI + 跨视图一致组），证明探针非「恒通过」假阳性；恢复基准后复跑 40/40 全绿。
+
+### 38.6 门禁复核（全部实跑）
+
+| 门禁 | 结果 |
+|---|---|
+| `npx vue-tsc --noEmit` | 0 error |
+| `npx vitest run --no-file-parallelism` | **542/542**（33 spec 文件） |
+| `npm run probe` | **40/40**（16 请求 / 32 total>0 / 37 内容变化 / 0 失败 / probeValid true） |
+| `npx vite build` | 零回退（探针脚本在 scripts/，不进 src、不参与打包） |
+
+### 38.7 铁律沉淀
+
+- **探针必须披露中间指标**：requests / totalsGt0 / contentChanged 三者，防止「全绿但什么都没测到」的假阳性——这是探针自身的「探针」。
+- **KPI 卡即权威展示**：统一 `.kpi` 结构是比 innerText 正则更稳的抓取锚点，天然对齐「数据只在一处定义、多处投影」的同源原则（C-47）。
+- **探针基准必须与 store 同源复算**：PV 用 plannedValue 而非自造比例，否则探针自身会制造「假不一致」（首轮 SPI 1.04 vs 0.86 即探针口径错误，非 UI bug）。
+- **探针须经篡改回退验证**：人工注入已知违规样本，探针必须能捕获，否则探针无牙齿、报告无意义。
