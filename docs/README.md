@@ -45,7 +45,7 @@ docker compose up -d --build
 ```bash
 cd app
 npm run typecheck    # vue-tsc --noEmit，应为 0 error
-npm run test         # vitest，领域层 + 修复回归单测（629 例）
+npm run test         # vitest，领域层 + 修复回归单测（640 例）
 npm run smoke        # 全路由冒烟（79/79），截图落 shots/
 npm run e2e          # 交互点击级回归（11 链路 31 断言），需先起 preview
 npm run probe        # 跨视图 UI-数据一致性探针（三维度 40/40），需先起 preview
@@ -99,7 +99,7 @@ node server/test-isolation.cjs  # 隔离面验收脚本（对象存储 + 异步�
 
 ### 3.3 架构约束落地
 
-- **ARC-001 四层**：`views → store(application) → domain ← infra`，依赖单向；`src/domain/` 内零框架 import、零 DOM 访问，可脱离 Vue 单测（629 例全部纯函数验证）。
+- **ARC-001 四层**：`views → store(application) → domain ← infra`，依赖单向；`src/domain/` 内零框架 import、零 DOM 访问，可脱离 Vue 单测（640 例全部纯函数验证）。
 - **ARC-016 图表**：甘特图、S 曲线、组合气泡图全部 `Svg*.vue` 手写 SVG，**无任何第三方图表库**。
 - **ARC-004 受控对象五要素**：状态机 + 版本 + 基线绑定 + 审计 + 权限范围，在基线页与审计页可见联动。
 - **ARC-001（R2 扩展）**：新增 `infra/repo.ts`（RestRepo），后端持久化以 `GET/PUT /api/state` + `version` 为稳定契约，前端只依赖契约不依赖实现，静默降级不白屏。
@@ -120,7 +120,7 @@ app/
 │   ├── router/         # 18 组菜单 + 83 条路由（hash 模式）
 │   ├── layouts/        # AppLayout：左侧菜单 + 语言切换 + 响应式 + 缓存标识
 │   └── styles/         # tokens.css 深色企业风 + element-overrides.css
-├── tests/*.spec.ts     # 39 个领域层单测文件（629 例）
+├── tests/*.spec.ts     # 40 个领域层单测文件（640 例）
 ├── scripts/smoke.cjs   # 浏览器冒烟（Playwright）
 ├── scripts/e2e-click.cjs # 交互点击级回归
 └── dist/               # 构建产物

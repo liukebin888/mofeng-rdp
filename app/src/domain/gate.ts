@@ -105,9 +105,52 @@ export interface GateSubmitInput {
   at?: string
 }
 
-/** Gate 准入校验：L4 阻断、L3 条件放行、安全项不可豁免 */
+/** 未知 gate code 的权威解析结果（供视图/调用方显式处理，不静默放行） */
+export interface GateRejection {
+  gate: string
+  projectId: string
+  passed: false
+  conditional: false
+  missing: string[]
+  safetyBlocked: false
+  results: { code: string; name: string; ok: false; note: string }[]
+  submittedBy?: string
+}
+
+/**
+ * GAT-001 / D-15 裁决：Gate 模板由 PMO 统一维护、唯一权威，项目不得自建判据。
+ * 权威模板解析：仅接受 GATE_TEMPLATES 内登记的 gate code；未知/自建 code 返回 null，
+ * 由调用方显式拒绝（而非以 `!` 非空断言静默崩溃）。
+ */
+export function resolveGateTemplate(gate: string): GateTemplate | null {
+  return GATE_TEMPLATES.find((g) => g.code === gate) ?? null
+}
+
+/** 构造「非权威 gate」拒绝结果（D-15：项目自建判据一律拒绝） */
+export function rejectUnknownGate(gate: string, projectId: string, submitter?: string): GateRejection {
+  return {
+    gate,
+    projectId,
+    passed: false,
+    conditional: false,
+    missing: [`${gate} 非权威闸门模板`],
+    safetyBlocked: false,
+    results: [
+      {
+        code: gate,
+        name: '非权威闸门模板',
+        ok: false,
+        note: '该闸门不在 PMO 统一维护的权威模板集内（GAT-001 / D-15），项目不得自建判据，拒绝执行'
+      }
+    ],
+    submittedBy: submitter
+  }
+}
+
+/** Gate 准入校验：L4 阻断、L3 条件放行、安全项不可豁免；非权威 gate 直接拒绝 */
 export function runGate(input: GateSubmitInput): GateRun {
-  const tpl = GATE_TEMPLATES.find((g) => g.code === input.gate)!
+  const tpl = resolveGateTemplate(input.gate)
+  if (!tpl) return rejectUnknownGate(input.gate, input.projectId, input.submitter)
   const cpMap = new Map(input.cpResults.map((r) => [r.code, r]))
   const results = tpl.items.map((it) => {
     if (input.gate !== 'G1' && it.cp === 'C-20' && !input.baselineFrozen) {
@@ -160,9 +203,10 @@ export function sodRelease(submitter: string, releaser: string): { ok: boolean; 
     : { ok: false, message: `提交人与放行人为同一人（${submitter}），违反 SOD-01，放行被拒` }
 }
 
-/** GAT-008 超时升级 */
-export function slaState(gate: string, submittedAt: string, now = new Date()) {
-  const tpl = GATE_TEMPLATES.find((g) => g.code === gate)!
+/** GAT-008 超时升级；非权威 gate 返回 null（不崩溃） */
+export function slaState(gate: string, submittedAt: string, now = new Date()): { hours: number; overdue: boolean; limit: number } | null {
+  const tpl = resolveGateTemplate(gate)
+  if (!tpl) return null
   const hours = (now.getTime() - new Date(submittedAt).getTime()) / 36e5
   return { hours: Math.round(hours * 10) / 10, overdue: hours > tpl.slaHours, limit: tpl.slaHours }
 }
