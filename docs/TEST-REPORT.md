@@ -1418,3 +1418,201 @@ SRS 第 12 章的三个 P1/P2 项此前**完全落空**：
 - **未定义口径不得上线**：EXA-001 报表口径必须绑定字典条目（RPT-007），指标三处同值（EXA-010）。
 - **钩子失败不影响主流程**：ARC-020 事件钩子隔离执行，异常吞掉记录但不阻断业务，客户化永不拖垮主干。
 - **写接口须幂等**：INT-006 写接口幂等键 + EXA-007 事件幂等去重，杜绝重复投递重复处理。
+
+## 三十二、前期三大审批流程（前期交申请 → 报价 → 立项申请，实现方，2026-11-01）
+
+### 32.1 范围
+
+- 三条固定次序的审批主线，每条独立审批流：
+  1. **前期交申请**：市场客户经理发起 → 市场总监审核 → 电子/结构/工艺三中心总监会签 → 总经理批准。
+  2. **项目报价**：市场发起 → 电子 BOM/结构 BOM/工艺报价/采购价格四角色并行填报 → 财务汇总 → 总经理批准。
+  3. **立项申请**：市场客户经理 → 市场总监审核 → 电子/结构/工艺/模具/项目/制造/计划物流/质量八部门会签 → 总经理批准。
+
+### 32.2 修复内容
+
+- `seed.ts` 新增 `DEF-PRE-1/2/3` 三个 `FlowDefinition` + `PRE-1-001/PRE-2-001` 实例；store 新增 `signAsFlow(id, role)`（按角色会签）；新建 `presale/PreSaleFlowView.vue`（三流程卡片 + 实例表格 + 会签进度 + 次序说明）；router 加 `/presale/flow`；locale 加对应中英文词条。
+- 引擎修复：`approveNode` 推进目标是 `end` 节点时直接标记「已完成」，不再停在 `end` 等待额外审批（原语义需对 `end` 再 approve 一次，属缺陷）。
+
+### 32.3 引擎验收（vitest 8 条全通过）
+
+- 三条审批主线定义可配置、实例可流转、按角色会签推进正确。
+
+### 32.4 门禁复核（全部实跑）
+
+| 门禁 | 结果 |
+|---|---|
+| `npx vue-tsc --noEmit` | 0 error |
+| `npx vitest run --no-file-parallelism` | **480/480**（472 → 480，+8 presaleFlow） |
+| `npx vite build` | ✓ built in 5.71s |
+| `npm run smoke` | 73/73 |
+| `npm run e2e` | 31 PASS / 0 FAIL |
+
+### 32.5 铁律沉淀
+
+- **seed 新增数据必须同步 bump SEED_VERSION**：后端旧数据（同版本号）会覆盖新种子，导致新功能不显示（v1.0.5 → v1.0.6）。
+- **视图引用 FlowDefinition 需区分「定义容器 vs 定义本体」**：避免 `row.def` 嵌套错位。
+- **end 节点即终点**：审批推进到 `end` 直接闭环，不额外等待一次 approve。
+
+## 三十三、组织架构与岗位序列（TEN-009 / SEC-006，实现方，2026-11-01）
+
+### 33.1 落空判定
+
+- 六级组织模型缺失；组织与 RBAC 角色职责混淆；岗位序列无定义；跨组织兼职/离职失效无引擎支撑。
+
+### 33.2 修复内容
+
+- 新建 `domain/org.ts`：六级层级引擎（集团(总裁)→公司(总经理)→中心(执行总监)→部门(总监)→科室(高级经理)→小组(经理)）+ 负责人岗位映射 + 岗位序列 + 跨组织兼职权限取并集 + 离职失效 + 层级相邻校验 + 系统归类（研发系统/制造系统/职能系统）。
+- `types.ts` 加 `OrgNode/OrgLevel/OrgMembership/PostTrack/PostTrackDef`；`seed.ts` 加 `orgNodes`（27 节点六级树）+ `orgMemberships`（18 人挂靠，U004 跨组织兼职）；store 加 `orgNodes/orgMemberships` computed；`OrgView` 加「组织架构」标签页。
+- SEED_VERSION v1.0.6 → v1.0.7。
+
+### 33.3 引擎验收（vitest 13 条全通过）
+
+- 层级相邻校验（跳级/孤儿报错）、跨组织兼职权限取并集、离职 active=false 历史保留、岗位序列定义。
+
+### 33.4 门禁复核（全部实跑）
+
+| 门禁 | 结果 |
+|---|---|
+| `npx vue-tsc --noEmit` | 0 error |
+| `npx vitest run --no-file-parallelism` | **493/493**（480 → 493，+13 org） |
+| `npx vite build` | ✓ built in 5.67s |
+| `npm run smoke` | 73/73 |
+| `npm run e2e` | 31 PASS / 0 FAIL |
+
+### 33.5 铁律沉淀
+
+- **组织与角色分离**：组织决定「能看到哪些数据」（SEC-002 数据作用域），RBAC 角色决定「能做什么动作」（SEC-006）；父子层级须逐级相邻；跨组织兼职权限取并集；离职 active=false 历史保留。
+
+## 三十四、基础数据菜单（客户管理 + 产品管理，实现方，2026-11-01）
+
+### 34.1 落空判定
+
+- 客户、产品三级分类（产品类别→产品线→产品）无主数据实体，无 CRUD/导入导出。
+
+### 34.2 修复内容
+
+- 新建 `domain/basicData.ts`（客户 CRUD 唯一性校验 + 产品三级层级校验 + CSV 导入导出逐行定位错误）；`types.ts` 加 `Customer/ProductCategory/ProductLine/Product`；`seed.ts` 加 customers（5 车厂）+ productCategories（7 类）+ productLines（24 线）+ products（8 个）；store 加全套 CRUD/导入导出 action；router 加 basic 菜单组；新建 `basic/CustomerView.vue` + `basic/ProductView.vue`（三级联动三列布局）。
+- `org.ts` 扩展 `addOrgNode/updateOrgNode/removeOrgNode/exportOrgNodes/parseOrgNodes`（层级相邻校验、集团唯一、有子节点拒删）。
+- SEED_VERSION v1.0.7 → v1.0.8。
+
+### 34.3 引擎验收（vitest 32 条全通过）
+
+- 客户名称/编号唯一、产品三级层级逐级合法、删除有子级/关联先删下级、导入逐行校验定位行号（+19 org CRUD + 13 basicData）。
+
+### 34.4 门禁复核（全部实跑）
+
+| 门禁 | 结果 |
+|---|---|
+| `npx vue-tsc --noEmit` | 0 error |
+| `npx vitest run --no-file-parallelism` | **512/512**（493 → 512，+19 org CRUD + 13 basicData） |
+| `npx vite build` | ✓ built in 5.93s |
+| `npm run smoke` | 73/73 |
+| `npm run e2e` | 31 PASS / 0 FAIL |
+
+### 34.5 铁律沉淀
+
+- **客户名称/编号唯一**；产品三级层级须逐级合法（产品线挂类别、产品挂产品线）；删除有子级/有关联须先删下级；导入逐行校验并定位行号，不整批回滚。
+
+## 三十五、命名与编码规则菜单（基础数据第三项，实现方，2026-11-01）
+
+### 35.1 落空判定
+
+- 客户/产品/文档/部门/人员五类对象的命名规范与编码规范无主数据字典。
+
+### 35.2 修复内容
+
+- 新建 `domain/naming.ts`（NamingRule 领域引擎：对象类型 customer/product/document/department/person + 规则类别 naming/coding 双维度，同对象同类别下规则名称唯一校验，CRUD + 启用切换 + CSV 导入导出逐行定位错误）；`types.ts` 加 `NamingObject/NamingRuleKind/NamingRule`；`seed.ts` 加 `buildNamingRules`（15 条样例）；store 加 6 action；新建 `basic/NamingView.vue`；router 加 `/basic/naming`。
+- SEED_VERSION v1.0.8 → v1.0.9。
+
+### 35.3 引擎验收（vitest 9 条全通过）
+
+- 同对象同类别规则名唯一、CRUD、启用切换、CSV 导入逐行定位。
+
+### 35.4 门禁复核（全部实跑）
+
+| 门禁 | 结果 |
+|---|---|
+| `npx vue-tsc --noEmit` | 0 error |
+| `npx vitest run --no-file-parallelism` | **521/521**（512 → 521，+9 naming） |
+| `npx vite build` | ✓ built in 5.68s |
+| `npm run smoke` | 73/73 |
+| `npm run e2e` | 31 PASS / 0 FAIL |
+
+### 35.5 铁律沉淀
+
+- **命名与编码规则是「主数据字典」性质**：同对象同类别下规则名唯一；导入 CSV 逐行校验并定位行号，不整批回滚；对象类型/规则类别用中文标签映射。
+
+## 三十六、命名编码引擎化 + 主数据打通 + 版本化审计（实现方，2026-11-01）
+
+### 36.1 范围
+
+1. **编码规则引擎化**：前缀 + 分段 + 流水号 + 分隔符做成可执行生成器（非纯文本）。
+2. **主数据打通**：新建对象按规则自动生成编号、非法编号拦截。
+3. **规则版本化/生效审计**：变更留痕、历史版本追溯。
+
+### 36.2 修复内容
+
+- 新建 `domain/codingEngine.ts`：`CodePattern`（segments 分段数组 + separator）+ `generateCode`（常量/变量/流水号三段，流水号按已用编号递增补零、须在末尾、唯一）+ `validateCode`（正则校验前缀/宽度）+ `describePattern` + `simplePattern` 工厂 + `activeCodingRuleOf`。
+- `types.ts` 扩 `CodeSegment/CodePattern` + `NamingRule`（version/updatedAt/updatedBy/pattern）+ `NamingRuleHistory`（append-only before/after）；`naming.ts` 扩 `addNamingRule/updateNamingRule/toggleNamingRule`（版本递增）+ `appendHistory/historyOf`。
+- `seed.ts`：给 7 条编码规则加结构化 pattern，SEED_VERSION v1.0.9 → v1.0.10。
+- store：`createCustomer/createProductLine/createProduct` 接 `autoGenerateCode`（编号留空自动生成、填了则 `checkCodeValid` 校验拦截）+ `createOrgNode` 自动生成部门编号；命名规则 action 全部接版本 + appendHistory。
+
+### 36.3 引擎验收（vitest 8 条全通过）
+
+- 流水号段必须末尾且唯一、变量段上下文注入缺失报错、编号双轨（留空生成/填了校验）、规则变更 append-only 审计链可回溯任一历史版本。
+
+### 36.4 门禁复核（全部实跑）
+
+| 门禁 | 结果 |
+|---|---|
+| `npx vue-tsc --noEmit` | 0 error |
+| `npx vitest run --no-file-parallelism` | **529/529**（521 → 529，+8 naming 引擎/历史） |
+| `npx vite build` | ✓ built in 6.07s |
+| `npm run smoke` | 73/73 |
+| `npm run e2e` | 31 PASS / 0 FAIL |
+
+### 36.5 铁律沉淀
+
+- **流水号段必须是最后一段且唯一**（否则无法定位递增）；变量段从上下文注入（客户缩写/产品线代码/专业代码），缺失即报错不静默。
+- **编号留空自动生成、填了则校验拦截（双轨）**；规则变更是 append-only 审计链，before/after 快照可回溯任一历史版本。
+
+## 三十七、电子研发中心重构 + 科室小组人员 + 功能完善四连（实现方，2026-11-01）
+
+### 37.1 范围
+
+1. **电子研发中心下辖重构**：智能交互一~三部、智能控制一~二部、智能座舱一~二部、智能驾驶一~二部、验证中心、技术中心（标准化科/体系科/原器件科）、综合管理部（项目管理科/行政管理科）、AI 实验室。
+2. **事业部补科室/小组/人员**：9 事业部各加硬件科/软件科，每科室 2 小组 1 人（36 工程师）。
+3. **客户产品扩充**：客户 5→10、产品线 24→30、产品 8→12。
+4. **功能完善四连**：编号实例审计 + 命名结构化校验 + 主数据打通 + 组织负责人映射。
+
+### 37.2 修复内容
+
+- **研发中心重构**：`buildOrgNodes` 重写 ELEC 下属 13 部门；技术中心挂 3 科室、综合管理部挂 2 科室；删除原 ELEC-D1/D2；`orgMemberships` 重挂 U004/U018。SEED_VERSION v1.0.10 → v1.0.11。
+- **科室小组人员**：`buildUsers` 扩 18 角色 + 36 工程师（U019~U054，roleCode=SE）；`buildOrgNodes` 循环生成 ELEC-D1~D9 硬件科/软件科 + 四组；`buildOrgMemberships` 36 条挂靠；客户/产品线/产品扩充。SEED_VERSION v1.0.11 → v1.0.12。
+- **编号实例审计**：`types.ts` 加 `CodeIssue`；`naming.ts` 加 `appendCodeIssue/codeIssuesOf/codeIssueOfCode`；`autoGenerateCode` 返回 ruleId/ruleVersion，create 成功时 `recordCodeIssue`。
+- **命名结构化校验**：`types.ts` 加 `NamingPattern`（prefix/minLength/maxLength/forbidden/case）+ `NamingRule.namePattern`；`naming.ts` 加 `validateName/describeNamePattern`；create 四函数接入名称校验。
+- **主数据打通**：`ApplyView` 客户/产品线改 el-select（store.customers/productLines）。
+- **组织负责人映射**：`org.ts` 加 `resolveApprover`（组织名精确/前缀匹配 + 岗位名精确 + 「X总监」去后缀匹配）；store 加 `resolveApproverOf/resolveSignersOf`。
+- SEED_VERSION v1.0.12 → v1.0.13。
+
+### 37.3 引擎验收（vitest 13 条全通过）
+
+- 编号实例 append-only 记录生成时规则版本（+3）、命名约束结构化校验（+5）、组织负责人审批流映射（+5）。
+
+### 37.4 门禁复核（全部实跑）
+
+| 门禁 | 结果 |
+|---|---|
+| `npx vue-tsc --noEmit` | 0 error |
+| `npx vitest run --no-file-parallelism` | **542/542**（529 → 542，+3 编号实例 +5 命名校验 +5 组织映射） |
+| `npx vite build` | ✓ built in 6.22s（主包 1,329.62 kB） |
+| `npm run smoke` | **77/77**（placeholder 0，bad 0；新增命名/编码/组织/前期流程等路由） |
+| `npm run e2e` | 31 PASS / 0 FAIL |
+| 隔离面脚本 | 12/12 |
+
+### 37.5 铁律沉淀
+
+- **编号实例 append-only**：记录生成时的规则版本，规则后续升版可追溯生成时点。
+- **命名规则无结构化约束不拦截**（向后兼容）；`resolveApprover` 未匹配返回 `matched=false` 不静默。
+- **新增用户必须写入 users**：否则 `orgMemberships` 的 `userName` 反查 `u(userId)!` 会 undefined 崩溃。
+- **主数据下拉与基础数据菜单同源**：`ApplyView` 用 `store.customers/productLines`，避免自由文本与主数据脱节。
