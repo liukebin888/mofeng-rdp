@@ -184,6 +184,50 @@ export function leaderOf(nodes: OrgNode[], id: string): { title: string; name?: 
   return { title, name: n.leaderName }
 }
 
+/**
+ * 审批角色 → 组织负责人解析（组织负责人与审批流自动映射）
+ *
+ * 审批流里的会签角色名与组织负责人建立映射，组织负责人变更后审批人自动同步：
+ * 1. 「组织名」直接匹配（如「电子研发中心」「质量中心」→ 该节点 leaderName）
+ * 2. 「组织名 + 岗位」前缀匹配（如「电子研发中心总监」→ 电子研发中心 leaderName）
+ * 3. 「岗位名」精确匹配（如「总经理」→ company 层总经理 leaderName）
+ * 4. 「X总监 / X总工 / X经理」去岗位后缀后匹配组织名（如「市场总监」→ 市场中心负责人）
+ */
+export function resolveApprover(
+  signRole: string,
+  nodes: OrgNode[]
+): { name?: string; orgName?: string; matched: boolean } {
+  if (!signRole?.trim()) return { matched: false }
+  const role = signRole.trim()
+  const withLeader = nodes.filter((n) => n.leaderName)
+
+  // 1. 组织名直接 / 前缀匹配（取最长名称，更精确）
+  const byName = withLeader.filter((n) => role === n.name || role.startsWith(n.name))
+  if (byName.length) {
+    const best = [...byName].sort((a, b) => b.name.length - a.name.length)[0]
+    return { name: best.leaderName, orgName: best.name, matched: true }
+  }
+
+  // 2. 岗位名精确匹配（总经理 / 执行总监 等）
+  const byTitle = withLeader.filter((n) => n.leaderTitle === role)
+  if (byTitle.length) {
+    const ordered = [...byTitle].sort((a, b) => LEVEL_ORDER.indexOf(a.level) - LEVEL_ORDER.indexOf(b.level))
+    return { name: ordered[0].leaderName, orgName: ordered[0].name, matched: true }
+  }
+
+  // 3. 「X总监 / X总工 / X经理」去岗位后缀 → 匹配组织名
+  const stem = role.replace(/(总监|总工|经理)$/, '')
+  if (stem && stem !== role) {
+    const byStem = withLeader.filter((n) => n.name.startsWith(stem) || stem.startsWith(n.name))
+    if (byStem.length) {
+      const best = [...byStem].sort((a, b) => b.name.length - a.name.length)[0]
+      return { name: best.leaderName, orgName: best.name, matched: true }
+    }
+  }
+
+  return { matched: false }
+}
+
 /** 按系统统计节点数（用于视图 KPI） */
 export function countBySystem(nodes: OrgNode[]): Record<string, number> {
   const out: Record<string, number> = {}

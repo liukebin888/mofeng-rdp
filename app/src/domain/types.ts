@@ -1080,6 +1080,20 @@ export interface CodePattern {
   separator: string
 }
 
+/** 命名规则结构化模板（命名规则结构化校验：前缀/长度/禁用字符/大小写） */
+export interface NamingPattern {
+  /** 名称须以此前缀开头（可选，如「智能」「电子」） */
+  prefix?: string
+  /** 最小长度（字符数，可选） */
+  minLength?: number
+  /** 最大长度（字符数，可选） */
+  maxLength?: number
+  /** 禁用字符（正则字符类，如 /\\d 表示禁用数字） */
+  forbidden?: string
+  /** 大小写要求（upper 全大写 / lower 全小写 / any 不限制） */
+  case?: 'upper' | 'lower' | 'any'
+}
+
 /** 命名与编码规则（TEN-017：各对象的命名规范与编码规范，可增删改 + 导入导出 + 版本化审计） */
 export interface NamingRule {
   id: string
@@ -1097,6 +1111,8 @@ export interface NamingRule {
   enabled: boolean
   /** 结构化编码模板（kind=coding 时生效，引擎据此生成/校验编号） */
   pattern?: CodePattern
+  /** 结构化命名模板（kind=naming 时生效，引擎据此校验名称合规） */
+  namePattern?: NamingPattern
   /** 规则版本号（每次变更递增，历史追溯） */
   version: number
   /** 最近更新时间（ISO） */
@@ -1122,6 +1138,25 @@ export interface NamingRuleHistory {
   at: string
   /** 变更说明 */
   note?: string
+}
+
+/** 编号生成实例（编号实例审计闭环：记录「某个编号由哪版规则生成」，与规则审计链双向追溯） */
+export interface CodeIssue {
+  id: string
+  /** 生成该编号所用的编码规则 id */
+  ruleId: string
+  /** 生成时的规则版本号（规则后续升版可追溯生成时点） */
+  ruleVersion: number
+  /** 对象类型 */
+  object: NamingObject
+  /** 生成的编号 */
+  code: string
+  /** 挂接的业务对象 id（如客户 CUST-1、产品 PRD-3） */
+  objectId?: string
+  /** 生成人 */
+  by: string
+  /** 生成时间（ISO） */
+  at: string
 }
 
 

@@ -9,6 +9,11 @@ import {
   parseNamingRules,
   appendHistory,
   historyOf,
+  appendCodeIssue,
+  codeIssuesOf,
+  codeIssueOfCode,
+  validateName,
+  describeNamePattern,
   NAMING_OBJECT_LABEL,
   RULE_KIND_LABEL
 } from '@/domain/naming'
@@ -78,6 +83,37 @@ describe('变更历史（append-only 审计链）', () => {
   })
 })
 
+describe('编号生成实例（审计闭环）', () => {
+  it('追加实例：记录规则 id + 版本 + 生成值 + 对象', () => {
+    let list: any[] = []
+    list = appendCodeIssue(list, { ruleId: 'NM-1', ruleVersion: 1, object: 'customer', code: 'CUST-SGMW', objectId: 'CUST-6', by: '留总' })
+    list = appendCodeIssue(list, { ruleId: 'NM-1', ruleVersion: 2, object: 'customer', code: 'CUST-GWM', objectId: 'CUST-7', by: '留总' })
+    expect(list).toHaveLength(2)
+    expect(list[0].id).toMatch(/^CI-/)
+    expect(list[0].at).toBeTruthy()
+    expect(list[1].ruleVersion).toBe(2)
+  })
+
+  it('按规则追溯编号实例（倒序）', () => {
+    let list: any[] = []
+    list = appendCodeIssue(list, { ruleId: 'NM-1', ruleVersion: 1, object: 'customer', code: 'CUST-A', by: '留总' })
+    list = appendCodeIssue(list, { ruleId: 'NM-1', ruleVersion: 2, object: 'customer', code: 'CUST-B', by: '留总' })
+    list = appendCodeIssue(list, { ruleId: 'NM-9', ruleVersion: 1, object: 'document', code: 'DOC-SYS-001', by: '留总' })
+    const ofRule1 = codeIssuesOf(list, 'NM-1')
+    expect(ofRule1).toHaveLength(2)
+    expect(ofRule1[0].code).toBe('CUST-B') // 倒序
+  })
+
+  it('按编号反查生成它的实例（双向追溯）', () => {
+    let list: any[] = []
+    list = appendCodeIssue(list, { ruleId: 'NM-1', ruleVersion: 3, object: 'customer', code: 'CUST-X', by: '留总' })
+    const hit = codeIssueOfCode(list, 'CUST-X')
+    expect(hit?.ruleId).toBe('NM-1')
+    expect(hit?.ruleVersion).toBe(3)
+    expect(codeIssueOfCode(list, 'NOT-EXIST')).toBeUndefined()
+  })
+})
+
 describe('标签映射', () => {
   it('对象类型与规则类别标签', () => {
     expect(NAMING_OBJECT_LABEL.customer).toBe('客户')
@@ -87,6 +123,39 @@ describe('标签映射', () => {
     expect(NAMING_OBJECT_LABEL.person).toBe('人员')
     expect(RULE_KIND_LABEL.naming).toBe('命名规则')
     expect(RULE_KIND_LABEL.coding).toBe('编码规则')
+  })
+})
+
+describe('命名规则结构化校验（前缀/长度/禁用字符/大小写）', () => {
+  it('validateName：前缀匹配', () => {
+    const p = { prefix: 'DOC-' }
+    expect(validateName(p, 'DOC-SYS-001').ok).toBe(true)
+    expect(validateName(p, 'HW-001').ok).toBe(false)
+    expect(validateName(p, 'HW-001').error).toContain('DOC-')
+  })
+
+  it('validateName：长度范围', () => {
+    const p = { minLength: 2, maxLength: 4 }
+    expect(validateName(p, '五菱').ok).toBe(true)
+    expect(validateName(p, '上汽通用五菱汽车').ok).toBe(false) // 超长
+    expect(validateName(p, 'A').ok).toBe(false) // 过短
+  })
+
+  it('validateName：禁用字符', () => {
+    const p = { forbidden: '\\d' }
+    expect(validateName(p, '陈志远').ok).toBe(true)
+    expect(validateName(p, '陈志远2').ok).toBe(false)
+  })
+
+  it('validateName：大小写要求', () => {
+    expect(validateName({ case: 'upper' }, 'ECC').ok).toBe(true)
+    expect(validateName({ case: 'upper' }, 'Ecc').ok).toBe(false)
+    expect(validateName({ case: 'lower' }, 'ecc').ok).toBe(true)
+  })
+
+  it('describeNamePattern：反解为可读约束', () => {
+    expect(describeNamePattern({ prefix: 'DOC-', minLength: 2, maxLength: 8 })).toContain('DOC-')
+    expect(describeNamePattern({})).toBe('（无结构化约束）')
   })
 })
 

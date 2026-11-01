@@ -94,6 +94,16 @@
         <div class="kv"><span>会签规则</span><em>部门会签全通过方推进（signMode: all）</em></div>
         <div class="kv"><span>并行填报</span><em>报价四角色（电子/结构/工艺/采购）并行，全部完成后财务汇总</em></div>
       </div>
+      <div class="panel">
+        <div class="panel-title">会签人映射（组织负责人 → 审批流）</div>
+        <div v-for="s in signerMapping" :key="s.role" class="mrow">
+          <span class="mono">{{ s.role }}</span>
+          <span class="arr">→</span>
+          <span class="nm" :class="{ dim: !s.matched }">{{ s.name }}</span>
+          <span v-if="!s.matched" class="dim">（未匹配到组织负责人）</span>
+        </div>
+        <div class="dim" style="margin-top: 6px">会签角色按组织架构自动解析到负责人，组织负责人变更后审批人同步更新。</div>
+      </div>
     </div>
   </div>
 </template>
@@ -140,6 +150,14 @@ const running = computed(() => rows.value.filter((r) => r.status === '运行中'
 const finished = computed(() => rows.value.filter((r) => r.status === '已完成'))
 const signNodes = computed(() => running.value.filter((r) => r.view.node?.type === 'sign').length)
 const signInstances = computed(() => running.value.filter((r) => r.view.node?.type === 'sign'))
+
+// 会签人映射：三中心总监会签（DEF-PRE-1）的角色 → 组织负责人
+const signerMapping = computed(() => {
+  const def = presaleDefs.value.find((d) => d.id === 'DEF-PRE-1')?.def
+  const signNode = def?.nodes.find((n) => n.type === 'sign')
+  const roles = signNode?.signRoles ?? []
+  return store.resolveSignersOf(roles)
+})
 
 function passedCount(row: (typeof rows.value)[number]) {
   return row.passedNodeIds.length

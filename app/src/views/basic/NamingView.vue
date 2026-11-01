@@ -7,11 +7,12 @@
       </template>
     </PageHeader>
 
-    <div class="grid grid-4" style="margin-bottom: 12px">
+    <div class="grid grid-5" style="margin-bottom: 12px">
       <KpiCard label="规则总数" :value="store.namingRules.length" unit="条" sub="命名 + 编码规则" />
       <KpiCard label="命名规则" :value="namingCount" unit="条" sub="名称命名规范" />
       <KpiCard label="编码规则" :value="codingCount" unit="条" sub="编号编码规范（可结构化）" />
       <KpiCard label="变更记录" :value="store.namingRuleHistory.length" unit="条" sub="append-only 审计链" />
+      <KpiCard label="编号实例" :value="store.codeIssues.length" unit="条" sub="编号生成审计闭环" />
     </div>
 
     <div class="panel">
@@ -77,6 +78,39 @@
       </div>
     </div>
 
+    <!-- 编号生成实例（审计闭环） -->
+    <div class="panel" style="margin-top: 12px">
+      <div class="panel-title">编号生成实例（审计闭环）</div>
+      <div class="dim" style="margin-bottom: 8px">每次按编码规则自动生成编号时留痕「规则 + 版本 + 生成值 + 对象」，与规则审计链双向追溯：既可查某条规则生成了哪些编号，也可反查某编号由哪版规则生成。</div>
+      <el-table :data="store.codeIssues" size="small" height="260">
+        <el-table-column label="对象" width="90">
+          <template #default="{ row }">
+            <span class="tag">{{ OBJECT_LABEL[row.object as keyof typeof OBJECT_LABEL] }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="编号" width="150">
+          <template #default="{ row }">
+            <code class="example">{{ row.code }}</code>
+          </template>
+        </el-table-column>
+        <el-table-column label="规则" min-width="170">
+          <template #default="{ row }">
+            <el-button link type="primary" size="small" @click="openHistoryById(row.ruleId)">{{ ruleNameOf(row.ruleId) }}</el-button>
+          </template>
+        </el-table-column>
+        <el-table-column label="规则版本" width="90" align="center">
+          <template #default="{ row }">
+            <span class="ver">v{{ row.ruleVersion }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="业务对象" width="100" prop="objectId" />
+        <el-table-column label="生成人" width="90" prop="by" />
+        <el-table-column label="时间" width="170">
+          <template #default="{ row }">{{ fmtTime(row.at) }}</template>
+        </el-table-column>
+      </el-table>
+    </div>
+
     <!-- 新增/编辑规则 -->
     <el-dialog v-model="dlgVisible" :title="editing ? '编辑规则' : '新增规则'" width="560px">
       <el-form label-width="90px" size="small">
@@ -115,6 +149,37 @@
           </el-form-item>
           <el-form-item label="分隔符">
             <el-input v-model="form.separator" size="small" style="width: 80px" placeholder="-" />
+          </el-form-item>
+        </template>
+
+        <!-- 命名规则：结构化校验模板编辑 -->
+        <template v-if="form.kind === 'naming'">
+          <el-form-item label="命名约束">
+            <div class="seg-box">
+              <div class="seg-row">
+                <span class="dim" style="width: 60px">前缀</span>
+                <el-input v-model="form.namePattern.prefix" size="small" placeholder="如 DOC-（可空）" style="width: 180px" />
+              </div>
+              <div class="seg-row">
+                <span class="dim" style="width: 60px">长度</span>
+                <el-input v-model.number="form.namePattern.minLength" size="small" type="number" placeholder="最小" style="width: 80px" />
+                <span class="dim">~</span>
+                <el-input v-model.number="form.namePattern.maxLength" size="small" type="number" placeholder="最大" style="width: 80px" />
+              </div>
+              <div class="seg-row">
+                <span class="dim" style="width: 60px">禁用字符</span>
+                <el-input v-model="form.namePattern.forbidden" size="small" placeholder="正则，如 \d 禁用数字" style="width: 180px" />
+              </div>
+              <div class="seg-row">
+                <span class="dim" style="width: 60px">大小写</span>
+                <el-radio-group v-model="form.namePattern.case" size="small">
+                  <el-radio-button label="any">不限</el-radio-button>
+                  <el-radio-button label="upper">全大写</el-radio-button>
+                  <el-radio-button label="lower">全小写</el-radio-button>
+                </el-radio-group>
+              </div>
+              <div class="dim" style="margin-top: 4px">当前约束：<code class="example">{{ namePreview }}</code></div>
+            </div>
           </el-form-item>
         </template>
 
@@ -193,13 +258,17 @@ const form = reactive({
   example: '',
   enabled: true,
   segments: [] as CodeSegment[],
-  separator: '-'
+  separator: '-',
+  namePattern: { prefix: '', minLength: undefined, maxLength: undefined, forbidden: '', case: 'any' } as {
+    prefix: string; minLength?: number; maxLength?: number; forbidden: string; case: 'upper' | 'lower' | 'any'
+  }
 })
 
 function openAdd() {
   editing.value = null
   form.object = 'customer'; form.kind = 'naming'; form.name = ''; form.description = ''; form.example = ''; form.enabled = true
   form.segments = []; form.separator = '-'
+  form.namePattern = { prefix: '', minLength: undefined, maxLength: undefined, forbidden: '', case: 'any' }
   dlgVisible.value = true
 }
 function openEdit(row: any) {
@@ -208,6 +277,7 @@ function openEdit(row: any) {
   form.description = row.description ?? ''; form.example = row.example ?? ''; form.enabled = row.enabled
   form.segments = row.pattern ? row.pattern.segments.map((s: any) => ({ ...s })) : []
   form.separator = row.pattern?.separator ?? '-'
+  form.namePattern = row.namePattern ? { ...row.namePattern } : { prefix: '', minLength: undefined, maxLength: undefined, forbidden: '', case: 'any' }
   dlgVisible.value = true
 }
 
@@ -230,14 +300,33 @@ const segPreview = computed(() => {
     .join(form.separator)
 })
 
+const namePreview = computed(() => {
+  const p = form.namePattern
+  const parts: string[] = []
+  if (p.prefix) parts.push(`前缀「${p.prefix}」`)
+  if (p.minLength != null || p.maxLength != null) parts.push(`长度 ${p.minLength ?? 0}~${p.maxLength ?? '不限'} 字`)
+  if (p.forbidden) parts.push(`禁用 ${p.forbidden}`)
+  if (p.case === 'upper') parts.push('全大写')
+  if (p.case === 'lower') parts.push('全小写')
+  return parts.length ? parts.join('，') : '（无结构化约束）'
+})
+
 function buildPattern() {
   if (form.kind !== 'coding' || !form.segments.length) return undefined
   return { segments: form.segments.map((s) => ({ ...s })), separator: form.separator || '-' }
 }
+function buildNamePattern() {
+  if (form.kind !== 'naming') return undefined
+  const p = form.namePattern
+  const has = p.prefix || p.minLength != null || p.maxLength != null || p.forbidden || (p.case && p.case !== 'any')
+  if (!has) return undefined
+  return { ...p }
+}
 
 function submit() {
   const pattern = buildPattern()
-  const payload = { object: form.object, kind: form.kind, name: form.name, description: form.description, example: form.example, enabled: form.enabled, pattern }
+  const namePattern = buildNamePattern()
+  const payload = { object: form.object, kind: form.kind, name: form.name, description: form.description, example: form.example, enabled: form.enabled, pattern, namePattern }
   if (editing.value) {
     if (store.saveNamingRule(editing.value, payload)) dlgVisible.value = false
   } else {
@@ -257,6 +346,13 @@ const histList = computed(() => store.ruleHistoryOf(histRuleId.value))
 function openHistory(row: any) {
   histRuleId.value = row.id
   histVisible.value = true
+}
+function openHistoryById(ruleId: string) {
+  histRuleId.value = ruleId
+  histVisible.value = true
+}
+function ruleNameOf(ruleId: string) {
+  return store.namingRules.find((r) => r.id === ruleId)?.name ?? ruleId
 }
 function actionClass(action: string) {
   return action === 'create' ? 'tag-naming' : action === 'delete' ? 'tag-danger' : action === 'toggle' ? 'tag-coding' : ''

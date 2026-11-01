@@ -17,7 +17,8 @@ import {
   updateOrgNode,
   removeOrgNode,
   exportOrgNodes,
-  parseOrgNodes
+  parseOrgNodes,
+  resolveApprover
 } from '@/domain/org'
 import type { OrgNode, OrgMembership } from '@/domain/types'
 
@@ -226,5 +227,41 @@ describe('组织导入导出', () => {
   it('导入非法层级报错', () => {
     const r = parseOrgNodes('层级,名称,负责人,系统\n事业部,XX,,\n', [])
     expect(r.errors.some((e) => e.note.includes('非法'))).toBe(true)
+  })
+})
+
+describe('审批角色 → 组织负责人解析（组织负责人与审批流映射）', () => {
+  it('组织名直接匹配（如「电子研发中心」）', () => {
+    const r = resolveApprover('电子研发中心', orgNodes())
+    expect(r.matched).toBe(true)
+    expect(r.name).toBe('周立群')
+    expect(r.orgName).toBe('电子研发中心')
+  })
+
+  it('「组织名 + 岗位」前缀匹配（如「电子研发中心总监」）', () => {
+    const r = resolveApprover('电子研发中心总监', orgNodes())
+    expect(r.matched).toBe(true)
+    expect(r.name).toBe('周立群')
+  })
+
+  it('纯岗位名精确匹配（如「总经理」）', () => {
+    const r = resolveApprover('总经理', orgNodes())
+    expect(r.matched).toBe(true)
+    expect(r.name).toBe('林静')
+  })
+
+  it('「X总监」去后缀匹配组织名（如「市场总监」→ 市场中心）', () => {
+    // 市场中心不在测试树，构造含市场中心的树验证
+    const nodes = orgNodes().concat([
+      { id: 'MKT', name: '市场中心', level: 'center', parentId: 'C', leaderTitle: '执行总监', leaderName: '王琳', system: '职能系统', order: 9 }
+    ])
+    const r = resolveApprover('市场总监', nodes)
+    expect(r.matched).toBe(true)
+    expect(r.name).toBe('王琳')
+  })
+
+  it('未匹配返回 matched=false（专业角色不映射到组织负责人）', () => {
+    const r = resolveApprover('功能安全经理', orgNodes())
+    expect(r.matched).toBe(false)
   })
 })

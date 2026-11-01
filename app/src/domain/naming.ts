@@ -10,7 +10,7 @@
  *
  * 对象类型覆盖：客户、产品、文档、部门、人员 五大类
  */
-import type { NamingRule, NamingRuleHistory } from './types'
+import type { NamingRule, NamingRuleHistory, CodeIssue, NamingPattern } from './types'
 import { describePattern } from './codingEngine'
 
 /** 生成短 id */
@@ -109,6 +109,60 @@ export function toggleNamingRule(
   return { list: list.map((r) => (r.id === id ? after : r)), before: origin, after }
 }
 
+// ============ 命名规则结构化校验（前缀/长度/禁用字符/大小写） ============
+
+/** 名称校验结果 */
+export interface NameValidateResult {
+  ok: boolean
+  error?: string
+}
+
+/**
+ * 校验名称是否符合命名规则结构化模板。
+ * - prefix：须以指定前缀开头
+ * - minLength/maxLength：长度范围（字符数）
+ * - forbidden：禁用字符（正则字符类）
+ * - case：大小写要求（upper/lower）
+ */
+export function validateName(pattern: NamingPattern, name: string): NameValidateResult {
+  const s = (name ?? '').trim()
+  if (!s) return { ok: false, error: '名称为空' }
+  if (pattern.prefix && !s.startsWith(pattern.prefix)) {
+    return { ok: false, error: `名称须以「${pattern.prefix}」开头` }
+  }
+  const len = [...s].length
+  if (pattern.minLength != null && len < pattern.minLength) {
+    return { ok: false, error: `名称长度须 ≥ ${pattern.minLength} 个字符（当前 ${len}）` }
+  }
+  if (pattern.maxLength != null && len > pattern.maxLength) {
+    return { ok: false, error: `名称长度须 ≤ ${pattern.maxLength} 个字符（当前 ${len}）` }
+  }
+  if (pattern.forbidden) {
+    const re = new RegExp(pattern.forbidden)
+    if (re.test(s)) return { ok: false, error: `名称含禁用字符（${pattern.forbidden}）` }
+  }
+  if (pattern.case === 'upper' && s !== s.toUpperCase()) {
+    return { ok: false, error: '名称须为全大写' }
+  }
+  if (pattern.case === 'lower' && s !== s.toLowerCase()) {
+    return { ok: false, error: '名称须为全小写' }
+  }
+  return { ok: true }
+}
+
+/** 把结构化命名模板反解为人类可读的约束说明 */
+export function describeNamePattern(pattern: NamingPattern): string {
+  const parts: string[] = []
+  if (pattern.prefix) parts.push(`前缀「${pattern.prefix}」`)
+  if (pattern.minLength != null || pattern.maxLength != null) {
+    parts.push(`长度 ${pattern.minLength ?? 0}~${pattern.maxLength ?? '不限'} 字`)
+  }
+  if (pattern.forbidden) parts.push(`禁用 ${pattern.forbidden}`)
+  if (pattern.case === 'upper') parts.push('全大写')
+  if (pattern.case === 'lower') parts.push('全小写')
+  return parts.length ? parts.join('，') : '（无结构化约束）'
+}
+
 // ============ 规则变更历史（append-only 审计链） ============
 
 const historyUid = () => `NMH-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
@@ -125,6 +179,29 @@ export function appendHistory(
 /** 取某规则的历史（按时间倒序） */
 export function historyOf(history: NamingRuleHistory[], ruleId: string): NamingRuleHistory[] {
   return history.filter((h) => h.ruleId === ruleId).sort((a, b) => (a.at < b.at ? 1 : -1))
+}
+
+// ============ 编号生成实例（编号实例审计闭环） ============
+
+const codeIssueUid = () => `CI-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+
+/** 追加一条编号生成实例（append-only，记录「编号由哪版规则生成」） */
+export function appendCodeIssue(
+  list: CodeIssue[],
+  entry: Omit<CodeIssue, 'id' | 'at'>
+): CodeIssue[] {
+  const item: CodeIssue = { id: codeIssueUid(), ...entry, at: new Date().toISOString() }
+  return [...list, item]
+}
+
+/** 取某规则生成的所有编号实例（按时间倒序） */
+export function codeIssuesOf(list: CodeIssue[], ruleId: string): CodeIssue[] {
+  return list.filter((c) => c.ruleId === ruleId).sort((a, b) => (a.at < b.at ? 1 : -1))
+}
+
+/** 按编号反查生成它的实例（供「某编号由哪版规则生成」追溯） */
+export function codeIssueOfCode(list: CodeIssue[], code: string): CodeIssue | undefined {
+  return list.find((c) => c.code === code)
 }
 
 // ============ 导入 / 导出（CSV） ============

@@ -14,11 +14,19 @@
         <el-form label-width="96px" size="small">
           <el-form-item label="项目编码"><el-input :model-value="p.code" disabled /></el-form-item>
           <el-form-item label="项目名称"><el-input v-model="form.name" /></el-form-item>
-          <el-form-item label="客户"><el-input v-model="form.customer" /></el-form-item>
+          <el-form-item label="客户">
+            <el-select v-model="form.customer" filterable placeholder="从客户主数据选择" style="width: 100%">
+              <el-option v-for="c in store.customers" :key="c.id" :value="c.name" :label="`${c.name}（${c.code}）`" />
+            </el-select>
+          </el-form-item>
           <el-form-item label="产品线 / 平台">
             <div class="row" style="width: 100%">
-              <el-input v-model="form.productLine" />
-              <el-input v-model="form.platform" />
+              <el-select v-model="form.productLine" filterable placeholder="从产品线主数据选择" style="flex: 1">
+                <el-option-group v-for="cat in productCategories" :key="cat.id" :label="cat.name">
+                  <el-option v-for="l in linesOf(cat.id)" :key="l.id" :value="l.name" :label="`${l.name}${l.code ? '（' + l.code + '）' : ''}`" />
+                </el-option-group>
+              </el-select>
+              <el-input v-model="form.platform" placeholder="平台（自由文本）" style="flex: 1" />
             </div>
           </el-form-item>
           <el-form-item label="负责人"><el-input v-model="form.owner" /></el-form-item>
@@ -129,6 +137,10 @@ const input = reactive<GradingInput>({ asil: init?.asil ?? '', cal: init?.cal ??
 const schemeLinked = ref(true)
 const quoteLinked = ref(true)
 
+// 主数据下拉（客户 / 产品线，与基础数据菜单同源）
+const productCategories = computed(() => store.productCategories)
+const linesOf = (categoryId: string) => store.productLines.filter((l) => l.categoryId === categoryId)
+
 const result = computed(() => grade(input, store.actor))
 const gate = computed(() => store.gateResults.G1)
 
@@ -153,6 +165,11 @@ function submit() {
   const before = { level: proj.level }
   proj.level = result.value.level
   proj.grading = { input: { ...input }, result: result.value }
+  // 主数据打通：客户 / 产品线回写项目台账，与基础数据菜单同源
+  proj.customer = form.customer
+  proj.productLine = form.productLine
+  proj.name = form.name
+  proj.platform = form.platform
   store.log('SUBMIT', '项目', proj.id, { level: proj.level, row: result.value.hitRowNo }, before)
   store.notify('success', `立项申请已提交：判定 ${result.value.level}（命中第 ${result.value.hitRowNo} 行），留痕哈希 ${result.value.trace.snapshotHash.slice(0, 10)}…`)
 }

@@ -73,9 +73,9 @@ import { cloneStructure, validateClone } from '@/domain/projectClone'
 import { createShareLink, revokeLink, activeLinks, LINK_TTL_MS, type ShareLink } from '@/domain/shareLink'
 import { checkQuota, DEFAULT_QUOTA, type QuotaConfig, type QuotaUsage } from '@/domain/quota'
 import { addCustomer as addCustomerEngine, updateCustomer as updateCustomerEngine, removeCustomer as removeCustomerEngine, addCategory as addCategoryEngine, addProductLine as addProductLineEngine, addProduct as addProductEngine, removeProductLine as removeProductLineEngine, removeProduct as removeProductEngine, removeCategory as removeCategoryEngine, exportCustomers, parseCustomers, exportProducts, parseProducts } from '@/domain/basicData'
-import { addOrgNode as addOrgNodeEngine, updateOrgNode as updateOrgNodeEngine, removeOrgNode as removeOrgNodeEngine, exportOrgNodes, parseOrgNodes } from '@/domain/org'
-import { addNamingRule as addNamingRuleEngine, updateNamingRule as updateNamingRuleEngine, removeNamingRule as removeNamingRuleEngine, toggleNamingRule as toggleNamingRuleEngine, exportNamingRules, parseNamingRules, appendHistory, historyOf } from '@/domain/naming'
-import { generateCode, validateCode, activeCodingRuleOf } from '@/domain/codingEngine'
+import { addOrgNode as addOrgNodeEngine, updateOrgNode as updateOrgNodeEngine, removeOrgNode as removeOrgNodeEngine, exportOrgNodes, parseOrgNodes, resolveApprover } from '@/domain/org'
+import { addNamingRule as addNamingRuleEngine, updateNamingRule as updateNamingRuleEngine, removeNamingRule as removeNamingRuleEngine, toggleNamingRule as toggleNamingRuleEngine, exportNamingRules, parseNamingRules, appendHistory, historyOf, appendCodeIssue, codeIssuesOf as codeIssuesOfEngine, codeIssueOfCode as codeIssueOfCodeEngine, validateName } from '@/domain/naming'
+import { generateCode, validateCode } from '@/domain/codingEngine'
 import { pert, highRpnLinkage, filterLinkedRisks, QUANT_MODEL_VERSION } from '@/domain/riskQuant'
 import { runMonteCarlo } from '@/domain/simulation'
 import { computeReserveFromSim, gateQuantifiedCheck, riskAdjustedPlan } from '@/domain/contingency'
@@ -152,6 +152,7 @@ export const useAppStore = defineStore('app', () => {
   const products = computed(() => (data.value.products ?? []) as import('@/domain/types').Product[])
   const namingRules = computed(() => (data.value.namingRules ?? []) as import('@/domain/types').NamingRule[])
   const namingRuleHistory = computed(() => (data.value.namingRuleHistory ?? []) as import('@/domain/types').NamingRuleHistory[])
+  const codeIssues = computed(() => (data.value.codeIssues ?? []) as import('@/domain/types').CodeIssue[])
 
   // —— 多租户隔离（TEN-002/TEN-004）：当前租户上下文 + 可见项目 ——
   const tenants = computed(() => (data.value.tenants ?? []) as import('@/domain/tenant').Tenant[])
@@ -1355,12 +1356,17 @@ export const useAppStore = defineStore('app', () => {
 
   // —— 基础数据：客户 CRUD（编号按规则自动生成/校验）——
   function createCustomer(input: { name: string; code?: string; vehicleModels: string[]; shortName?: string }): boolean {
+    // 命名规则校验（前缀/长度/禁用字符）
+    const nameChk = checkNameValid('customer', input.name)
+    if (!nameChk.ok) { notify('warning', nameChk.error ?? '名称不合规'); return false }
     // 主数据打通：编号留空自动生成，填了则校验
     let code = (input.code ?? '').trim()
+    let genRule: { ruleId?: string; ruleVersion?: number } = {}
     if (!code) {
       const gen = autoGenerateCode('customer', customers.value.map((c) => c.code), { abbr: (input.shortName ?? input.name).toUpperCase() })
       if (!gen.ok) { notify('warning', '无法自动生成客户编号：' + gen.error); return false }
       code = gen.code!
+      genRule = { ruleId: gen.ruleId, ruleVersion: gen.ruleVersion }
     } else {
       const chk = checkCodeValid('customer', code)
       if (!chk.ok) { notify('warning', chk.error ?? '编号不合规'); return false }
@@ -1368,6 +1374,7 @@ export const useAppStore = defineStore('app', () => {
     const r = addCustomerEngine(customers.value, { ...input, code })
     if (r.error) { notify('warning', r.error); return false }
     data.value.customers = r.list as import('@/domain/types').Customer[]
+    if (genRule.ruleId) recordCodeIssue({ ruleId: genRule.ruleId, ruleVersion: genRule.ruleVersion!, object: 'customer', code, objectId: r.item!.id })
     log('CREATE', '客户', r.item!.id, { name: input.name, code })
     notify('success', `客户「${input.name}」已新增（编号 ${code}）`)
     return true
@@ -1398,11 +1405,15 @@ export const useAppStore = defineStore('app', () => {
     return true
   }
   function createProductLine(categoryId: string, name: string, code?: string): boolean {
+    const nameChk = checkNameValid('product', name)
+    if (!nameChk.ok) { notify('warning', nameChk.error ?? '名称不合规'); return false }
     let finalCode = (code ?? '').trim()
+    let genRule: { ruleId?: string; ruleVersion?: number } = {}
     if (!finalCode) {
       const gen = autoGenerateCode('product', productLines.value.map((l) => l.code ?? ''), { abbr: name.toUpperCase().slice(0, 3) })
       if (!gen.ok) { notify('warning', '无法自动生成产品线编号：' + gen.error); return false }
       finalCode = gen.code!
+      genRule = { ruleId: gen.ruleId, ruleVersion: gen.ruleVersion }
     } else {
       const chk = checkCodeValid('product', finalCode)
       if (!chk.ok) { notify('warning', chk.error ?? '编号不合规'); return false }
@@ -1410,17 +1421,22 @@ export const useAppStore = defineStore('app', () => {
     const r = addProductLineEngine(productLines.value, productCategories.value, { categoryId, name, code: finalCode })
     if (r.error) { notify('warning', r.error); return false }
     data.value.productLines = r.list as import('@/domain/types').ProductLine[]
+    if (genRule.ruleId) recordCodeIssue({ ruleId: genRule.ruleId, ruleVersion: genRule.ruleVersion!, object: 'product', code: finalCode, objectId: r.item!.id })
     log('CREATE', '产品线', r.item!.id, { categoryId, name, code: finalCode })
     notify('success', `产品线「${name}」已新增（编号 ${finalCode}）`)
     return true
   }
   function createProduct(lineId: string, name: string, code?: string): boolean {
+    const nameChk = checkNameValid('product', name)
+    if (!nameChk.ok) { notify('warning', nameChk.error ?? '名称不合规'); return false }
     let finalCode = (code ?? '').trim()
+    let genRule: { ruleId?: string; ruleVersion?: number } = {}
     if (!finalCode) {
       const line = productLines.value.find((l) => l.id === lineId)
       const gen = autoGenerateCode('product', products.value.map((p) => p.code ?? ''), { lineCode: line?.code ?? '' })
       if (!gen.ok) { notify('warning', '无法自动生成产品编号：' + gen.error); return false }
       finalCode = gen.code!
+      genRule = { ruleId: gen.ruleId, ruleVersion: gen.ruleVersion }
     } else {
       const chk = checkCodeValid('product', finalCode)
       if (!chk.ok) { notify('warning', chk.error ?? '编号不合规'); return false }
@@ -1428,6 +1444,7 @@ export const useAppStore = defineStore('app', () => {
     const r = addProductEngine(products.value, productLines.value, { lineId, name, code: finalCode })
     if (r.error) { notify('warning', r.error); return false }
     data.value.products = r.list as import('@/domain/types').Product[]
+    if (genRule.ruleId) recordCodeIssue({ ruleId: genRule.ruleId, ruleVersion: genRule.ruleVersion!, object: 'product', code: finalCode, objectId: r.item!.id })
     log('CREATE', '产品', r.item!.id, { lineId, name, code: finalCode })
     notify('success', `产品「${name}」已新增（编号 ${finalCode}）`)
     return true
@@ -1459,12 +1476,16 @@ export const useAppStore = defineStore('app', () => {
 
   // —— 组织节点 CRUD + 导入导出（部门编号按规则自动生成）——
   function createOrgNode(input: { name: string; level: import('@/domain/types').OrgLevel; parentId: string | null; system?: string; leaderName?: string }): boolean {
+    // 命名规则校验（部门命名）
+    const nameChk = checkNameValid('department', input.name)
+    if (!nameChk.ok) { notify('warning', nameChk.error ?? '名称不合规'); return false }
     // 部门编号自动生成（按部门编码规则）
     const sysAbbr = (input.system ?? 'GEN').replace(/系统$/, '').slice(0, 3).toUpperCase()
     const gen = autoGenerateCode('department', orgNodes.value.map((n) => n.code ?? ''), { sys: sysAbbr })
     const r = addOrgNodeEngine(orgNodes.value, { ...input, code: gen.ok ? gen.code : undefined })
     if (r.error) { notify('warning', r.error); return false }
     data.value.orgNodes = r.list as import('@/domain/types').OrgNode[]
+    if (gen.ok && gen.ruleId && r.item!.code) recordCodeIssue({ ruleId: gen.ruleId, ruleVersion: gen.ruleVersion!, object: 'department', code: r.item!.code, objectId: r.item!.id })
     log('CREATE', '组织节点', r.item!.id, { name: input.name, level: input.level, code: r.item!.code })
     notify('success', `组织节点「${input.name}」已新增${r.item!.code ? `（编号 ${r.item!.code}）` : ''}`)
     return true
@@ -1493,6 +1514,21 @@ export const useAppStore = defineStore('app', () => {
     data.value.orgNodes = r.list as import('@/domain/types').OrgNode[]
     log('IMPORT', '组织节点', 'CSV', { total: r.list.length, errors: r.errors.length })
     return { errors: r.errors }
+  }
+
+  /**
+   * 审批角色 → 组织负责人解析（组织负责人与审批流自动映射）
+   * 组织负责人变更后，审批流会签人自动同步（同源解析，非硬编码人名）。
+   */
+  function resolveApproverOf(signRole: string): { name?: string; orgName?: string; matched: boolean } {
+    return resolveApprover(signRole, orgNodes.value)
+  }
+  /** 批量解析会签角色列表 → 负责人名列表（未匹配的保留原角色名） */
+  function resolveSignersOf(signRoles: string[]): { role: string; name: string; matched: boolean }[] {
+    return signRoles.map((role) => {
+      const r = resolveApprover(role, orgNodes.value)
+      return { role, name: r.matched ? r.name! : role, matched: r.matched }
+    })
   }
 
   // —— 基础数据：导入导出 ——
@@ -1528,6 +1564,7 @@ export const useAppStore = defineStore('app', () => {
     example?: string
     enabled?: boolean
     pattern?: import('@/domain/types').CodePattern
+    namePattern?: import('@/domain/types').NamingPattern
   }): boolean {
     const r = addNamingRuleEngine(namingRules.value, { ...input, enabled: input.enabled ?? true }, namingActor())
     if (r.error) { notify('warning', r.error); return false }
@@ -1547,6 +1584,7 @@ export const useAppStore = defineStore('app', () => {
     example?: string
     enabled?: boolean
     pattern?: import('@/domain/types').CodePattern
+    namePattern?: import('@/domain/types').NamingPattern
   }): boolean {
     const r = updateNamingRuleEngine(namingRules.value, id, patch, namingActor())
     if (r.error) { notify('warning', r.error); return false }
@@ -1594,26 +1632,57 @@ export const useAppStore = defineStore('app', () => {
   // —— 主数据打通：按编码规则自动生成/校验编号 ——
   /** 取某对象的启用编码规则 */
   function codingRuleOf(object: import('@/domain/types').NamingObject) {
-    return activeCodingRuleOf(namingRules.value as any[], object) as
-      | { object: string; kind: string; enabled: boolean; pattern?: import('@/domain/types').CodePattern }
-      | undefined
+    return namingRules.value.find((r) => r.object === object && r.kind === 'coding' && r.enabled) as import('@/domain/types').NamingRule | undefined
   }
   /**
    * 自动生成编号：某对象按启用编码规则 + 已用编号集合生成下一编号。
-   * 返回 { ok, code }；无启用规则或模板非法时 ok=false。
+   * 返回 { ok, code, ruleId, ruleVersion }；无启用规则或模板非法时 ok=false。
    */
-  function autoGenerateCode(object: import('@/domain/types').NamingObject, usedCodes: string[], vars?: Record<string, string>): { ok: boolean; code?: string; error?: string } {
+  function autoGenerateCode(object: import('@/domain/types').NamingObject, usedCodes: string[], vars?: Record<string, string>): { ok: boolean; code?: string; error?: string; ruleId?: string; ruleVersion?: number } {
     const rule = codingRuleOf(object)
     if (!rule?.pattern) return { ok: false, error: `未配置「${object}」的编码规则` }
     const g = generateCode(rule.pattern, { usedCodes, vars })
     if (!g.ok) return { ok: false, error: g.error }
-    return { ok: true, code: g.code }
+    return { ok: true, code: g.code, ruleId: rule.id, ruleVersion: rule.version }
   }
   /** 校验编号是否符合某对象的启用编码规则 */
   function checkCodeValid(object: import('@/domain/types').NamingObject, code: string): { ok: boolean; error?: string } {
     const rule = codingRuleOf(object)
     if (!rule?.pattern) return { ok: true } // 无规则不拦截
     return validateCode(rule.pattern, code)
+  }
+  /** 取某对象的启用命名规则（结构化 namePattern） */
+  function namingRuleOf(object: import('@/domain/types').NamingObject): import('@/domain/types').NamingRule | undefined {
+    return namingRules.value.find((r) => r.object === object && r.kind === 'naming' && r.enabled)
+  }
+  /** 校验名称是否符合某对象的启用命名规则（前缀/长度/禁用字符/大小写） */
+  function checkNameValid(object: import('@/domain/types').NamingObject, name: string): { ok: boolean; error?: string } {
+    const rule = namingRuleOf(object)
+    if (!rule?.namePattern) return { ok: true } // 无结构化约束不拦截
+    return validateName(rule.namePattern, name)
+  }
+  /**
+   * 记录编号生成实例（编号实例审计闭环）：编号生成成功后调用，
+   * 把「规则 id + 规则版本 + 对象 + 生成值」append-only 写入 codeIssues。
+   */
+  function recordCodeIssue(input: { ruleId: string; ruleVersion: number; object: import('@/domain/types').NamingObject; code: string; objectId?: string }): void {
+    data.value.codeIssues = appendCodeIssue(codeIssues.value, {
+      ruleId: input.ruleId,
+      ruleVersion: input.ruleVersion,
+      object: input.object,
+      code: input.code,
+      objectId: input.objectId,
+      by: currentUser.value.name
+    })
+    log('CREATE', '编号实例', input.code, { ruleId: input.ruleId, ruleVersion: input.ruleVersion, code: input.code, object: input.object })
+  }
+  /** 按规则 id 追溯所有由该规则生成的编号实例 */
+  function codeIssuesOf(ruleId: string): import('@/domain/types').CodeIssue[] {
+    return codeIssuesOfEngine(codeIssues.value, ruleId)
+  }
+  /** 按编号反查生成它的规则（供「某编号由哪版规则生成」追溯） */
+  function codeIssueOfCode(code: string): import('@/domain/types').CodeIssue | undefined {
+    return codeIssueOfCodeEngine(codeIssues.value, code)
   }
 
   function saveUdf(input: { target: import('@/domain/types').UdfTarget; name: string; type: import('@/domain/types').UdfDef['type']; enumValues?: string[]; min?: number; max?: number }): boolean {
@@ -2257,6 +2326,7 @@ export const useAppStore = defineStore('app', () => {
     products,
     namingRules,
     namingRuleHistory,
+    codeIssues,
     createCustomer,
     saveCustomer,
     deleteCustomer,
@@ -2273,14 +2343,21 @@ export const useAppStore = defineStore('app', () => {
     exportNamingRulesCsv,
     importNamingRulesCsv,
     ruleHistoryOf,
+    codeIssuesOf,
+    codeIssueOfCode,
+    recordCodeIssue,
     autoGenerateCode,
     checkCodeValid,
+    checkNameValid,
+    namingRuleOf,
     codingRuleOf,
     createOrgNode,
     saveOrgNode,
     deleteOrgNode,
     exportOrgCsv,
     importOrgCsv,
+    resolveApproverOf,
+    resolveSignersOf,
     exportCustomersCsv,
     importCustomersCsv,
     exportProductsCsv,
