@@ -56,7 +56,7 @@ import type {
 import { ROLES } from '@/domain/rbac'
 import type { FlowDefinition, FlowInstance } from '@/domain/flowEngine'
 
-export const SEED_VERSION = 'mofeng.rdp.v1.0.11'
+export const SEED_VERSION = 'mofeng.rdp.v1.0.12'
 const TENANT = 'T-1001'
 
 export interface SeedUser {
@@ -89,7 +89,7 @@ function buildUsers(): SeedUser[] {
     '许国栋',
     '唐峰'
   ]
-  return ROLES.map((r, i) => ({
+  const base = ROLES.map((r, i) => ({
     id: `U${String(i + 1).padStart(3, '0')}`,
     name: names[i] || `用户${i + 1}`,
     roleCode: r.code,
@@ -97,6 +97,30 @@ function buildUsers(): SeedUser[] {
     dept: ['项目管理部', '研发中心', '质量部', '采购部', '制造部', 'IT'][i % 6],
     account: `mofeng.${r.code.toLowerCase()}`
   }))
+  // 新增 36 名工程师（U019~U054），对应 9 个事业部 × 4 个小组（硬件一组/二组、软件一组/二组）
+  const engNames = [
+    '韩晓峰', '罗建华', '蒋文博', '曹志强',
+    '邓海涛', '梁永刚', '谢国平', '韩雪梅',
+    '唐志明', '袁伟东', '崔永强', '龙海峰',
+    '曾志远', '彭建国', '蔡文静', '潘晓东',
+    '董丽华', '苏志强', '魏海涛', '叶国华',
+    '田文博', '万晓峰', '石志明', '于海燕',
+    '邵建国', '孟晓东', '秦文静', '段志强',
+    '郝海涛', '侯国华', '邹晓峰', '武志明',
+    '廖海燕', '龚建国', '姚晓东', '冯文静'
+  ]
+  const engs = engNames.map((n, i) => {
+    const idx = ROLES.length + i + 1
+    return {
+      id: `U${String(idx).padStart(3, '0')}`,
+      name: n,
+      roleCode: 'SE',
+      roleName: '系统工程师',
+      dept: '研发中心',
+      account: `mofeng.eng${String(i + 1).padStart(2, '0')}`
+    }
+  })
+  return [...base, ...engs]
 }
 
 /**
@@ -107,6 +131,21 @@ function buildUsers(): SeedUser[] {
 function buildOrgNodes(): OrgNode[] {
   const c = (id: string, name: string, system: string, order: number, leaderName?: string): OrgNode => ({
     id, name, level: 'center', parentId: 'C', system, leaderTitle: '执行总监', leaderName, order
+  })
+  // 9 个事业部（智能交互/控制/座舱/驾驶）各加硬件科 + 软件科，每科下硬件/软件一、二组
+  const divisionDepts: string[] = ['ELEC-D1', 'ELEC-D2', 'ELEC-D3', 'ELEC-D4', 'ELEC-D5', 'ELEC-D6', 'ELEC-D7', 'ELEC-D8', 'ELEC-D9']
+  const divisionNodes: OrgNode[] = []
+  divisionDepts.forEach((deptId) => {
+    const hwId = `${deptId}-HW`
+    const swId = `${deptId}-SW`
+    divisionNodes.push(
+      { id: hwId, name: '硬件科', level: 'section', parentId: deptId, leaderTitle: '高级经理', order: 1 },
+      { id: swId, name: '软件科', level: 'section', parentId: deptId, leaderTitle: '高级经理', order: 2 },
+      { id: `${hwId}-T1`, name: '硬件一组', level: 'team', parentId: hwId, leaderTitle: '经理', order: 1 },
+      { id: `${hwId}-T2`, name: '硬件二组', level: 'team', parentId: hwId, leaderTitle: '经理', order: 2 },
+      { id: `${swId}-T1`, name: '软件一组', level: 'team', parentId: swId, leaderTitle: '经理', order: 1 },
+      { id: `${swId}-T2`, name: '软件二组', level: 'team', parentId: swId, leaderTitle: '经理', order: 2 }
+    )
   })
   return [
     { id: 'G', name: '魔程集团', level: 'group', parentId: null, leaderTitle: '总裁', leaderName: '陈志远', system: '集团', order: 1 },
@@ -142,6 +181,8 @@ function buildOrgNodes(): OrgNode[] {
     { id: 'ELEC-D11', name: '技术中心', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 11 },
     { id: 'ELEC-D12', name: '综合管理部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 12 },
     { id: 'ELEC-D13', name: 'AI 实验室', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 13 },
+    // 事业部科室 + 小组（9 部 × 硬件科/软件科 × 硬件/软件一、二组）
+    ...divisionNodes,
     // 科室（技术中心下）
     { id: 'ELEC-D11-S1', name: '标准化科', level: 'section', parentId: 'ELEC-D11', leaderTitle: '高级经理', order: 1 },
     { id: 'ELEC-D11-S2', name: '体系科', level: 'section', parentId: 'ELEC-D11', leaderTitle: '高级经理', order: 2 },
@@ -160,6 +201,21 @@ function buildOrgMemberships(users: SeedUser[]): OrgMembership[] {
   const u = (id: string) => users.find((x) => x.id === id)!
   const m = (userId: string, orgId: string, track: OrgMembership['track'], postLevel: string, primary = false): OrgMembership => ({
     userId, userName: u(userId).name, orgId, track, postLevel, primary, active: true
+  })
+  // 9 个事业部 × 4 个小组（硬件一组/二组、软件一组/二组）各 1 名工程师，U019~U054
+  const divisionDepts: string[] = ['ELEC-D1', 'ELEC-D2', 'ELEC-D3', 'ELEC-D4', 'ELEC-D5', 'ELEC-D6', 'ELEC-D7', 'ELEC-D8', 'ELEC-D9']
+  const engineerMemberships: OrgMembership[] = []
+  divisionDepts.forEach((deptId, di) => {
+    const base = 19 + di * 4 // U019 起
+    const hwId = `${deptId}-HW`
+    const swId = `${deptId}-SW`
+    const uid = (o: number) => `U${String(base + o).padStart(3, '0')}`
+    engineerMemberships.push(
+      m(uid(0), `${hwId}-T1`, 'tech', '硬件工程师', true),
+      m(uid(1), `${hwId}-T2`, 'tech', '硬件工程师', true),
+      m(uid(2), `${swId}-T1`, 'software', '软件工程师', true),
+      m(uid(3), `${swId}-T2`, 'software', '软件工程师', true)
+    )
   })
   return [
     m('U001', 'G', 'tech-mgmt', '首席总工', true),
@@ -180,7 +236,8 @@ function buildOrgMemberships(users: SeedUser[]): OrgMembership[] {
     m('U015', 'MKT', 'project', '项目管理员', true),
     m('U016', 'ADM', 'tech-mgmt', '主任工程师', true),
     m('U017', 'EXEC', 'software', '架构师', true),
-    m('U018', 'ELEC-D4', 'software', '网络工程师', true)
+    m('U018', 'ELEC-D4', 'software', '网络工程师', true),
+    ...engineerMemberships
   ]
 }
 
@@ -191,7 +248,12 @@ function buildCustomers(): Customer[] {
     { id: 'CUST-2', code: 'CUST-CHERY', name: '奇瑞汽车', shortName: '奇瑞', vehicleModels: ['瑞虎 8', '艾瑞泽 5'] },
     { id: 'CUST-3', code: 'CUST-GAC', name: '广汽埃安', shortName: '埃安', vehicleModels: ['AION S', 'AION Y'] },
     { id: 'CUST-4', code: 'CUST-BYD', name: '比亚迪', shortName: '比亚迪', vehicleModels: ['汉', '海豹'] },
-    { id: 'CUST-5', code: 'CUST-GEELY', name: '吉利汽车', shortName: '吉利', vehicleModels: ['星越 L', '银河 E8'] }
+    { id: 'CUST-5', code: 'CUST-GEELY', name: '吉利汽车', shortName: '吉利', vehicleModels: ['星越 L', '银河 E8'] },
+    { id: 'CUST-6', code: 'CUST-GWM', name: '长城汽车', shortName: '长城', vehicleModels: ['哈弗 H6', '坦克 300'] },
+    { id: 'CUST-7', code: 'CUST-CHANGAN', name: '长安汽车', shortName: '长安', vehicleModels: ['深蓝 SL03', 'UNI-K'] },
+    { id: 'CUST-8', code: 'CUST-NIO', name: '蔚来汽车', shortName: '蔚来', vehicleModels: ['ES6', 'ET5'] },
+    { id: 'CUST-9', code: 'CUST-XPENG', name: '小鹏汽车', shortName: '小鹏', vehicleModels: ['G6', 'P7'] },
+    { id: 'CUST-10', code: 'CUST-LI', name: '理想汽车', shortName: '理想', vehicleModels: ['L7', 'L8'] }
   ]
 }
 
@@ -219,14 +281,18 @@ function buildProductLines(): ProductLine[] {
     mk('PL-10', 'CAT-2', '空调控制器', 1, 'ECC'), mk('PL-11', 'CAT-2', '域控制器', 2),
     // 智能座舱
     mk('PL-12', 'CAT-3', '中控屏', 1), mk('PL-13', 'CAT-3', '仪表屏', 2), mk('PL-14', 'CAT-3', '扶手屏', 3), mk('PL-15', 'CAT-3', '吸顶屏', 4),
+    mk('PL-25', 'CAT-3', 'HUD 抬头显示', 5),
     // 智能驾驶
     mk('PL-16', 'CAT-4', '智驾域控', 1), mk('PL-17', 'CAT-4', '雷达', 2), mk('PL-18', 'CAT-4', '摄像头', 3),
+    mk('PL-26', 'CAT-4', '激光雷达', 4), mk('PL-27', 'CAT-4', '超声波雷达', 5),
     // 动力能源
     mk('PL-19', 'CAT-5', '高压电驱', 1), mk('PL-20', 'CAT-5', 'BMS 电池管理', 2),
+    mk('PL-28', 'CAT-5', '车载充电机', 3), mk('PL-29', 'CAT-5', 'DC-DC 变换器', 4),
     // 底盘控制
     mk('PL-21', 'CAT-6', '转向控制', 1), mk('PL-22', 'CAT-6', '制动控制', 2),
     // 车载电器
-    mk('PL-23', 'CAT-7', '车身控制器', 1, 'BCM'), mk('PL-24', 'CAT-7', '雨刮控制', 2)
+    mk('PL-23', 'CAT-7', '车身控制器', 1, 'BCM'), mk('PL-24', 'CAT-7', '雨刮控制', 2),
+    mk('PL-30', 'CAT-7', '网关控制器', 3)
   ]
 }
 
@@ -236,7 +302,9 @@ function buildProducts(): Product[] {
     mk('PRD-1', 'PL-1', '左前门控制模块', 1), mk('PRD-2', 'PL-1', '右前门控制模块', 2),
     mk('PRD-3', 'PL-10', 'ECC 空调控制器', 1, 'ECC-01'), mk('PRD-4', 'PL-10', '双区自动空调', 2),
     mk('PRD-5', 'PL-12', '12.3 寸中控屏', 1), mk('PRD-6', 'PL-13', '全液晶仪表', 1),
-    mk('PRD-7', 'PL-16', '智驾域控制器', 1), mk('PRD-8', 'PL-17', '前向毫米波雷达', 1)
+    mk('PRD-7', 'PL-16', '智驾域控制器', 1), mk('PRD-8', 'PL-17', '前向毫米波雷达', 1),
+    mk('PRD-9', 'PL-25', 'AR-HUD 抬头显示', 1), mk('PRD-10', 'PL-26', '固态激光雷达', 1),
+    mk('PRD-11', 'PL-28', '车载充电机 OBC', 1, 'OBC-01'), mk('PRD-12', 'PL-23', '车身控制器', 1, 'BCM-01')
   ]
 }
 
