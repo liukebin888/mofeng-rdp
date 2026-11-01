@@ -58,8 +58,9 @@ import type {
 import { ROLES } from '@/domain/rbac'
 import type { FlowDefinition, FlowInstance } from '@/domain/flowEngine'
 import type { ComplianceItem } from '@/domain/compliance'
+import type { AiCorpusItem, AiSwitchConfig, AiCallLog } from '@/domain/aiAssist'
 
-export const SEED_VERSION = 'mofeng.rdp.v1.0.14'
+export const SEED_VERSION = 'mofeng.rdp.v1.0.15'
 const TENANT = 'T-1001'
 
 export interface SeedUser {
@@ -1075,6 +1076,76 @@ export function buildSeed() {
     }
   ]
 
+  /**
+   * AI 智能辅助（SRS 第 24 章 / AIA-001~007，R1 批次）
+   * 语料：由真实需求/风险/交付物投影出的受控对象，带租户/项目/密级归属，
+   * 供「检索前置过滤」演示——跨租户/越密级对象必须在检索阶段被剔除（越权命中 0）。
+   * 注意：seed 为演示基线，模型选型（D-08）待拍板，此处语料为规则型 RAG 的依据，
+   * 真实 LLM 接入后同一套语料继续作为「引用可溯 + 前置过滤」的校验对象。
+   */
+  const aiCorpus: AiCorpusItem[] = [
+    // P-001（T-1001 集团租户）核心需求语料
+    { id: 'R01', objType: 'REQ', tenantId: 'T-1001', projectId: 'P-001', class: 'L2', text: '避免转向助力在行驶中非预期失效（ASIL B）', version: 1 },
+    { id: 'R03', objType: 'REQ', tenantId: 'T-1001', projectId: 'P-001', class: 'L2', text: '系统应在助力扭矩偏差 >15% 时 100ms 内进入降级模式', version: 1 },
+    { id: 'R05', objType: 'REQ', tenantId: 'T-1001', projectId: 'P-001', class: 'L2', text: '系统应在通信丢失 3 个周期内点亮故障灯', version: 1 },
+    { id: 'R17', objType: 'REQ', tenantId: 'T-1001', projectId: 'P-001', class: 'L4', text: '诊断服务 0x27 安全访问采用 SM4 加密种子（涉密安全机制）', version: 1 },
+    { id: 'TC-001', objType: 'TC', tenantId: 'T-1001', projectId: 'P-001', class: 'L2', text: '旋变信号交叉校验用例（含单路失效注入）', version: 1 },
+    { id: 'VER-001', objType: 'VER', tenantId: 'T-1001', projectId: 'P-001', class: 'L2', text: 'SW 1.4.2 版本验证记录', version: 1 },
+    // 断链/歧义样本（供追溯断链、质量体检场景）
+    { id: 'R13', objType: 'REQ', tenantId: 'T-1001', projectId: 'P-001', class: 'L2', text: 'PWM 调光频率配置为 200Hz±5%，具体取值适当即可', version: 1 },
+    // 跨租户对象（越权测试样本：T-1002 子租户，A 租户检索 B 租户专有词须命中 0）
+    { id: 'P004-SEC', objType: 'REQ', tenantId: 'T-1002', projectId: 'P-004', class: 'L2', text: 'B 租户专有的自动驾驶域控安全需求', version: 1 },
+    { id: 'P005-SEC', objType: 'REQ', tenantId: 'T-1003', projectId: 'P-005', class: 'L2', text: 'C 租户专有的新能源电池热管理需求', version: 1 }
+  ]
+
+  /** AI 两级开关（AIA-007）：总开关开启 + 项目级开关 + 一条已到期的临时开启（演示自动关闭） */
+  const aiSwitch: AiSwitchConfig = {
+    globalEnabled: true,
+    projectSwitches: { 'P-001': true, 'P-002': true },
+    temporary: { enabled: false, reason: '历史临时开启（已到期示例）', expireAt: '2026-10-01T00:00:00.000Z' }
+  }
+
+  /** AI 调用日志（附录 B.3 ai_call_log）：一条待复核、一条已采纳、一条已驳回，覆盖三态 */
+  const aiCallLogs: AiCallLog[] = [
+    {
+      id: 'AILOG-001',
+      projectId: 'P-001',
+      userId: 'u-pm',
+      sceneCode: '需求检索问答',
+      modelKey: 'rule-rag',
+      promptVer: 'v1.0.0',
+      inputHash: 'seed-hash-001',
+      citedIds: ['R01', 'R03'],
+      reviewStatus: 'PENDING'
+    },
+    {
+      id: 'AILOG-002',
+      projectId: 'P-001',
+      userId: 'u-pm',
+      sceneCode: '追溯断链提示',
+      modelKey: 'rule-rag',
+      promptVer: 'v1.0.0',
+      inputHash: 'seed-hash-002',
+      citedIds: ['R13'],
+      reviewStatus: 'ACCEPTED',
+      reviewerId: 'u-qa',
+      reviewedAt: '2026-10-30T10:00:00.000Z'
+    },
+    {
+      id: 'AILOG-003',
+      projectId: 'P-001',
+      userId: 'u-pm',
+      sceneCode: '需求质量体检',
+      modelKey: 'rule-rag',
+      promptVer: 'v1.0.0',
+      inputHash: 'seed-hash-003',
+      citedIds: ['R13'],
+      reviewStatus: 'REJECTED',
+      reviewerId: 'u-qa',
+      reviewedAt: '2026-10-31T09:30:00.000Z'
+    }
+  ]
+
   const schemeLinked = true
   const quoteLinked = true
 
@@ -1135,6 +1206,9 @@ export function buildSeed() {
     audit,
     flags,
     complianceItems,
+    aiCorpus,
+    aiSwitch,
+    aiCallLogs,
     flowDefinitions: [
       // ① 含「条件分支 + 超时升级」的 ECR 审批流程（FUN-017 验收样例：不发版生效）
       {

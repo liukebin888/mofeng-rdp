@@ -75,6 +75,7 @@ export const zhCN: Dict = {
   'menu.group.report': '报表与看板',
   'menu.group.basic': '基础数据',
   'menu.group.system': '系统管理',
+  'menu.group.ai': 'AI 智能辅助',
 
   // —— 二级菜单 ——
   'menu.item./workbench/today': '今日必办',
@@ -153,7 +154,8 @@ export const zhCN: Dict = {
   'menu.item./system/audit': '审计日志',
   'menu.item./system/dict': '分类码与 UDF',
   'menu.item./system/calendar': '三层日历',
-  'menu.item./system/data': '数据与版本'
+  'menu.item./system/data': '数据与版本',
+  'menu.item./ai/assist': '智能辅助工作台'
 }
 
 export const enUS: Dict = {
@@ -223,6 +225,7 @@ export const enUS: Dict = {
   'menu.group.report': 'Reports & Dashboards',
   'menu.group.system': 'System Administration',
   'menu.group.basic': 'Master Data',
+  'menu.group.ai': 'AI Assistance',
 
   // —— 二级菜单 ——
   'menu.item./workbench/today': "Today's Must-Do",
@@ -301,7 +304,8 @@ export const enUS: Dict = {
   'menu.item./system/audit': 'Audit Log',
   'menu.item./system/dict': 'Code Dict & UDF',
   'menu.item./system/calendar': 'Three-tier Calendar',
-  'menu.item./system/data': 'Data & Version'
+  'menu.item./system/data': 'Data & Version',
+  'menu.item./ai/assist': 'AI Assistance Workbench'
 }
 
 export const DICTS: Record<Locale, Dict> = {

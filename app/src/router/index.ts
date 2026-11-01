@@ -168,6 +168,12 @@ export const MENUS: MenuGroup[] = [
     ]
   },
   {
+    key: 'ai', title: 'AI 智能辅助', icon: 'MagicStick', stage: '全阶段', role: '全员', cp: 'C-30',
+    items: [
+      { path: '/ai/assist', title: '智能辅助工作台', desc: '六类场景 + 检索前置过滤 + 复核留痕（AIA-001~007）', comp: v('ai/AiAssistView') }
+    ]
+  },
+  {
     key: 'basic', title: '基础数据', icon: 'Coin', stage: '全阶段', role: '租户管理员 / 项目秘书', cp: '—',
     items: [
       { path: '/basic/customer', title: '客户管理', desc: '车厂主数据：名称/编号/车型，增删改+导入导出', comp: v('basic/CustomerView') },

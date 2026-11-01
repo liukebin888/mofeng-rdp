@@ -45,8 +45,8 @@ docker compose up -d --build
 ```bash
 cd app
 npm run typecheck    # vue-tsc --noEmit，应为 0 error
-npm run test         # vitest，领域层 + 修复回归单测（575 例）
-npm run smoke        # 全路由冒烟（77/77），截图落 shots/
+npm run test         # vitest，领域层 + 修复回归单测（602 例）
+npm run smoke        # 全路由冒烟（78/78），截图落 shots/
 npm run e2e          # 交互点击级回归（11 链路 31 断言），需先起 preview
 npm run probe        # 跨视图 UI-数据一致性探针（三维度 40/40），需先起 preview
 node server/test-isolation.cjs  # 隔离面验收脚本（对象存储 + 异步任务，12 断言）
@@ -62,11 +62,11 @@ node server/test-isolation.cjs  # 隔离面验收脚本（对象存储 + 异步�
 
 | 项 | 数量 | 说明 |
 |---|---|---|
-| 一级菜单 | **17** | 我的工作中心 / 项目前期 / 组合与投资 / 项目计划与进度 / 研发过程 / 样件试制与 OTS / 交付管理 / 质量管理 / 成本管理 / 资源与成本 / 门户与协同 / 文档中心 / 流程中心 / 供应链协同 / 报表与看板 / 基础数据 / 系统管理 |
-| 路由总数 | **82** | 全部接真实页面，无占位 |
-| 真实视图 | **54** | 均有独立视图、真实计算、可交互 |
+| 一级菜单 | **18** | 我的工作中心 / 项目前期 / 组合与投资 / 项目计划与进度 / 研发过程 / 样件试制与 OTS / 交付管理 / 质量管理 / 成本管理 / 资源与成本 / 门户与协同 / 文档中心 / 流程中心 / 供应链协同 / 报表与看板 / 基础数据 / 系统管理 / AI 智能辅助 |
+| 路由总数 | **83** | 全部接真实页面，无占位 |
+| 真实视图 | **55** | 均有独立视图、真实计算、可交互 |
 
-### 3.2 已实现的核心引擎（61 个 domain 纯函数模块，全部真实计算）
+### 3.2 已实现的核心引擎（62 个 domain 纯函数模块，全部真实计算）
 
 | 引擎 | 落点 | 关键口径 |
 |---|---|---|
@@ -95,11 +95,11 @@ node server/test-isolation.cjs  # 隔离面验收脚本（对象存储 + 异步�
 | 报表互操作 | `domain/reportLibrary.ts` + `interop.ts` + `dataQuality.ts` | 报表库 / 导入校验逐行定位 / 事件幂等 / 指标三处同值 |
 | 扩展点 | `domain/extensionPoint.ts` + `accessibility.ts` | 四类扩展点 + WCAG 对比度/键盘可达 |
 
-> 完整 61 个模块清单见 `app/src/domain/` 目录。
+> 完整 62 个模块清单见 `app/src/domain/` 目录。
 
 ### 3.3 架构约束落地
 
-- **ARC-001 四层**：`views → store(application) → domain ← infra`，依赖单向；`src/domain/` 内零框架 import、零 DOM 访问，可脱离 Vue 单测（575 例全部纯函数验证）。
+- **ARC-001 四层**：`views → store(application) → domain ← infra`，依赖单向；`src/domain/` 内零框架 import、零 DOM 访问，可脱离 Vue 单测（602 例全部纯函数验证）。
 - **ARC-016 图表**：甘特图、S 曲线、组合气泡图全部 `Svg*.vue` 手写 SVG，**无任何第三方图表库**。
 - **ARC-004 受控对象五要素**：状态机 + 版本 + 基线绑定 + 审计 + 权限范围，在基线页与审计页可见联动。
 - **ARC-001（R2 扩展）**：新增 `infra/repo.ts`（RestRepo），后端持久化以 `GET/PUT /api/state` + `version` 为稳定契约，前端只依赖契约不依赖实现，静默降级不白屏。
@@ -111,16 +111,16 @@ node server/test-isolation.cjs  # 隔离面验收脚本（对象存储 + 异步�
 ```
 app/
 ├── src/
-│   ├── domain/         # 61 个纯 TS 模块，业务规则唯一来源（不依赖 Vue）
-│   ├── data/seed.ts    # 种子数据（schema 版本 SEED_VERSION，当前 v1.0.14）
+│   ├── domain/         # 62 个纯 TS 模块，业务规则唯一来源（不依赖 Vue）
+│   ├── data/seed.ts    # 种子数据（schema 版本 SEED_VERSION，当前 v1.0.15）
 │   ├── infra/          # repo.ts（RestRepo 后端契约）+ i18nPlugin.ts
 │   ├── store/app.ts    # Pinia：派生指标全部由 domain 复算，localStorage + REST 双写
 │   ├── components/     # PageHeader / KpiCard / DataTable / ControlPointPanel / Svg* 图
-│   ├── views/          # 54 个视图，按 17 个一级菜单分目录
-│   ├── router/         # 17 组菜单 + 82 条路由（hash 模式）
+│   ├── views/          # 55 个视图，按 18 个一级菜单分目录
+│   ├── router/         # 18 组菜单 + 83 条路由（hash 模式）
 │   ├── layouts/        # AppLayout：左侧菜单 + 语言切换 + 响应式 + 缓存标识
 │   └── styles/         # tokens.css 深色企业风 + element-overrides.css
-├── tests/*.spec.ts     # 37 个领域层单测文件（575 例）
+├── tests/*.spec.ts     # 38 个领域层单测文件（602 例）
 ├── scripts/smoke.cjs   # 浏览器冒烟（Playwright）
 ├── scripts/e2e-click.cjs # 交互点击级回归
 └── dist/               # 构建产物

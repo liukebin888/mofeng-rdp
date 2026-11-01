@@ -6,6 +6,20 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { buildSeed, SEED_VERSION, type SeedData, type SeedUser } from '@/data/seed'
 import { evaluateControlPoints, type CpContext } from '@/domain/controlPoints'
+import {
+  filterByScope,
+  runScene,
+  SCENE_PRODUCERS,
+  reviewOutput,
+  baselineAdmission,
+  aiReviewAuditEntry,
+  aiEnabled,
+  watermark,
+  type AiScene,
+  type AiSceneOutput,
+  type RetrievalScope,
+  type ReviewAction
+} from '@/domain/aiAssist'
 import { runGate, GATE_TEMPLATES } from '@/domain/gate'
 import { freeze as freezeBaseline, verifyBaseline } from '@/domain/baseline'
 import { appendAudit, verifyChain } from '@/domain/audit'
@@ -852,6 +866,69 @@ export const useAppStore = defineStore('app', () => {
   }))
 
   const cpResults = computed(() => evaluateControlPoints(cpContext.value))
+
+  // —— AI 智能辅助（SRS 第 24 章 / AIA-001~007）——
+  /** 当前项目在两级开关下的 AI 可用性（三级优先级：总开关→项目→临时，到期自动关闭） */
+  const aiSwitchState = computed(() => aiEnabled(data.value.aiSwitch ?? { globalEnabled: true, projectSwitches: {} }, projectId.value))
+  /** 当前请求方检索范围（租户 + 项目 + 密级，密级暂取最高 L4 以便演示，实际由 RBAC 下发） */
+  const aiScope = computed<RetrievalScope>(() => ({
+    tenantId: data.value.tenantId,
+    projectId: projectId.value,
+    allowedClass: 'L4'
+  }))
+  /** 检索前置过滤后的可见语料（越权/越密级对象在检索阶段即被剔除） */
+  const aiVisibleCorpus = computed(() => filterByScope(data.value.aiCorpus ?? [], aiScope.value))
+
+  /** 执行一个 AI 场景（前置过滤 → 规则产出 → 红线校验 → 水印），返回三元组或拒绝 */
+  function runAiScene(scene: AiScene, query: string): { ok: boolean; output?: AiSceneOutput; reason?: string; watermarkText?: string } {
+    const sw = aiSwitchState.value
+    if (!sw.enabled) return { ok: false, reason: sw.reason }
+    const r = runScene(scene, aiVisibleCorpus.value.visible, query, SCENE_PRODUCERS[scene])
+    if ('rejected' in r) return { ok: false, reason: r.reason }
+    const wm = watermark(`${r.conclusion}（置信度：${r.confidence}）`)
+    // 记调用日志（待复核，不得入基线）
+    const logId = `AILOG-${Date.now()}`
+    if (!data.value.aiCallLogs) data.value.aiCallLogs = []
+    data.value.aiCallLogs.push({
+      id: logId,
+      projectId: projectId.value,
+      userId: currentUser.value.id,
+      sceneCode: scene,
+      modelKey: 'rule-rag',
+      promptVer: 'v1.0.0',
+      inputHash: String(query.length),
+      citedIds: r.citations.map((c) => c.objId),
+      reviewStatus: 'PENDING'
+    })
+    log('AI_REVIEW', 'ai_call_log', logId, { sceneCode: scene, reviewStatus: 'PENDING' })
+    return { ok: true, output: r, watermarkText: wm }
+  }
+
+  /** 复核 AI 产出（三态流转 + 未复核不可入基线 + 审计留痕） */
+  function reviewAi(logId: string, action: ReviewAction, revisedConclusion?: string) {
+    const rec = (data.value.aiCallLogs ?? []).find((l) => l.id === logId)
+    if (!rec) return null
+    const admission = baselineAdmission(rec)
+    const result = reviewOutput(rec, action, actor.value, revisedConclusion)
+    // 写回状态
+    rec.reviewStatus = result.status
+    rec.reviewerId = result.reviewerId
+    rec.reviewedAt = result.reviewedAt
+    // 生成 AI_REVIEW 审计事件（AIA-006 引用被拒/采纳均留痕）
+    const entry = aiReviewAuditEntry(rec, actor.value, result)
+    log(entry.action, entry.objType, entry.objId, entry.after, entry.before)
+    notify('success', `AI 产出「${logId}」已${action === 'REJECT' ? '驳回' : '采纳'}，${admission.reason}`)
+    return result
+  }
+
+  /** 项目级 AI 开关切换（AIA-007） */
+  function toggleAiSwitch(projectId: string, enabled: boolean) {
+    if (!data.value.aiSwitch) data.value.aiSwitch = { globalEnabled: true, projectSwitches: {} }
+    data.value.aiSwitch.projectSwitches[projectId] = enabled
+    log('UPDATE', 'ai_switch', projectId, { enabled })
+    notify('success', `项目 ${projectId} AI 已${enabled ? '开启' : '关闭'}`)
+  }
+
   const gateResults = computed<Record<string, GateRun>>(() => {
     const frozen = projectBaselines.value.some((b) => b.status === '已冻结')
     const safetySigned = data.value.flags['C-31']?.ok ?? false
@@ -2464,6 +2541,13 @@ export const useAppStore = defineStore('app', () => {
     cacheBadgeInfo,
     cpResults,
     gateResults,
+    aiSwitchState,
+    aiScope,
+    aiVisibleCorpus,
+    aiCallLogs: computed(() => data.value.aiCallLogs ?? []),
+    runAiScene,
+    reviewAi,
+    toggleAiSwitch,
     cpm,
     quality,
     completion,
