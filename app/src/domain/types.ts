@@ -982,6 +982,8 @@ export interface OrgNode {
   leaderName?: string
   /** 所属系统（研发系统 / 制造系统 / 职能系统 / 集团…） */
   system?: string
+  /** 部门编号（按部门编码规则生成，如 DEPT-RD-01） */
+  code?: string
   /** 排序 */
   order: number
 }
@@ -1058,7 +1060,27 @@ export type NamingObject = 'customer' | 'product' | 'document' | 'department' | 
 /** 命名与编码规则类别（命名规则 / 编码规则） */
 export type NamingRuleKind = 'naming' | 'coding'
 
-/** 命名与编码规则（TEN-017：各对象的命名规范与编码规范，可增删改 + 导入导出） */
+/** 编码规则结构化分段（编码规则引擎化：前缀 + 分段 + 流水号 + 分隔符） */
+export interface CodeSegment {
+  /** 分段类型：字面量常量 / 流水号 / 变量（上下文注入） */
+  type: 'literal' | 'sequence' | 'variable'
+  /** 字面量常量值（type=literal 时生效） */
+  value?: string
+  /** 流水号宽度（type=sequence 时生效，如 4 表示补零到 4 位） */
+  width?: number
+  /** 变量名（type=variable 时生效，如 code 取上下文 code） */
+  variable?: string
+}
+
+/** 编码规则结构化模板（pattern：分段数组，引擎据此生成/校验编号） */
+export interface CodePattern {
+  /** 分段列表（按序拼接） */
+  segments: CodeSegment[]
+  /** 分段之间的分隔符（默认 '-'） */
+  separator: string
+}
+
+/** 命名与编码规则（TEN-017：各对象的命名规范与编码规范，可增删改 + 导入导出 + 版本化审计） */
 export interface NamingRule {
   id: string
   /** 对象类型 */
@@ -1073,6 +1095,33 @@ export interface NamingRule {
   example?: string
   /** 是否启用 */
   enabled: boolean
+  /** 结构化编码模板（kind=coding 时生效，引擎据此生成/校验编号） */
+  pattern?: CodePattern
+  /** 规则版本号（每次变更递增，历史追溯） */
+  version: number
+  /** 最近更新时间（ISO） */
+  updatedAt?: string
+  /** 最近更新人 */
+  updatedBy?: string
+}
+
+/** 规则变更历史记录（append-only：每次增删改留痕 before/after） */
+export interface NamingRuleHistory {
+  id: string
+  /** 关联规则 id */
+  ruleId: string
+  /** 动作：新增 / 更新 / 删除 / 启停 */
+  action: 'create' | 'update' | 'delete' | 'toggle'
+  /** 变更前规则快照（新增时为空） */
+  before?: NamingRule
+  /** 变更后规则快照（删除时为空） */
+  after?: NamingRule
+  /** 变更人 */
+  by: string
+  /** 变更时间（ISO） */
+  at: string
+  /** 变更说明 */
+  note?: string
 }
 
 

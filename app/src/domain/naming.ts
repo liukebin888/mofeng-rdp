@@ -10,7 +10,8 @@
  *
  * 对象类型覆盖：客户、产品、文档、部门、人员 五大类
  */
-import type { NamingRule } from './types'
+import type { NamingRule, NamingRuleHistory } from './types'
+import { describePattern } from './codingEngine'
 
 /** 生成短 id */
 const uid = (prefix: string) => `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
@@ -54,25 +55,34 @@ export function validateNamingRule(
 
 export function addNamingRule(
   list: NamingRule[],
-  input: Omit<NamingRule, 'id'>
+  input: Omit<NamingRule, 'id' | 'version'>,
+  actor?: string
 ): { list: NamingRule[]; item?: NamingRule; error?: string } {
   const v = validateNamingRule(input, list)
   if (!v.ok) return { list, error: v.note }
-  const item: NamingRule = { id: uid('NM'), ...input, name: input.name.trim() }
+  const now = new Date().toISOString()
+  const item: NamingRule = { id: uid('NM'), ...input, name: input.name.trim(), version: 1, updatedAt: now, updatedBy: actor }
   return { list: [...list, item], item }
 }
 
 export function updateNamingRule(
   list: NamingRule[],
   id: string,
-  patch: Partial<NamingRule>
-): { list: NamingRule[]; error?: string } {
+  patch: Partial<Omit<NamingRule, 'id' | 'version'>>,
+  actor?: string
+): { list: NamingRule[]; before?: NamingRule; after?: NamingRule; error?: string } {
   const origin = list.find((r) => r.id === id)
   if (!origin) return { list, error: '规则不存在' }
   const merged = { ...origin, ...patch, name: (patch.name ?? origin.name).trim() }
   const v = validateNamingRule(merged, list, id)
   if (!v.ok) return { list, error: v.note }
-  return { list: list.map((r) => (r.id === id ? merged : r)) }
+  const after: NamingRule = {
+    ...merged,
+    version: (origin.version ?? 1) + 1,
+    updatedAt: new Date().toISOString(),
+    updatedBy: actor
+  }
+  return { list: list.map((r) => (r.id === id ? after : r)), before: origin, after }
 }
 
 export function removeNamingRule(list: NamingRule[], id: string): { list: NamingRule[]; removed?: NamingRule } {
@@ -80,9 +90,41 @@ export function removeNamingRule(list: NamingRule[], id: string): { list: Naming
   return { list: list.filter((r) => r.id !== id), removed }
 }
 
-/** 切换启用状态 */
-export function toggleNamingRule(list: NamingRule[], id: string, enabled: boolean): NamingRule[] {
-  return list.map((r) => (r.id === id ? { ...r, enabled } : r))
+/** 切换启用状态（版本递增，返回 before/after 供审计） */
+export function toggleNamingRule(
+  list: NamingRule[],
+  id: string,
+  enabled: boolean,
+  actor?: string
+): { list: NamingRule[]; before?: NamingRule; after?: NamingRule } {
+  const origin = list.find((r) => r.id === id)
+  if (!origin) return { list }
+  const after: NamingRule = {
+    ...origin,
+    enabled,
+    version: (origin.version ?? 1) + 1,
+    updatedAt: new Date().toISOString(),
+    updatedBy: actor
+  }
+  return { list: list.map((r) => (r.id === id ? after : r)), before: origin, after }
+}
+
+// ============ 规则变更历史（append-only 审计链） ============
+
+const historyUid = () => `NMH-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+
+/** 追加一条规则变更历史（append-only，不修改既有记录） */
+export function appendHistory(
+  history: NamingRuleHistory[],
+  entry: Omit<NamingRuleHistory, 'id' | 'at'>
+): NamingRuleHistory[] {
+  const item: NamingRuleHistory = { id: historyUid(), ...entry, at: new Date().toISOString() }
+  return [...history, item]
+}
+
+/** 取某规则的历史（按时间倒序） */
+export function historyOf(history: NamingRuleHistory[], ruleId: string): NamingRuleHistory[] {
+  return history.filter((h) => h.ruleId === ruleId).sort((a, b) => (a.at < b.at ? 1 : -1))
 }
 
 // ============ 导入 / 导出（CSV） ============
@@ -95,15 +137,17 @@ const csvCell = (v: string | number | boolean) => {
 
 /** 规则导出为 CSV（含表头） */
 export function exportNamingRules(list: NamingRule[]): string {
-  const head = ['对象类型', '规则类别', '规则名称', '规则描述', '示例', '是否启用']
+  const head = ['对象类型', '规则类别', '规则名称', '规则描述', '编码格式', '示例', '是否启用', '版本']
   const rows = list.map((r) =>
     [
       NAMING_OBJECT_LABEL[r.object],
       RULE_KIND_LABEL[r.kind],
       r.name,
       r.description ?? '',
+      r.pattern ? describePattern(r.pattern) : '',
       r.example ?? '',
-      r.enabled ? '是' : '否'
+      r.enabled ? '是' : '否',
+      r.version ?? 1
     ]
       .map(csvCell)
       .join(',')
@@ -134,8 +178,8 @@ export function parseNamingRules(
     const kindLabel = (cells[1] || '').trim()
     const name = (cells[2] || '').trim()
     const description = (cells[3] || '').trim()
-    const example = (cells[4] || '').trim()
-    const enabledText = (cells[5] || '').trim()
+    const example = (cells[5] || '').trim()
+    const enabledText = (cells[6] || '').trim()
 
     const object = objectByLabel(objectLabel)
     const kind = kindByLabel(kindLabel)
@@ -159,7 +203,9 @@ export function parseNamingRules(
       name,
       description: description || undefined,
       example: example || undefined,
-      enabled: enabledText === '否' ? false : true
+      enabled: enabledText === '否' ? false : true,
+      version: 1,
+      updatedAt: new Date().toISOString()
     })
   }
   return { list: out, errors }

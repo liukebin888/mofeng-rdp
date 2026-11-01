@@ -201,7 +201,7 @@ const orgUid = (prefix: string) => `${prefix}-${Date.now().toString(36)}${Math.r
 /** 新增组织节点：父节点须存在且层级相邻；根节点只能 group */
 export function addOrgNode(
   nodes: OrgNode[],
-  input: { name: string; level: OrgLevel; parentId: string | null; system?: string; leaderName?: string }
+  input: { name: string; level: OrgLevel; parentId: string | null; system?: string; leaderName?: string; code?: string }
 ): { list: OrgNode[]; item?: OrgNode; error?: string } {
   if (!input.name?.trim()) return { list: nodes, error: '组织名称必填' }
   const byId = new Map(nodes.map((n) => [n.id, n]))
@@ -227,6 +227,7 @@ export function addOrgNode(
     leaderTitle: LEVEL_LEADER_TITLE[input.level],
     leaderName: input.leaderName,
     system: input.system,
+    code: input.code,
     order: nodes.filter((n) => n.parentId === input.parentId).length + 1
   }
   return { list: [...nodes, item], item }

@@ -44,7 +44,7 @@
     <el-dialog v-model="dlgVisible" :title="editing ? '编辑客户' : '新增客户'" width="460px">
       <el-form label-width="80px" size="small">
         <el-form-item label="名称" required><el-input v-model="form.name" placeholder="如 上汽通用五菱" /></el-form-item>
-        <el-form-item label="编号" required><el-input v-model="form.code" placeholder="如 CUST-SGMW" /></el-form-item>
+        <el-form-item label="编号"><el-input v-model="form.code" placeholder="留空自动生成，如 CUST-SGMW" /></el-form-item>
         <el-form-item label="简称"><el-input v-model="form.shortName" placeholder="可选" /></el-form-item>
         <el-form-item label="车型">
           <el-select v-model="form.vehicleModels" multiple filterable allow-create default-first-option placeholder="输入车型后回车添加" style="width: 100%">
