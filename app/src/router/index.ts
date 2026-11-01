@@ -171,7 +171,8 @@ export const MENUS: MenuGroup[] = [
     key: 'basic', title: '基础数据', icon: 'Coin', stage: '全阶段', role: '租户管理员 / 项目秘书', cp: '—',
     items: [
       { path: '/basic/customer', title: '客户管理', desc: '车厂主数据：名称/编号/车型，增删改+导入导出', comp: v('basic/CustomerView') },
-      { path: '/basic/product', title: '产品管理', desc: '产品三级分类：类别→产品线→产品，增删改+导入导出', comp: v('basic/ProductView') }
+      { path: '/basic/product', title: '产品管理', desc: '产品三级分类：类别→产品线→产品，增删改+导入导出', comp: v('basic/ProductView') },
+      { path: '/basic/naming', title: '命名与编码规则', desc: '客户/产品/文档/部门/人员 命名规范与编码规范', comp: v('basic/NamingView') }
     ]
   },
   {

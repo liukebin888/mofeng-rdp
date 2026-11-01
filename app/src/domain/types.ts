@@ -1052,4 +1052,27 @@ export interface Product {
   order?: number
 }
 
+/** 命名与编码规则对象类型（客户 / 产品 / 文档 / 部门 / 人员） */
+export type NamingObject = 'customer' | 'product' | 'document' | 'department' | 'person'
+
+/** 命名与编码规则类别（命名规则 / 编码规则） */
+export type NamingRuleKind = 'naming' | 'coding'
+
+/** 命名与编码规则（TEN-017：各对象的命名规范与编码规范，可增删改 + 导入导出） */
+export interface NamingRule {
+  id: string
+  /** 对象类型 */
+  object: NamingObject
+  /** 规则类别：命名规则 / 编码规则 */
+  kind: NamingRuleKind
+  /** 规则名称（同一对象类别下唯一） */
+  name: string
+  /** 规则描述（格式、分段、长度约束、禁用字符等） */
+  description?: string
+  /** 示例（合法示例） */
+  example?: string
+  /** 是否启用 */
+  enabled: boolean
+}
+
 

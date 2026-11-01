@@ -74,6 +74,7 @@ import { createShareLink, revokeLink, activeLinks, LINK_TTL_MS, type ShareLink }
 import { checkQuota, DEFAULT_QUOTA, type QuotaConfig, type QuotaUsage } from '@/domain/quota'
 import { addCustomer as addCustomerEngine, updateCustomer as updateCustomerEngine, removeCustomer as removeCustomerEngine, addCategory as addCategoryEngine, addProductLine as addProductLineEngine, addProduct as addProductEngine, removeProductLine as removeProductLineEngine, removeProduct as removeProductEngine, removeCategory as removeCategoryEngine, exportCustomers, parseCustomers, exportProducts, parseProducts } from '@/domain/basicData'
 import { addOrgNode as addOrgNodeEngine, updateOrgNode as updateOrgNodeEngine, removeOrgNode as removeOrgNodeEngine, exportOrgNodes, parseOrgNodes } from '@/domain/org'
+import { addNamingRule as addNamingRuleEngine, updateNamingRule as updateNamingRuleEngine, removeNamingRule as removeNamingRuleEngine, toggleNamingRule as toggleNamingRuleEngine, exportNamingRules, parseNamingRules } from '@/domain/naming'
 import { pert, highRpnLinkage, filterLinkedRisks, QUANT_MODEL_VERSION } from '@/domain/riskQuant'
 import { runMonteCarlo } from '@/domain/simulation'
 import { computeReserveFromSim, gateQuantifiedCheck, riskAdjustedPlan } from '@/domain/contingency'
@@ -148,6 +149,7 @@ export const useAppStore = defineStore('app', () => {
   const productCategories = computed(() => (data.value.productCategories ?? []) as import('@/domain/types').ProductCategory[])
   const productLines = computed(() => (data.value.productLines ?? []) as import('@/domain/types').ProductLine[])
   const products = computed(() => (data.value.products ?? []) as import('@/domain/types').Product[])
+  const namingRules = computed(() => (data.value.namingRules ?? []) as import('@/domain/types').NamingRule[])
 
   // —— 多租户隔离（TEN-002/TEN-004）：当前租户上下文 + 可见项目 ——
   const tenants = computed(() => (data.value.tenants ?? []) as import('@/domain/tenant').Tenant[])
@@ -1481,6 +1483,59 @@ export const useAppStore = defineStore('app', () => {
     return { total: r.products.length, errors: r.errors }
   }
 
+  // —— 命名与编码规则 CRUD + 导入导出 ——
+  function createNamingRule(input: {
+    object: import('@/domain/types').NamingObject
+    kind: import('@/domain/types').NamingRuleKind
+    name: string
+    description?: string
+    example?: string
+    enabled?: boolean
+  }): boolean {
+    const r = addNamingRuleEngine(namingRules.value, { ...input, enabled: input.enabled ?? true })
+    if (r.error) { notify('warning', r.error); return false }
+    data.value.namingRules = r.list as import('@/domain/types').NamingRule[]
+    log('CREATE', '命名编码规则', r.item!.id, { object: input.object, kind: input.kind, name: input.name })
+    notify('success', `规则「${input.name}」已新增`)
+    return true
+  }
+  function saveNamingRule(id: string, patch: {
+    object?: import('@/domain/types').NamingObject
+    kind?: import('@/domain/types').NamingRuleKind
+    name?: string
+    description?: string
+    example?: string
+    enabled?: boolean
+  }): boolean {
+    const r = updateNamingRuleEngine(namingRules.value, id, patch)
+    if (r.error) { notify('warning', r.error); return false }
+    data.value.namingRules = r.list as import('@/domain/types').NamingRule[]
+    log('UPDATE', '命名编码规则', id, patch)
+    notify('success', '规则已更新')
+    return true
+  }
+  function deleteNamingRule(id: string): boolean {
+    const r = removeNamingRuleEngine(namingRules.value, id)
+    data.value.namingRules = r.list as import('@/domain/types').NamingRule[]
+    log('DELETE', '命名编码规则', id, {})
+    notify('success', '规则已删除')
+    return true
+  }
+  function toggleNamingRule(id: string, enabled: boolean): boolean {
+    data.value.namingRules = toggleNamingRuleEngine(namingRules.value, id, enabled) as import('@/domain/types').NamingRule[]
+    log('UPDATE', '命名编码规则', id, { enabled })
+    return true
+  }
+  function exportNamingRulesCsv(): string {
+    return exportNamingRules(namingRules.value)
+  }
+  function importNamingRulesCsv(csv: string): { total: number; errors: { line: number; note: string }[] } {
+    const r = parseNamingRules(csv, namingRules.value)
+    data.value.namingRules = r.list as import('@/domain/types').NamingRule[]
+    log('IMPORT', '命名编码规则', 'CSV', { total: r.list.length, errors: r.errors.length })
+    return { total: r.list.length, errors: r.errors }
+  }
+
   function saveUdf(input: { target: import('@/domain/types').UdfTarget; name: string; type: import('@/domain/types').UdfDef['type']; enumValues?: string[]; min?: number; max?: number }): boolean {
     const v = validateUdf(input)
     if (!v.ok) {
@@ -2120,6 +2175,7 @@ export const useAppStore = defineStore('app', () => {
     productCategories,
     productLines,
     products,
+    namingRules,
     createCustomer,
     saveCustomer,
     deleteCustomer,
@@ -2129,6 +2185,12 @@ export const useAppStore = defineStore('app', () => {
     deleteProductLine,
     deleteProduct,
     deleteCategory,
+    createNamingRule,
+    saveNamingRule,
+    deleteNamingRule,
+    toggleNamingRule,
+    exportNamingRulesCsv,
+    importNamingRulesCsv,
     createOrgNode,
     saveOrgNode,
     deleteOrgNode,

@@ -48,12 +48,13 @@ import type {
   Customer,
   ProductCategory,
   ProductLine,
-  Product
+  Product,
+  NamingRule
 } from '@/domain/types'
 import { ROLES } from '@/domain/rbac'
 import type { FlowDefinition, FlowInstance } from '@/domain/flowEngine'
 
-export const SEED_VERSION = 'mofeng.rdp.v1.0.8'
+export const SEED_VERSION = 'mofeng.rdp.v1.0.9'
 const TENANT = 'T-1001'
 
 export interface SeedUser {
@@ -222,6 +223,33 @@ function buildProducts(): Product[] {
     mk('PRD-3', 'PL-10', 'ECC 空调控制器', 1, 'ECC-01'), mk('PRD-4', 'PL-10', '双区自动空调', 2),
     mk('PRD-5', 'PL-12', '12.3 寸中控屏', 1), mk('PRD-6', 'PL-13', '全液晶仪表', 1),
     mk('PRD-7', 'PL-16', '智驾域控制器', 1), mk('PRD-8', 'PL-17', '前向毫米波雷达', 1)
+  ]
+}
+
+/** 命名与编码规则（客户/产品/文档/部门/人员 五大对象的命名规范与编码规范） */
+function buildNamingRules(): NamingRule[] {
+  const r = (id: string, object: NamingRule['object'], kind: NamingRule['kind'], name: string, description: string, example?: string, enabled = true): NamingRule => ({ id, object, kind, name, description, example, enabled })
+  return [
+    // 客户
+    r('NM-1', 'customer', 'naming', '客户全称规范', '车厂工商注册全称，不含「有限公司」缩写以外的简称', '上汽通用五菱汽车股份有限公司', true),
+    r('NM-2', 'customer', 'naming', '客户简称规范', '2~4 字通用简称，用于台账与报表展示', '五菱 / 奇瑞 / 埃安', true),
+    r('NM-3', 'customer', 'coding', '客户编号规则', '前缀 CUST- + 车厂英文/拼音缩写大写，4~10 位，全局唯一', 'CUST-SGMW、CUST-CHERY', true),
+    r('NM-4', 'customer', 'coding', '车型编号规则', '车型名称 + 平台代码，避免使用特殊符号', 'E15、B30、瑞虎 8', true),
+    // 产品
+    r('NM-5', 'product', 'naming', '产品名称规范', '功能 + 型号/规格，中文优先，同类产品命名风格统一', '12.3 寸中控屏、双区自动空调', true),
+    r('NM-6', 'product', 'coding', '产品编码规则', '产品线代码 + 两位流水号（如 ECC-01），产品线代码 3~4 位大写字母', 'ECC-01、BCM-01', true),
+    r('NM-7', 'product', 'coding', '产品线编码规则', '3~4 位大写字母缩写，取自英文全称首字母组合', 'ECC（空调）、BCM（车身）', true),
+    // 文档
+    r('NM-8', 'document', 'naming', '文档命名规则', '文档类别缩写 + 专业缩写 + 三位流水号 + 版本，如 DOC-HW-011', 'DOC-SYS-001、DOC-HW-011', true),
+    r('NM-9', 'document', 'coding', '文档编号规则', '前缀 DOC + 专业代码（SYS/HW/SW/SAF/QUA）+ 三位流水号，受控发布后编号不可变', 'DOC-SW-024、DOC-SAF-004', true),
+    r('NM-10', 'document', 'naming', '文档版本规则', '主版本 V + 副版本，正式发布用 Vx.y，草稿可用 Vx.y-draft', 'V1.4、V2.1', true),
+    // 部门
+    r('NM-11', 'department', 'naming', '部门命名规则', '按六级组织：集团→公司→中心→部门→科室→小组，名称唯一且层级语义清晰', '研发中心 / 电子电器部 / 车身控制科', true),
+    r('NM-12', 'department', 'coding', '部门编号规则', '前缀 DEPT + 层级代码 + 两位流水号，上级编号作为下级前缀', 'DEPT-RD-01、DEPT-RD-EE-02', true),
+    // 人员
+    r('NM-13', 'person', 'naming', '人员姓名规范', '实名制，中文姓名，工号与姓名一一对应', '陈志远、赵启明', true),
+    r('NM-14', 'person', 'coding', '人员工号规则', '前缀 EMP + 四位流水号，入职即定、离职保留不复用', 'EMP-0001、EMP-0002', true),
+    r('NM-15', 'person', 'coding', '岗位编号规则', '岗位序列代码 + 等级代码，如 PM-01（项目管理岗）', 'SE-01、PM-02', true)
   ]
 }
 
@@ -542,6 +570,7 @@ export function buildSeed() {
   const productCategories = buildProductCategories()
   const productLines = buildProductLines()
   const products = buildProducts()
+  const namingRules = buildNamingRules()
 
   const risks: RiskItem[] = [
     { id: 'RK1', projectId: 'P-001', code: 'RSK-018', title: '双路旋变信号共因失效', failureMode: '两路信号同时受同一干扰源影响', cause: '走线并行走同一屏蔽层', consequence: '助力误判，ASIL B 不可接受', trigger: 'EMC 辐射抗扰度试验 200V/m', severity: 7, occurrence: 6, detection: 6, strategy: '改分层走线 + 增加独立滤波，DV 阶段验证', owner: '赵启明', status: '缓解中' },
@@ -879,6 +908,7 @@ export function buildSeed() {
     productCategories,
     productLines,
     products,
+    namingRules,
     projects: projects.map((p) => ({ ...p, schemeLinked, quoteLinked }) as Project),
     wbs,
     reqs,
