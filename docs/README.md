@@ -139,6 +139,7 @@ docs/
 ├── TEST-REPORT.md      # 回归测试报告（39 节，追平 552 基线）
 ├── DEPLOYMENT.md       # 部署手册
 ├── SPEC-DISCREPANCIES.md # 规格书口径冲突确认清单
+├── GAP-ANALYSIS.md     # 需求与技术方案未达成项分析（P0 合规底线 / AI / 集成运维 / 待决策）
 └── README.md           # 本文件
 spec/
 ├── SRS.md              # 需求规格书 V1.4 全文（含附录 A~H）
