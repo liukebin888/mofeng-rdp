@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.mofeng.rdp</groupId>
+        <artifactId>mofeng-rdp-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>mofeng-application</artifactId>
+    <name>mofeng-application（应用层）</name>
+    <description>
+        SRS ARC-001 应用层：用例编排、事务边界、权限校验入口、幂等控制。可调用领域层与
+        基础设施层接口，禁止承载领域规则。技术实现为 Spring Boot Controller + ApplicationService。
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.mofeng.rdp</groupId>
+            <artifactId>mofeng-domain</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+    </dependencies>
+</project>

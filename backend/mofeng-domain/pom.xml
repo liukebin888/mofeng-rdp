@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.mofeng.rdp</groupId>
+        <artifactId>mofeng-rdp-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>mofeng-domain</artifactId>
+    <name>mofeng-domain（领域层）</name>
+    <description>
+        SRS ARC-001：领域层仅依赖 JDK 与领域自身，禁止依赖 Spring、MyBatis、HTTP 等框架与传输实现。
+        本模块承载业务对象、状态机、规则判定、追溯与基线语义——与前端 TS 纯函数引擎同构，
+        以「通过同一套 744 例测试」为迁移验收判据。
+    </description>
+
+    <dependencies>
+        <!-- 仅 JDK 与领域自身，无任何框架依赖 -->
+
+        <!-- 测试：JUnit 5 -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- 架构守护：ArchUnit（仅测试作用域，不在运行时依赖里） -->
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <version>${archunit.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

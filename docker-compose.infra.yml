@@ -1,0 +1,112 @@
+# MOFENG-RDP 基础设施栈编排（阶段 B）
+# 与 docker-compose.yml（应用栈：nginx + Node）分离，可独立启动/验证。
+# 启动：docker compose -f docker-compose.infra.yml up -d
+# 用途：承载 SRS ARC-021 锁定的中间件——MySQL 8.0 / Redis 6+ / Elasticsearch 8.x / Kafka 3.x
+
+services:
+  # —— 关系型数据库：事务 + 受控对象基表 + 追溯闭包表 + 基线哈希链 ——
+  mysql:
+    image: mysql:8.0
+    container_name: mofeng-rdp-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: mofeng-root-dev
+      MYSQL_DATABASE: mofeng_rdp
+      MYSQL_USER: mofeng
+      MYSQL_PASSWORD: mofeng-dev
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+08:00
+      - --innodb-buffer-pool-size=512M
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-umofeng", "-pmofeng-dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - mofeng-infra-net
+
+  # —— 缓存/会话/限流/分布式锁 ——
+  redis:
+    image: redis:7-alpine
+    container_name: mofeng-rdp-redis
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "mofeng-redis-dev"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "mofeng-redis-dev", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - mofeng-infra-net
+
+  # —— 全文检索 / 大列表查询（单节点，开发/试点用；生产改集群） ——
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    container_name: mofeng-rdp-es
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - mofeng-infra-net
+
+  # —— 异步任务 / 领域事件 / 跨域最终一致（KRaft 模式，单节点） ——
+  kafka:
+    image: bitnami/kafka:3.6
+    container_name: mofeng-rdp-kafka
+    environment:
+      - KAFKA_CFG_NODE_ID=0
+      - KAFKA_CFG_PROCESS_ROLES=controller,broker
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka-data:/bitnami/kafka
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server 127.0.0.1:9092 --list >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - mofeng-infra-net
+
+volumes:
+  mysql-data:
+  redis-data:
+  es-data:
+  kafka-data:
+
+networks:
+  mofeng-infra-net:
+    driver: bridge
