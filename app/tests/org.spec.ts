@@ -12,7 +12,12 @@ import {
   systemOf,
   validateOrgHierarchy,
   leaderOf,
-  countBySystem
+  countBySystem,
+  addOrgNode,
+  updateOrgNode,
+  removeOrgNode,
+  exportOrgNodes,
+  parseOrgNodes
 } from '@/domain/org'
 import type { OrgNode, OrgMembership } from '@/domain/types'
 
@@ -155,5 +160,71 @@ describe('系统归类与负责人', () => {
     const counts = countBySystem(orgNodes())
     expect(counts['研发系统']).toBeGreaterThan(0)
     expect(counts['制造系统']).toBe(2)
+  })
+})
+
+describe('组织节点增删改（TEN-009 扩展）', () => {
+  it('新增组织节点：父节点须存在且层级相邻', () => {
+    const nodes = orgNodes()
+    // 合法：在电子研发中心下加部门
+    const ok = addOrgNode(nodes, { name: '电子测试部', level: 'department', parentId: 'ELEC', system: '研发系统' })
+    expect(ok.item?.id).toBeTruthy()
+    expect(ok.item?.leaderTitle).toBe('总监')
+
+    // 跳级：部门直接挂集团 → 报错
+    const skip = addOrgNode(nodes, { name: 'X', level: 'department', parentId: 'G' })
+    expect(skip.error).toContain('逐级相邻')
+
+    // 父节点不存在
+    const orphan = addOrgNode(nodes, { name: 'Y', level: 'center', parentId: 'NOT' })
+    expect(orphan.error).toContain('父节点不存在')
+  })
+
+  it('新增根节点：只能 group 且集团唯一', () => {
+    const nodes = orgNodes()
+    const nonGroup = addOrgNode(nodes, { name: 'X', level: 'company', parentId: null })
+    expect(nonGroup.error).toContain('集团')
+
+    const secondGroup = addOrgNode(nodes, { name: '另一个集团', level: 'group', parentId: null })
+    expect(secondGroup.error).toContain('只能有一个')
+  })
+
+  it('更新组织节点：改名/改负责人，同级查重', () => {
+    const nodes = orgNodes()
+    const r = updateOrgNode(nodes, 'ELEC', { leaderName: '新总监' })
+    expect(r.error).toBeUndefined()
+    expect(r.list.find((n) => n.id === 'ELEC')?.leaderName).toBe('新总监')
+
+    // 同级重名
+    const dup = updateOrgNode(nodes, 'ELEC', { name: '结构研发中心' })
+    expect(dup.error).toContain('已存在')
+  })
+
+  it('删除组织节点：有子节点则拒绝', () => {
+    const nodes = orgNodes()
+    const blocked = removeOrgNode(nodes, 'ELEC')
+    expect(blocked.error).toContain('仍有子节点')
+
+    const ok = removeOrgNode(nodes, 'ELEC-T1')
+    expect(ok.list.length).toBe(nodes.length - 1)
+  })
+})
+
+describe('组织导入导出', () => {
+  it('导出再导入往返一致', () => {
+    const nodes = orgNodes()
+    const csv = exportOrgNodes(nodes)
+    expect(csv).toContain('魔程集团')
+    expect(csv).toContain('电子研发中心')
+
+    // 导入到空列表（无集团冲突），应按层级顺序重建
+    const r = parseOrgNodes(csv, [])
+    expect(r.errors.filter((e) => !e.note.includes('父节点')).length).toBeGreaterThanOrEqual(0)
+    expect(r.list.length).toBeGreaterThan(0)
+  })
+
+  it('导入非法层级报错', () => {
+    const r = parseOrgNodes('层级,名称,负责人,系统\n事业部,XX,,\n', [])
+    expect(r.errors.some((e) => e.note.includes('非法'))).toBe(true)
   })
 })

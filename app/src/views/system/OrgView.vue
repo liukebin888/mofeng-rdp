@@ -16,7 +16,15 @@
       <el-tab-pane label="组织架构" name="org">
         <div class="grid" style="grid-template-columns: 1.15fr 0.85fr; gap: 12px">
           <div class="panel">
-            <div class="panel-title">组织树（点击展开层级）</div>
+            <div class="panel-title" style="display: flex; align-items: center; justify-content: space-between">
+              <span>组织树（点击展开层级）</span>
+              <span>
+                <el-button link size="small" @click="doExportOrg">导出</el-button>
+                <el-button link size="small" @click="orgImportInput?.click()">导入</el-button>
+                <el-button link type="primary" size="small" @click="openAddOrg()">+ 新增</el-button>
+                <input ref="orgImportInput" type="file" accept=".csv" style="display: none" @change="doImportOrg" />
+              </span>
+            </div>
             <el-tree
               :data="orgTree"
               :props="{ label: 'name', children: 'children' }"
@@ -30,6 +38,7 @@
                   <span class="node-name">{{ data.name }}</span>
                   <span class="tag" :class="sysTagClass(data.system)">{{ data.system || '未归类' }}</span>
                   <span class="node-leader">{{ leaderTitleOf(data) }}<template v-if="data.leaderName">· {{ data.leaderName }}</template></span>
+                  <el-button link type="danger" size="small" @click.stop="doDeleteOrg(data)">删</el-button>
                 </span>
               </template>
             </el-tree>
@@ -73,6 +82,35 @@
             </div>
           </div>
         </div>
+
+        <el-dialog v-model="orgDlgVisible" :title="editingOrgId ? '编辑组织节点' : '新增组织节点'" width="440px">
+          <el-form label-width="90px" size="small">
+            <el-form-item label="层级" required>
+              <el-select v-model="orgForm.level" style="width: 100%" :disabled="!!editingOrgId">
+                <el-option v-for="(label, lv) in levelOptions" :key="lv" :label="label" :value="lv" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="父节点">
+              <el-select v-model="orgForm.parentId" style="width: 100%" clearable placeholder="留空则为集团根节点" :disabled="!!editingOrgId">
+                <el-option v-for="n in parentOptions" :key="n.id" :label="n.name" :value="n.id" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="名称" required><el-input v-model="orgForm.name" /></el-form-item>
+            <el-form-item label="负责人"><el-input v-model="orgForm.leaderName" /></el-form-item>
+            <el-form-item label="所属系统">
+              <el-select v-model="orgForm.system" style="width: 100%" clearable>
+                <el-option label="研发系统" value="研发系统" />
+                <el-option label="制造系统" value="制造系统" />
+                <el-option label="职能系统" value="职能系统" />
+                <el-option label="集团" value="集团" />
+              </el-select>
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <el-button size="small" @click="orgDlgVisible = false">取消</el-button>
+            <el-button size="small" type="primary" @click="submitOrg">保存</el-button>
+          </template>
+        </el-dialog>
       </el-tab-pane>
 
       <!-- ② 用户与角色 -->
@@ -138,12 +176,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, reactive } from 'vue'
 import PageHeader from '@/components/PageHeader.vue'
 import KpiCard from '@/components/KpiCard.vue'
 import { useAppStore } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
-import { ref } from 'vue'
 import { buildOrgTree, POST_TRACKS, LEVEL_LEADER_TITLE, trackOf, countBySystem } from '@/domain/org'
 import type { OrgLevel } from '@/domain/types'
 
@@ -210,6 +247,47 @@ const quotaRows = computed(() => {
     mk('AI token', u.aiToken, c.maxAiToken)
   ]
 })
+
+// —— 组织节点增删改 + 导入导出 ——
+const levelOptions: Record<string, string> = { group: '集团', company: '公司', center: '中心', department: '部门', section: '科室', team: '小组' }
+const orgDlgVisible = ref(false)
+const editingOrgId = ref<null | string>(null)
+const orgImportInput = ref<HTMLInputElement>()
+const orgForm = reactive({ name: '', level: 'center' as OrgLevel, parentId: null as string | null, leaderName: '', system: '' })
+
+const parentOptions = computed(() => store.orgNodes.filter((n) => n.level !== 'team'))
+
+function openAddOrg() {
+  editingOrgId.value = null
+  orgForm.name = ''; orgForm.level = 'center'; orgForm.parentId = ''; orgForm.leaderName = ''; orgForm.system = ''
+  orgDlgVisible.value = true
+}
+function submitOrg() {
+  if (editingOrgId.value) {
+    if (store.saveOrgNode(editingOrgId.value, { name: orgForm.name, leaderName: orgForm.leaderName, system: orgForm.system || undefined })) orgDlgVisible.value = false
+  } else {
+    if (store.createOrgNode({ name: orgForm.name, level: orgForm.level, parentId: orgForm.parentId || null, leaderName: orgForm.leaderName || undefined, system: orgForm.system || undefined })) orgDlgVisible.value = false
+  }
+}
+function doDeleteOrg(node: any) {
+  store.deleteOrgNode(node.id)
+}
+function doExportOrg() {
+  const csv = store.exportOrgCsv()
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = '组织架构.csv'
+  a.click()
+  URL.revokeObjectURL(a.href)
+}
+async function doImportOrg(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  const text = await file.text()
+  const r = store.importOrgCsv(text)
+  store.notify(r.errors.length ? 'warning' : 'success', `导入完成，${r.errors.length} 处异常`)
+}
 </script>
 
 <style scoped>

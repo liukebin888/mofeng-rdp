@@ -44,12 +44,16 @@ import type {
   WbsNode,
   WhatIfScenario,
   OrgNode,
-  OrgMembership
+  OrgMembership,
+  Customer,
+  ProductCategory,
+  ProductLine,
+  Product
 } from '@/domain/types'
 import { ROLES } from '@/domain/rbac'
 import type { FlowDefinition, FlowInstance } from '@/domain/flowEngine'
 
-export const SEED_VERSION = 'mofeng.rdp.v1.0.7'
+export const SEED_VERSION = 'mofeng.rdp.v1.0.8'
 const TENANT = 'T-1001'
 
 export interface SeedUser {
@@ -162,6 +166,62 @@ function buildOrgMemberships(users: SeedUser[]): OrgMembership[] {
     m('U016', 'ADM', 'tech-mgmt', '主任工程师', true),
     m('U017', 'EXEC', 'software', '架构师', true),
     m('U018', 'ELEC-D1-S1-T1', 'software', '网络工程师', true)
+  ]
+}
+
+/** 客户（车厂）主数据：名称 + 编号 + 车型 */
+function buildCustomers(): Customer[] {
+  return [
+    { id: 'CUST-1', code: 'CUST-SGMW', name: '上汽通用五菱', shortName: '五菱', vehicleModels: ['E15', 'B30', 'N300'] },
+    { id: 'CUST-2', code: 'CUST-CHERY', name: '奇瑞汽车', shortName: '奇瑞', vehicleModels: ['瑞虎 8', '艾瑞泽 5'] },
+    { id: 'CUST-3', code: 'CUST-GAC', name: '广汽埃安', shortName: '埃安', vehicleModels: ['AION S', 'AION Y'] },
+    { id: 'CUST-4', code: 'CUST-BYD', name: '比亚迪', shortName: '比亚迪', vehicleModels: ['汉', '海豹'] },
+    { id: 'CUST-5', code: 'CUST-GEELY', name: '吉利汽车', shortName: '吉利', vehicleModels: ['星越 L', '银河 E8'] }
+  ]
+}
+
+/** 产品三级分类：产品类别 → 产品线 → 产品 */
+function buildProductCategories(): ProductCategory[] {
+  return [
+    { id: 'CAT-1', name: '智能交互', order: 1 },
+    { id: 'CAT-2', name: '智能控制', order: 2 },
+    { id: 'CAT-3', name: '智能座舱', order: 3 },
+    { id: 'CAT-4', name: '智能驾驶', order: 4 },
+    { id: 'CAT-5', name: '动力能源', order: 5 },
+    { id: 'CAT-6', name: '底盘控制', order: 6 },
+    { id: 'CAT-7', name: '车载电器', order: 7 }
+  ]
+}
+
+function buildProductLines(): ProductLine[] {
+  const mk = (id: string, categoryId: string, name: string, order: number, code?: string): ProductLine => ({ id, categoryId, name, code, order })
+  return [
+    // 智能交互
+    mk('PL-1', 'CAT-1', '门窗控制', 1), mk('PL-2', 'CAT-1', '灯光控制', 2), mk('PL-3', 'CAT-1', '视野控制', 3),
+    mk('PL-4', 'CAT-1', '方向盘开关', 4), mk('PL-5', 'CAT-1', '电子排档', 5), mk('PL-6', 'CAT-1', '组合开关', 6),
+    mk('PL-7', 'CAT-1', '中控面板', 7), mk('PL-8', 'CAT-1', '开关组', 8), mk('PL-9', 'CAT-1', '座椅控制', 9),
+    // 智能控制
+    mk('PL-10', 'CAT-2', '空调控制器', 1, 'ECC'), mk('PL-11', 'CAT-2', '域控制器', 2),
+    // 智能座舱
+    mk('PL-12', 'CAT-3', '中控屏', 1), mk('PL-13', 'CAT-3', '仪表屏', 2), mk('PL-14', 'CAT-3', '扶手屏', 3), mk('PL-15', 'CAT-3', '吸顶屏', 4),
+    // 智能驾驶
+    mk('PL-16', 'CAT-4', '智驾域控', 1), mk('PL-17', 'CAT-4', '雷达', 2), mk('PL-18', 'CAT-4', '摄像头', 3),
+    // 动力能源
+    mk('PL-19', 'CAT-5', '高压电驱', 1), mk('PL-20', 'CAT-5', 'BMS 电池管理', 2),
+    // 底盘控制
+    mk('PL-21', 'CAT-6', '转向控制', 1), mk('PL-22', 'CAT-6', '制动控制', 2),
+    // 车载电器
+    mk('PL-23', 'CAT-7', '车身控制器', 1, 'BCM'), mk('PL-24', 'CAT-7', '雨刮控制', 2)
+  ]
+}
+
+function buildProducts(): Product[] {
+  const mk = (id: string, lineId: string, name: string, order: number, code?: string): Product => ({ id, lineId, name, code, order })
+  return [
+    mk('PRD-1', 'PL-1', '左前门控制模块', 1), mk('PRD-2', 'PL-1', '右前门控制模块', 2),
+    mk('PRD-3', 'PL-10', 'ECC 空调控制器', 1, 'ECC-01'), mk('PRD-4', 'PL-10', '双区自动空调', 2),
+    mk('PRD-5', 'PL-12', '12.3 寸中控屏', 1), mk('PRD-6', 'PL-13', '全液晶仪表', 1),
+    mk('PRD-7', 'PL-16', '智驾域控制器', 1), mk('PRD-8', 'PL-17', '前向毫米波雷达', 1)
   ]
 }
 
@@ -478,6 +538,10 @@ export function buildSeed() {
   const boms = buildBom()
   const orgNodes = buildOrgNodes()
   const orgMemberships = buildOrgMemberships(users)
+  const customers = buildCustomers()
+  const productCategories = buildProductCategories()
+  const productLines = buildProductLines()
+  const products = buildProducts()
 
   const risks: RiskItem[] = [
     { id: 'RK1', projectId: 'P-001', code: 'RSK-018', title: '双路旋变信号共因失效', failureMode: '两路信号同时受同一干扰源影响', cause: '走线并行走同一屏蔽层', consequence: '助力误判，ASIL B 不可接受', trigger: 'EMC 辐射抗扰度试验 200V/m', severity: 7, occurrence: 6, detection: 6, strategy: '改分层走线 + 增加独立滤波，DV 阶段验证', owner: '赵启明', status: '缓解中' },
@@ -811,6 +875,10 @@ export function buildSeed() {
     users,
     orgNodes,
     orgMemberships,
+    customers,
+    productCategories,
+    productLines,
+    products,
     projects: projects.map((p) => ({ ...p, schemeLinked, quoteLinked }) as Project),
     wbs,
     reqs,

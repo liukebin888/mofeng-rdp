@@ -193,3 +193,105 @@ export function countBySystem(nodes: OrgNode[]): Record<string, number> {
   })
   return out
 }
+
+// ============ 组织节点 CRUD（TEN-009 扩展：支持增删改） ============
+
+const orgUid = (prefix: string) => `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+
+/** 新增组织节点：父节点须存在且层级相邻；根节点只能 group */
+export function addOrgNode(
+  nodes: OrgNode[],
+  input: { name: string; level: OrgLevel; parentId: string | null; system?: string; leaderName?: string }
+): { list: OrgNode[]; item?: OrgNode; error?: string } {
+  if (!input.name?.trim()) return { list: nodes, error: '组织名称必填' }
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  const levelIdx = (l: OrgLevel) => LEVEL_ORDER.indexOf(l)
+  if (input.parentId == null) {
+    if (input.level !== 'group') return { list: nodes, error: '根节点层级必须为集团（group）' }
+    if (nodes.some((n) => n.parentId == null)) return { list: nodes, error: '已存在根节点，集团只能有一个' }
+  } else {
+    const parent = byId.get(input.parentId)
+    if (!parent) return { list: nodes, error: '父节点不存在' }
+    if (levelIdx(input.level) !== levelIdx(parent.level) + 1) {
+      return { list: nodes, error: `层级 ${LEVEL_LABEL[input.level]} 不能直接挂在 ${LEVEL_LABEL[parent.level]} 下（须逐级相邻）` }
+    }
+  }
+  if (nodes.some((n) => n.parentId === input.parentId && n.name === input.name.trim())) {
+    return { list: nodes, error: `同级下「${input.name}」已存在` }
+  }
+  const item: OrgNode = {
+    id: orgUid('ORG'),
+    name: input.name.trim(),
+    level: input.level,
+    parentId: input.parentId,
+    leaderTitle: LEVEL_LEADER_TITLE[input.level],
+    leaderName: input.leaderName,
+    system: input.system,
+    order: nodes.filter((n) => n.parentId === input.parentId).length + 1
+  }
+  return { list: [...nodes, item], item }
+}
+
+/** 更新组织节点（改名/改负责人/改系统） */
+export function updateOrgNode(nodes: OrgNode[], id: string, patch: Partial<Pick<OrgNode, 'name' | 'leaderName' | 'system'>>): { list: OrgNode[]; error?: string } {
+  const origin = nodes.find((n) => n.id === id)
+  if (!origin) return { list: nodes, error: '组织节点不存在' }
+  const merged = { ...origin, ...patch, name: (patch.name ?? origin.name).trim() }
+  if (!merged.name) return { list: nodes, error: '组织名称不能为空' }
+  const dup = nodes.find((n) => n.parentId === origin.parentId && n.name === merged.name && n.id !== id)
+  if (dup) return { list: nodes, error: `同级下「${merged.name}」已存在` }
+  return { list: nodes.map((n) => (n.id === id ? merged : n)) }
+}
+
+/** 删除组织节点：有子节点则拒绝 */
+export function removeOrgNode(nodes: OrgNode[], id: string): { list: OrgNode[]; error?: string } {
+  if (nodes.some((n) => n.parentId === id)) return { list: nodes, error: '该节点下仍有子节点，请先删除子节点' }
+  return { list: nodes.filter((n) => n.id !== id) }
+}
+
+// ============ 组织导入导出（CSV） ============
+
+const orgCsvCell = (v: string | number) => {
+  const s = String(v ?? '')
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+}
+
+/** 组织导出 CSV（层级/名称/负责人/系统） */
+export function exportOrgNodes(nodes: OrgNode[]): string {
+  const head = ['层级', '名称', '负责人', '所属系统']
+  const rows = nodes.map((n) => [LEVEL_LABEL[n.level], n.name, n.leaderName ?? '', n.system ?? ''].map(orgCsvCell).join(','))
+  return [head.join(','), ...rows].join('\n')
+}
+
+/** 组织导入（逐行：层级,名称,负责人,系统；层级须合法且按树顺序挂载） */
+export function parseOrgNodes(csv: string, existing: OrgNode[]): { list: OrgNode[]; errors: { line: number; note: string }[] } {
+  const errors: { line: number; note: string }[] = []
+  const rawLines = csv.split(/\r?\n/).filter((l) => l.trim())
+  if (rawLines.length === 0) return { list: existing, errors: [{ line: 0, note: '文件为空' }] }
+  const start = rawLines[0].includes('层级') || rawLines[0].includes('名称') ? 1 : 0
+  const out = [...existing]
+  const levelByName = (s: string): OrgLevel | undefined => (Object.entries(LEVEL_LABEL).find(([, v]) => v === s)?.[0] as OrgLevel)
+  for (let i = start; i < rawLines.length; i++) {
+    const lineNo = i + 1
+    const cells = rawLines[i].split(',').map((s) => s.replace(/^"|"$/g, '').replace(/""/g, '"'))
+    const levelName = (cells[0] || '').trim()
+    const name = (cells[1] || '').trim()
+    const leaderName = (cells[2] || '').trim()
+    const system = (cells[3] || '').trim()
+    if (!name) { errors.push({ line: lineNo, note: '组织名称为空' }); continue }
+    const level = levelByName(levelName)
+    if (!level) { errors.push({ line: lineNo, note: `层级「${levelName}」非法` }); continue }
+    if (level === 'group') {
+      if (out.some((n) => n.parentId == null)) { errors.push({ line: lineNo, note: '集团已存在' }); continue }
+      out.push({ id: orgUid('ORG'), name, level, parentId: null, leaderTitle: LEVEL_LEADER_TITLE.group, leaderName: leaderName || undefined, system: system || undefined, order: 1 })
+    } else {
+      // 挂到上一层级的最后一个节点（简化：按上一层级最后出现的节点）
+      const parentLevel = LEVEL_ORDER[LEVEL_ORDER.indexOf(level) - 1]
+      const parent = [...out].reverse().find((n) => n.level === parentLevel)
+      if (!parent) { errors.push({ line: lineNo, note: `缺少 ${LEVEL_LABEL[parentLevel]} 父节点` }); continue }
+      out.push({ id: orgUid('ORG'), name, level, parentId: parent.id, leaderTitle: LEVEL_LEADER_TITLE[level], leaderName: leaderName || undefined, system: system || undefined, order: out.filter((n) => n.parentId === parent.id).length + 1 })
+    }
+  }
+  return { list: out, errors }
+}
+

@@ -1012,3 +1012,44 @@ export interface OrgMembership {
   active: boolean
 }
 
+/** 客户（车厂）主数据：名称 + 编号 + 车型列表 */
+export interface Customer {
+  id: string
+  /** 客户名称（车厂） */
+  name: string
+  /** 客户编号 */
+  code: string
+  /** 车型列表 */
+  vehicleModels: string[]
+  /** 简称 */
+  shortName?: string
+}
+
+/** 产品类别（一级：智能交互 / 智能控制 / 智能座舱 / 智能驾驶 / 动力能源 / 底盘控制 / 车载电器） */
+export interface ProductCategory {
+  id: string
+  name: string
+  /** 排序 */
+  order: number
+}
+
+/** 产品线（二级，挂在产品类别下） */
+export interface ProductLine {
+  id: string
+  categoryId: string
+  name: string
+  /** 产品线代码（如 ECC） */
+  code?: string
+  order?: number
+}
+
+/** 产品（三级，挂在产品线下） */
+export interface Product {
+  id: string
+  lineId: string
+  name: string
+  code?: string
+  order?: number
+}
+
+

@@ -73,6 +73,7 @@ export const zhCN: Dict = {
   'menu.group.flow': '流程中心',
   'menu.group.supply': '供应链协同',
   'menu.group.report': '报表与看板',
+  'menu.group.basic': '基础数据',
   'menu.group.system': '系统管理',
 
   // —— 二级菜单 ——
@@ -144,6 +145,8 @@ export const zhCN: Dict = {
   'menu.item./report/portfolio': '组合级驾驶舱',
   'menu.item./report/audit': '审计与合规报表',
   'menu.item./report/rules': '规则体检',
+  'menu.item./basic/customer': '客户管理',
+  'menu.item./basic/product': '产品管理',
   'menu.item./system/org': '组织与用户',
   'menu.item./system/roles': '角色权限',
   'menu.item./system/audit': '审计日志',
@@ -218,6 +221,7 @@ export const enUS: Dict = {
   'menu.group.supply': 'Supply Chain Collaboration',
   'menu.group.report': 'Reports & Dashboards',
   'menu.group.system': 'System Administration',
+  'menu.group.basic': 'Master Data',
 
   // —— 二级菜单 ——
   'menu.item./workbench/today': "Today's Must-Do",
@@ -288,6 +292,8 @@ export const enUS: Dict = {
   'menu.item./report/portfolio': 'Portfolio Dashboard',
   'menu.item./report/audit': 'Audit & Compliance Report',
   'menu.item./report/rules': 'Rules Check-up',
+  'menu.item./basic/customer': 'Customer Management',
+  'menu.item./basic/product': 'Product Management',
   'menu.item./system/org': 'Organization & Users',
   'menu.item./system/roles': 'Roles & Permissions',
   'menu.item./system/audit': 'Audit Log',

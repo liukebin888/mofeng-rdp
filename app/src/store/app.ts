@@ -72,6 +72,8 @@ import { analyzeBottlenecks } from '@/domain/bottleneck'
 import { cloneStructure, validateClone } from '@/domain/projectClone'
 import { createShareLink, revokeLink, activeLinks, LINK_TTL_MS, type ShareLink } from '@/domain/shareLink'
 import { checkQuota, DEFAULT_QUOTA, type QuotaConfig, type QuotaUsage } from '@/domain/quota'
+import { addCustomer as addCustomerEngine, updateCustomer as updateCustomerEngine, removeCustomer as removeCustomerEngine, addCategory as addCategoryEngine, addProductLine as addProductLineEngine, addProduct as addProductEngine, removeProductLine as removeProductLineEngine, removeProduct as removeProductEngine, removeCategory as removeCategoryEngine, exportCustomers, parseCustomers, exportProducts, parseProducts } from '@/domain/basicData'
+import { addOrgNode as addOrgNodeEngine, updateOrgNode as updateOrgNodeEngine, removeOrgNode as removeOrgNodeEngine, exportOrgNodes, parseOrgNodes } from '@/domain/org'
 import { pert, highRpnLinkage, filterLinkedRisks, QUANT_MODEL_VERSION } from '@/domain/riskQuant'
 import { runMonteCarlo } from '@/domain/simulation'
 import { computeReserveFromSim, gateQuantifiedCheck, riskAdjustedPlan } from '@/domain/contingency'
@@ -140,6 +142,12 @@ export const useAppStore = defineStore('app', () => {
   // —— 组织架构（TEN-009 六级组织树 + 岗位序列 + 人员挂靠）——
   const orgNodes = computed(() => (data.value.orgNodes ?? []) as import('@/domain/types').OrgNode[])
   const orgMemberships = computed(() => (data.value.orgMemberships ?? []) as import('@/domain/types').OrgMembership[])
+
+  // —— 基础数据（客户 + 产品三级分类）——
+  const customers = computed(() => (data.value.customers ?? []) as import('@/domain/types').Customer[])
+  const productCategories = computed(() => (data.value.productCategories ?? []) as import('@/domain/types').ProductCategory[])
+  const productLines = computed(() => (data.value.productLines ?? []) as import('@/domain/types').ProductLine[])
+  const products = computed(() => (data.value.products ?? []) as import('@/domain/types').Product[])
 
   // —— 多租户隔离（TEN-002/TEN-004）：当前租户上下文 + 可见项目 ——
   const tenants = computed(() => (data.value.tenants ?? []) as import('@/domain/tenant').Tenant[])
@@ -1341,6 +1349,138 @@ export const useAppStore = defineStore('app', () => {
     return true
   }
 
+  // —— 基础数据：客户 CRUD ——
+  function createCustomer(input: { name: string; code: string; vehicleModels: string[]; shortName?: string }): boolean {
+    const r = addCustomerEngine(customers.value, input)
+    if (r.error) { notify('warning', r.error); return false }
+    data.value.customers = r.list as import('@/domain/types').Customer[]
+    log('CREATE', '客户', r.item!.id, { name: input.name, code: input.code })
+    notify('success', `客户「${input.name}」已新增`)
+    return true
+  }
+  function saveCustomer(id: string, patch: { name?: string; code?: string; vehicleModels?: string[]; shortName?: string }): boolean {
+    const r = updateCustomerEngine(customers.value, id, patch)
+    if (r.error) { notify('warning', r.error); return false }
+    data.value.customers = r.list as import('@/domain/types').Customer[]
+    log('UPDATE', '客户', id, patch)
+    notify('success', '客户已更新')
+    return true
+  }
+  function deleteCustomer(id: string): boolean {
+    const r = removeCustomerEngine(customers.value, id)
+    data.value.customers = r.list as import('@/domain/types').Customer[]
+    log('DELETE', '客户', id, {})
+    notify('success', '客户已删除')
+    return true
+  }
+
+  // —— 基础数据：产品三级 CRUD ——
+  function createCategory(name: string): boolean {
+    const r = addCategoryEngine(productCategories.value, name)
+    if (r.error) { notify('warning', r.error); return false }
+    data.value.productCategories = r.list as import('@/domain/types').ProductCategory[]
+    log('CREATE', '产品类别', r.item!.id, { name })
+    notify('success', `产品类别「${name}」已新增`)
+    return true
+  }
+  function createProductLine(categoryId: string, name: string, code?: string): boolean {
+    const r = addProductLineEngine(productLines.value, productCategories.value, { categoryId, name, code })
+    if (r.error) { notify('warning', r.error); return false }
+    data.value.productLines = r.list as import('@/domain/types').ProductLine[]
+    log('CREATE', '产品线', r.item!.id, { categoryId, name })
+    notify('success', `产品线「${name}」已新增`)
+    return true
+  }
+  function createProduct(lineId: string, name: string, code?: string): boolean {
+    const r = addProductEngine(products.value, productLines.value, { lineId, name, code })
+    if (r.error) { notify('warning', r.error); return false }
+    data.value.products = r.list as import('@/domain/types').Product[]
+    log('CREATE', '产品', r.item!.id, { lineId, name })
+    notify('success', `产品「${name}」已新增`)
+    return true
+  }
+  function deleteProductLine(id: string): boolean {
+    const r = removeProductLineEngine(productLines.value, products.value, id)
+    if (r.error) { notify('warning', r.error); return false }
+    data.value.productLines = r.lines as import('@/domain/types').ProductLine[]
+    data.value.products = r.products as import('@/domain/types').Product[]
+    log('DELETE', '产品线', id, {})
+    notify('success', '产品线已删除')
+    return true
+  }
+  function deleteProduct(id: string): boolean {
+    data.value.products = removeProductEngine(products.value, id) as import('@/domain/types').Product[]
+    log('DELETE', '产品', id, {})
+    notify('success', '产品已删除')
+    return true
+  }
+  function deleteCategory(id: string): boolean {
+    const r = removeCategoryEngine(productCategories.value, productLines.value, id)
+    if (r.error) { notify('warning', r.error); return false }
+    data.value.productCategories = r.categories as import('@/domain/types').ProductCategory[]
+    data.value.productLines = r.lines as import('@/domain/types').ProductLine[]
+    log('DELETE', '产品类别', id, {})
+    notify('success', '产品类别已删除')
+    return true
+  }
+
+  // —— 组织节点 CRUD + 导入导出 ——
+  function createOrgNode(input: { name: string; level: import('@/domain/types').OrgLevel; parentId: string | null; system?: string; leaderName?: string }): boolean {
+    const r = addOrgNodeEngine(orgNodes.value, input)
+    if (r.error) { notify('warning', r.error); return false }
+    data.value.orgNodes = r.list as import('@/domain/types').OrgNode[]
+    log('CREATE', '组织节点', r.item!.id, { name: input.name, level: input.level })
+    notify('success', `组织节点「${input.name}」已新增`)
+    return true
+  }
+  function saveOrgNode(id: string, patch: { name?: string; leaderName?: string; system?: string }): boolean {
+    const r = updateOrgNodeEngine(orgNodes.value, id, patch)
+    if (r.error) { notify('warning', r.error); return false }
+    data.value.orgNodes = r.list as import('@/domain/types').OrgNode[]
+    log('UPDATE', '组织节点', id, patch)
+    notify('success', '组织节点已更新')
+    return true
+  }
+  function deleteOrgNode(id: string): boolean {
+    const r = removeOrgNodeEngine(orgNodes.value, id)
+    if (r.error) { notify('warning', r.error); return false }
+    data.value.orgNodes = r.list as import('@/domain/types').OrgNode[]
+    log('DELETE', '组织节点', id, {})
+    notify('success', '组织节点已删除')
+    return true
+  }
+  function exportOrgCsv(): string {
+    return exportOrgNodes(orgNodes.value)
+  }
+  function importOrgCsv(csv: string): { errors: { line: number; note: string }[] } {
+    const r = parseOrgNodes(csv, orgNodes.value)
+    data.value.orgNodes = r.list as import('@/domain/types').OrgNode[]
+    log('IMPORT', '组织节点', 'CSV', { total: r.list.length, errors: r.errors.length })
+    return { errors: r.errors }
+  }
+
+  // —— 基础数据：导入导出 ——
+  function exportCustomersCsv(): string {
+    return exportCustomers(customers.value)
+  }
+  function importCustomersCsv(csv: string): { total: number; ok: number; errors: { line: number; note: string }[] } {
+    const r = parseCustomers(csv, customers.value)
+    data.value.customers = r.list as import('@/domain/types').Customer[]
+    log('IMPORT', '客户', 'CSV', { ok: r.list.length, errors: r.errors.length })
+    return { total: r.list.length, ok: r.list.length - r.errors.length, errors: r.errors }
+  }
+  function exportProductsCsv(): string {
+    return exportProducts(productCategories.value, productLines.value, products.value)
+  }
+  function importProductsCsv(csv: string): { total: number; errors: { line: number; note: string }[] } {
+    const r = parseProducts(csv, productCategories.value, productLines.value, products.value)
+    data.value.productCategories = r.categories as import('@/domain/types').ProductCategory[]
+    data.value.productLines = r.lines as import('@/domain/types').ProductLine[]
+    data.value.products = r.products as import('@/domain/types').Product[]
+    log('IMPORT', '产品', 'CSV', { categories: r.categories.length, lines: r.lines.length, products: r.products.length, errors: r.errors.length })
+    return { total: r.products.length, errors: r.errors }
+  }
+
   function saveUdf(input: { target: import('@/domain/types').UdfTarget; name: string; type: import('@/domain/types').UdfDef['type']; enumValues?: string[]; min?: number; max?: number }): boolean {
     const v = validateUdf(input)
     if (!v.ok) {
@@ -1976,6 +2116,28 @@ export const useAppStore = defineStore('app', () => {
     actor,
     orgNodes,
     orgMemberships,
+    customers,
+    productCategories,
+    productLines,
+    products,
+    createCustomer,
+    saveCustomer,
+    deleteCustomer,
+    createCategory,
+    createProductLine,
+    createProduct,
+    deleteProductLine,
+    deleteProduct,
+    deleteCategory,
+    createOrgNode,
+    saveOrgNode,
+    deleteOrgNode,
+    exportOrgCsv,
+    importOrgCsv,
+    exportCustomersCsv,
+    importCustomersCsv,
+    exportProductsCsv,
+    importProductsCsv,
     tenants,
     tenantContext,
     visibleProjects,
