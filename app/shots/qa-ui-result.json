@@ -1,0 +1,465 @@
+{
+  "total": 65,
+  "passed": 64,
+  "failed": 1,
+  "rows": [
+    {
+      "page": "today",
+      "field": "我的任务（未完成）",
+      "pageValue": "23",
+      "expectValue": "23",
+      "ok": true
+    },
+    {
+      "page": "today",
+      "field": "待我审批",
+      "pageValue": "4",
+      "expectValue": "4",
+      "ok": true
+    },
+    {
+      "page": "today",
+      "field": "关键路径逾期",
+      "pageValue": "8",
+      "expectValue": "8",
+      "ok": true
+    },
+    {
+      "page": "today",
+      "field": "加权完成率",
+      "pageValue": "68.96",
+      "expectValue": "68.96",
+      "ok": true
+    },
+    {
+      "page": "today",
+      "field": "工时待审核条数（说明文案）",
+      "pageValue": "3",
+      "expectValue": "3",
+      "ok": true
+    },
+    {
+      "page": "wbs",
+      "field": "WBS 节点",
+      "pageValue": "32",
+      "expectValue": "32",
+      "ok": true
+    },
+    {
+      "page": "wbs",
+      "field": "项目工期",
+      "pageValue": "179",
+      "expectValue": "179",
+      "ok": true
+    },
+    {
+      "page": "wbs",
+      "field": "关键路径节点",
+      "pageValue": "14",
+      "expectValue": "14",
+      "ok": true
+    },
+    {
+      "page": "wbs",
+      "field": "加权完成率",
+      "pageValue": "68.96",
+      "expectValue": "68.96",
+      "ok": true
+    },
+    {
+      "page": "wbs",
+      "field": "权重合计（回归 109% 缺陷）",
+      "pageValue": "100",
+      "expectValue": "100",
+      "ok": true
+    },
+    {
+      "page": "wbs",
+      "field": "权重合计 sub 文案含\"必须 =100%\"",
+      "pageValue": "yes",
+      "expectValue": "yes",
+      "ok": true
+    },
+    {
+      "page": "wbs",
+      "field": "任务明细表行数",
+      "pageValue": "32",
+      "expectValue": "32",
+      "ok": true
+    },
+    {
+      "page": "wbs",
+      "field": "权重法完成率",
+      "pageValue": "68.96",
+      "expectValue": "68.96",
+      "ok": true
+    },
+    {
+      "page": "wbs",
+      "field": "EV/BAC 法完成率",
+      "pageValue": "68.96",
+      "expectValue": "68.96",
+      "ok": true
+    },
+    {
+      "page": "wbs",
+      "field": "EV（万元）",
+      "pageValue": "882.69",
+      "expectValue": "882.69",
+      "ok": true
+    },
+    {
+      "page": "wbs",
+      "field": "两路径一致",
+      "pageValue": "yes",
+      "expectValue": "yes",
+      "ok": true
+    },
+    {
+      "page": "wbs",
+      "field": "关键路径链",
+      "pageValue": "1.1 → 2.1 → 2.2 → 3.1 → 3.2 → 5.1 → 5.2 → 5.3 → 5.4 → 5.5 → 5.6 → 6.1 → 6.2 → 6.3",
+      "expectValue": "1.1 → 2.1 → 2.2 → 3.1 → 3.2 → 5.1 → 5.2 → 5.3 → 5.4 → 5.5 → 5.6 → 6.1 → 6.2 → 6.3",
+      "ok": true
+    },
+    {
+      "page": "grading",
+      "field": "当前项目等级",
+      "pageValue": "L1",
+      "expectValue": "L1",
+      "ok": true
+    },
+    {
+      "page": "grading",
+      "field": "命中行号（sub）",
+      "pageValue": "1",
+      "expectValue": "1",
+      "ok": true
+    },
+    {
+      "page": "grading",
+      "field": "回归一致率",
+      "pageValue": "100",
+      "expectValue": "100",
+      "ok": true
+    },
+    {
+      "page": "grading",
+      "field": "13 行真值表行数",
+      "pageValue": "13",
+      "expectValue": "13",
+      "ok": true
+    },
+    {
+      "page": "grading",
+      "field": "快照哈希为 64 位十六进制",
+      "pageValue": "yes",
+      "expectValue": "yes",
+      "ok": true
+    },
+    {
+      "page": "grading",
+      "field": "12 组回归中\"不一致\"条数",
+      "pageValue": "0",
+      "expectValue": "0",
+      "ok": true
+    },
+    {
+      "page": "gate",
+      "field": "闸门卡数量",
+      "pageValue": "5",
+      "expectValue": "5",
+      "ok": true
+    },
+    {
+      "page": "gate",
+      "field": "G1 通过项数",
+      "pageValue": "5/6",
+      "expectValue": "5/6",
+      "ok": true
+    },
+    {
+      "page": "gate",
+      "field": "G1 放行结论",
+      "pageValue": "阻断",
+      "expectValue": "阻断",
+      "ok": true
+    },
+    {
+      "page": "gate",
+      "field": "G2 通过项数",
+      "pageValue": "3/6",
+      "expectValue": "3/6",
+      "ok": true
+    },
+    {
+      "page": "gate",
+      "field": "G2 放行结论",
+      "pageValue": "阻断",
+      "expectValue": "阻断",
+      "ok": true
+    },
+    {
+      "page": "gate",
+      "field": "G3 通过项数",
+      "pageValue": "2/6",
+      "expectValue": "2/6",
+      "ok": true
+    },
+    {
+      "page": "gate",
+      "field": "G3 放行结论",
+      "pageValue": "阻断",
+      "expectValue": "阻断",
+      "ok": true
+    },
+    {
+      "page": "gate",
+      "field": "G4 通过项数",
+      "pageValue": "2/6",
+      "expectValue": "2/6",
+      "ok": true
+    },
+    {
+      "page": "gate",
+      "field": "G4 放行结论",
+      "pageValue": "阻断",
+      "expectValue": "阻断",
+      "ok": true
+    },
+    {
+      "page": "gate",
+      "field": "G5 通过项数",
+      "pageValue": "5/6",
+      "expectValue": "5/6",
+      "ok": true
+    },
+    {
+      "page": "gate",
+      "field": "G5 放行结论",
+      "pageValue": "阻断",
+      "expectValue": "阻断",
+      "ok": true
+    },
+    {
+      "page": "gate",
+      "field": "48 控制点表格行数",
+      "pageValue": "48",
+      "expectValue": "48",
+      "ok": true
+    },
+    {
+      "page": "gate",
+      "field": "不合格条数（面板文案）",
+      "pageValue": "16",
+      "expectValue": "16",
+      "ok": true
+    },
+    {
+      "page": "gate",
+      "field": "有条件条数（面板文案）",
+      "pageValue": "5",
+      "expectValue": "5",
+      "ok": true
+    },
+    {
+      "page": "trace",
+      "field": "安全链路覆盖率",
+      "pageValue": "56.52",
+      "expectValue": "56.52",
+      "ok": true
+    },
+    {
+      "page": "trace",
+      "field": "综合覆盖率",
+      "pageValue": "52",
+      "expectValue": "52",
+      "ok": true
+    },
+    {
+      "page": "trace",
+      "field": "分母 / 分子",
+      "pageValue": "25 / 13",
+      "expectValue": "25 / 13",
+      "ok": true
+    },
+    {
+      "page": "trace",
+      "field": "断链条数",
+      "pageValue": "16",
+      "expectValue": "16",
+      "ok": true
+    },
+    {
+      "page": "trace",
+      "field": "四类断链类型覆盖",
+      "pageValue": "孤儿需求|版本错配|缺失下游|跨基线漂移",
+      "expectValue": "孤儿需求|版本错配|缺失下游|跨基线漂移",
+      "ok": true
+    },
+    {
+      "page": "trace",
+      "field": "断链清单行数",
+      "pageValue": "16",
+      "expectValue": "16",
+      "ok": true
+    },
+    {
+      "page": "trace",
+      "field": "影响闭包-受影响对象",
+      "pageValue": "16",
+      "expectValue": "16",
+      "ok": true
+    },
+    {
+      "page": "trace",
+      "field": "影响闭包-最大深度",
+      "pageValue": "4",
+      "expectValue": "4",
+      "ok": true
+    },
+    {
+      "page": "trace",
+      "field": "影响闭包-冻结停止",
+      "pageValue": "16",
+      "expectValue": "16",
+      "ok": true
+    },
+    {
+      "page": "audit",
+      "field": "审计记录条数",
+      "pageValue": "40",
+      "expectValue": "40",
+      "ok": true
+    },
+    {
+      "page": "audit",
+      "field": "链完整性",
+      "pageValue": "连续",
+      "expectValue": "连续",
+      "ok": true
+    },
+    {
+      "page": "audit",
+      "field": "已校验条数（sub）",
+      "pageValue": "40",
+      "expectValue": "40",
+      "ok": true
+    },
+    {
+      "page": "audit",
+      "field": "动作类型覆盖",
+      "pageValue": "7 / 11",
+      "expectValue": "7 / 11",
+      "ok": true
+    },
+    {
+      "page": "audit",
+      "field": "拒绝类记录",
+      "pageValue": "3",
+      "expectValue": "3",
+      "ok": true
+    },
+    {
+      "page": "audit",
+      "field": "最近审计表格行数（应为 10）",
+      "pageValue": "10",
+      "expectValue": "10",
+      "ok": true
+    },
+    {
+      "page": "evm",
+      "field": "PV 计划值（store 口径 0.66×预算）",
+      "pageValue": "844.8",
+      "expectValue": "844.8",
+      "ok": true
+    },
+    {
+      "page": "evm",
+      "field": "EV 挣值",
+      "pageValue": "882.69",
+      "expectValue": "882.69",
+      "ok": true
+    },
+    {
+      "page": "evm",
+      "field": "AC 实际成本",
+      "pageValue": "812.6",
+      "expectValue": "812.6",
+      "ok": true
+    },
+    {
+      "page": "evm",
+      "field": "SPI（页面判读区）",
+      "pageValue": "1.04",
+      "expectValue": "1.04",
+      "ok": true
+    },
+    {
+      "page": "evm vs gate(C-05)",
+      "field": "同一 SPI 指标跨页一致性",
+      "pageValue": "EVM 页 1.04 / C-05 控制点 1.11",
+      "expectValue": "两处必须相同（C-28/C-47）",
+      "ok": false
+    },
+    {
+      "page": "persist",
+      "field": "首屏加载后 localStorage 是否已写入（store 仅在动作后 persist）",
+      "pageValue": "未写入（按设计）",
+      "expectValue": "观察项",
+      "ok": true
+    },
+    {
+      "page": "persist",
+      "field": "填报 +10% 后加权完成率变化",
+      "pageValue": "changed",
+      "expectValue": "changed",
+      "ok": true
+    },
+    {
+      "page": "persist",
+      "field": "localStorage 审计条数（40 + 1 次操作）",
+      "pageValue": "41",
+      "expectValue": "41",
+      "ok": true
+    },
+    {
+      "page": "persist",
+      "field": "localStorage 版本标记",
+      "pageValue": "mofeng.rdp.v1.0.3",
+      "expectValue": "mofeng.rdp.v1.0.3",
+      "ok": true
+    },
+    {
+      "page": "persist",
+      "field": "刷新后加权完成率不丢（等于操作后的值）",
+      "pageValue": "69.56",
+      "expectValue": "69.56",
+      "ok": true
+    },
+    {
+      "page": "persist",
+      "field": "reset() 后加权完成率回种子值",
+      "pageValue": "68.96",
+      "expectValue": "68.96",
+      "ok": true
+    },
+    {
+      "page": "persist",
+      "field": "reset() 后审计条数回种子值",
+      "pageValue": "40",
+      "expectValue": "40",
+      "ok": true
+    },
+    {
+      "page": "persist",
+      "field": "reset() 后 WBS 进度回种子值",
+      "pageValue": "diff",
+      "expectValue": "diff",
+      "ok": true
+    }
+  ],
+  "consoleErrors": [
+    "[console] http://127.0.0.1:4181/#/workbench/today :: Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ]
+}

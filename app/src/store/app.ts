@@ -1,0 +1,2156 @@
+/**
+ * 应用服务与全局上下文（对应架构中的 application 层 + pinia 适配）
+ * 业务规则一律调用 domain 引擎；本层只做编排、持久化与审计落地
+ */
+import { defineStore } from 'pinia'
+import { computed, ref } from 'vue'
+import { buildSeed, SEED_VERSION, type SeedData, type SeedUser } from '@/data/seed'
+import { evaluateControlPoints, type CpContext } from '@/domain/controlPoints'
+import { runGate, GATE_TEMPLATES } from '@/domain/gate'
+import { freeze as freezeBaseline, verifyBaseline } from '@/domain/baseline'
+import { appendAudit, verifyChain } from '@/domain/audit'
+import { computeCpm, planQualityChecks, plannedValue, statusDayOf, weightedCompletion } from '@/domain/schedule'
+import { computeEvm } from '@/domain/evm'
+import { rankProjects } from '@/domain/portfolio'
+import { coverage, detectBreaks } from '@/domain/trace'
+import type { ActorContext, Baseline, GateDef, GateRun, Level, WbsNode } from '@/domain/types'
+import { can, type ActionKey } from '@/domain/rbac'
+import { guardTenant, visibleInTenant, groupDrillDown, type TenantContext } from '@/domain/tenant'
+import { advanceThroughBranch, approveNode, availableActions, escalate, getNode, isOverdue, rejectNode, startFlow, addSigner, transferNode, signNode, type FlowDefinition } from '@/domain/flowEngine'
+import {
+  addComment,
+  archive,
+  canDownload,
+  checkin,
+  checkout,
+  obsolete,
+  publish,
+  resolveComment,
+  revisionUp,
+  searchDocs,
+  signoff,
+  submitForSignoff,
+  veto,
+  type ControlledDoc
+} from '@/domain/docEngine'
+import { appendRemoteAudit, checkBackend, loadRemoteState, saveRemoteState, seedRemoteAudit, repoBase } from '@/infra/repo'
+import { knowledgeStats, markReused, nextLessonCode, pushToLibrary, searchLessons as searchLessonsEngine, validateLesson } from '@/domain/lessonEngine'
+import {
+  advanceSupervise as advanceSuperviseEngine,
+  answerSendAudit as answerSendAuditEngine,
+  closeResolution as closeResolutionEngine,
+  escalateSendAudit,
+  escalateSupervise,
+  nextResolutionCode,
+  overdueResolutions,
+  resolutionToTask as resolutionToTaskEngine,
+  validateMeeting,
+  validateResolution,
+  validateSendAudit,
+  type ResolutionInput,
+  type SendAuditInput,
+  type SuperviseActionType
+} from '@/domain/collabEngine'
+import { decisionComplete } from '@/domain/portfolio'
+import { roiOf, validateCurrency, type CurrencyAmount } from '@/domain/portfolioFinance'
+import { applyAdjustments, canMerge, diffScenarios, mergeScenario, removeScenario } from '@/domain/whatif'
+import { affectedPlans, endDateAfter, isWorkday, lineage, validateException, workdaysBetween } from '@/domain/calendarEngine'
+import type { CalendarDef } from '@/domain/types'
+import { aggregateMyTasks, bucketTodos } from '@/domain/myWorkEngine'
+import { addCodeValue, filterCodeDict, validateUdf, stepCompletion, bumpTemplateVersion } from '@/domain/governanceConfig'
+import { unreadCount, markRead, markAllRead, shouldNotify, inboxFor, batchApprove, rejectInbox } from '@/domain/messageCenter'
+import { validateShareApply, isOccupied, expireOverdue, approveShare, renewShare, releaseShare, submitForApproval, activeShares } from '@/domain/resourceShare'
+import { visibleSections, resetSections, toggleSection, setSectionRoles } from '@/domain/portalConfig'
+import { upsertDraft, clearDraft, expiredDrafts, draftKey } from '@/domain/draftEngine'
+import { normalizeLocale, localeInvariant, LOCALE_AUDIT_KEY, type Locale } from '@/domain/i18n'
+import { enqueueWrite, settleWrite, dedupeQueue, stampCache, cacheBadge, type PendingWrite, type CacheStamp } from '@/domain/mobilePortal'
+import { detectConflicts } from '@/domain/resourceConflict'
+import { analyzeSupplyDemand } from '@/domain/supplyDemand'
+import { detectOverallocations, gateBlocked } from '@/domain/overallocation'
+import { levelResources, smoothResources } from '@/domain/leveling'
+import { analyzeBottlenecks } from '@/domain/bottleneck'
+import { cloneStructure, validateClone } from '@/domain/projectClone'
+import { createShareLink, revokeLink, activeLinks, LINK_TTL_MS, type ShareLink } from '@/domain/shareLink'
+import { checkQuota, DEFAULT_QUOTA, type QuotaConfig, type QuotaUsage } from '@/domain/quota'
+import { pert, highRpnLinkage, filterLinkedRisks, QUANT_MODEL_VERSION } from '@/domain/riskQuant'
+import { runMonteCarlo } from '@/domain/simulation'
+import { computeReserveFromSim, gateQuantifiedCheck, riskAdjustedPlan } from '@/domain/contingency'
+import type { RiskLink, SimConfig, ThreePoint } from '@/domain/types'
+import { searchCandidates, validatePoolHierarchy, validateEngagementRatio, canEnterBaseline, requestCommitmentChange, backfillHours, externalCapacityDeviation, effortDeviationRate, efficiencyFactor, isEstimateStale } from '@/domain/resourcePool'
+import { buildHistogram, rateAt, costForPeriod, convertCurrency, createScenario, selectScenario, canWriteBack, compareScenarios } from '@/domain/resourcePlan'
+import type { ResourcePoolNode, ResourceRequest, AssignmentCommitment, HourBackfill, ExternalCapacity, EffortDeviation, ResourceRate, ResourceScenario } from '@/domain/types'
+import { metricBindingRate, groupCoverage } from '@/domain/reportLibrary'
+import type { ReportDef, MetricDictEntry } from '@/domain/reportLibrary'
+import { threeWayConsistency } from '@/domain/dataQuality'
+import { validateImport, type FieldMapping } from '@/domain/interop'
+import { defineForm, runHooksAtPoint, apiContractComplete, extensionPointsComplete, type CustomFormDef, type EventHook, type OpenApiEndpoint } from '@/domain/extensionPoint'
+import { checkContrast, checkKeyboardAccessible, checkFormLabels, accessibilityPassRate } from '@/domain/accessibility'
+
+const KEY = 'mofeng.rdp.state.v1'
+/** 语言偏好独立持久化（UI 偏好 ≠ 业务数据，不进入主文档乐观锁通道） */
+const LOCALE_KEY = 'mofeng.rdp.locale.v1'
+
+interface PersistShape {
+  version: string
+  data: SeedData
+  userId: string
+  projectId: string
+  /** 服务端乐观锁版本号（REST 通道下维护，冲突返回 409） */
+  rev?: number
+}
+
+function load(): PersistShape | null {
+  try {
+    const raw = localStorage.getItem(KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as PersistShape
+    if (parsed.version !== SEED_VERSION) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+export const useAppStore = defineStore('app', () => {
+  const saved = load()
+  const data = ref<SeedData>(saved?.data ?? buildSeed())
+  const userId = ref<string>(saved?.userId ?? 'U003')
+  const projectId = ref<string>(saved?.projectId ?? 'P-001')
+  const toast = ref<{ type: 'success' | 'warning' | 'error' | 'info'; text: string } | null>(null)
+  /** 界面语言（TEN-013）：仅影响展示层，数据权限（tenantContext/rbac）不随语言变化 */
+  const locale = ref<Locale>(normalizeLocale(localStorage.getItem(LOCALE_KEY)))
+  /** 仓储通道：'local'（localStorage 降级）| 'rest'（后端持久化） */
+  const repoMode = ref<'local' | 'rest'>('local')
+  /** 服务端乐观锁版本号（REST 通道下维护） */
+  const rev = ref<number>(0)
+  /** 弱网离线写队列（POR-012：REST 写失败入队，同键去重，联网 flush） */
+  const pendingWrites = ref<PendingWrite[]>([])
+  /** 本地缓存时间戳（POR-012：标识数据是否为本地缓存 + 是否过期只读） */
+  const cacheStamp = ref<CacheStamp>({ cachedAt: new Date().toISOString(), version: 'current', fromCache: false })
+  /** 文件交换外链（SUP-016：默认 7 天失效、可撤销、内外分离） */
+  const shareLinks = ref<ShareLink[]>([])
+  /** 租户配额配置（TEN-012：四类配额按租户配置） */
+  const quotaConfig = ref<QuotaConfig>({ ...DEFAULT_QUOTA })
+  /** RES-005：已裁决的超分配（key = userId\0week），裁决后闸门放行 */
+  const resolvedOverallocIds = ref<string[]>([])
+
+  const users = computed<SeedUser[]>(() => data.value.users)
+  const currentUser = computed(() => users.value.find((u) => u.id === userId.value) || users.value[0])
+
+  // —— 多租户隔离（TEN-002/TEN-004）：当前租户上下文 + 可见项目 ——
+  const tenants = computed(() => (data.value.tenants ?? []) as import('@/domain/tenant').Tenant[])
+  /** 当前租户上下文：tenantId 由入口（登录态）强制注入，业务代码禁止从入参取 */
+  const tenantContext = computed<TenantContext>(() => ({
+    tenantId: data.value.tenantId,
+    roleCode: currentUser.value.roleCode
+  }))
+  /** 可见项目 = 归属当前租户的项目（跨租户项目不可见，不泄露存在性 TEN-004） */
+  const visibleProjects = computed(() => visibleInTenant(tenantContext.value, data.value.projects))
+  const currentProject = computed(() => visibleProjects.value.find((p) => p.id === projectId.value) || visibleProjects.value[0])
+
+  /** 跨租户访问守卫：伪造/越界 tenantId 一律拒绝并留审计（应用层面，TEN-004） */
+  function guardTenantAccess(targetTenantId?: string): boolean {
+    const v = guardTenant(tenantContext.value, targetTenantId)
+    if (!v.ok) {
+      notify('error', `${v.note}（TEN-004 越权拦截）`)
+      log('ACCESS', '租户', targetTenantId ?? '—', { verdict: v.code }, undefined, 'DENY')
+      return false
+    }
+    return true
+  }
+
+  /** 集团视图下钻判定（TEN-008）：仅集团级角色可看子租户授权共享的汇总指标 */
+  function guardGroupDrillDown(metric: string, subTenantCode: string): boolean {
+    const sub = tenants.value.find((t) => t.code === subTenantCode)
+    if (!sub) return false
+    const v = groupDrillDown(tenantContext.value, metric, sub)
+    if (!v.ok) {
+      notify('error', v.note)
+      log('ACCESS', '集团视图', subTenantCode, { metric, verdict: v.code }, undefined, 'DENY')
+      return false
+    }
+    return true
+  }
+
+  const actor = computed<ActorContext>(() => ({
+    userId: currentUser.value.id,
+    userName: currentUser.value.name,
+    roleCode: currentUser.value.roleCode,
+    roleName: currentUser.value.roleName,
+    tenantId: data.value.tenantId,
+    projectId: projectId.value,
+    at: new Date().toISOString()
+  }))
+
+  function persist() {
+    const payload: PersistShape = { version: SEED_VERSION, data: data.value, userId: userId.value, projectId: projectId.value, rev: rev.value }
+    localStorage.setItem(KEY, JSON.stringify(payload))
+    // 后端可用时异步同步（fire-and-forget，不阻塞交互；失败入队待重试）
+    // 降级提示不得覆盖业务反馈：仅当当前无 toast 时提示一次，避免「基线篡改被拒」等关键错误被淹没。
+    if (repoMode.value === 'rest') {
+      void saveRemoteState({ ...payload, expectedRev: rev.value }).then((ok) => {
+        if (ok) {
+          rev.value = rev.value + 1
+          void flushPendingWrites()
+        } else {
+          // POR-012 弱网排队去重：同键（数据状态）写失败入队，保留最新
+          pendingWrites.value = enqueueWrite(pendingWrites.value, 'state', JSON.stringify(payload), new Date().toISOString())
+          if (!toast.value) notify('warning', '网络较弱，写入已排队待同步（POR-012）')
+        }
+      })
+    }
+  }
+
+  /** POR-012：联网后按序 flush 待写队列（去重压缩后逐条重试） */
+  async function flushPendingWrites() {
+    if (!pendingWrites.value.length) return
+    const queue = dedupeQueue(pendingWrites.value)
+    for (const w of queue) {
+      const ok = await saveRemoteState({ expectedRev: rev.value, ...(JSON.parse(w.payload) as object) })
+      const r = settleWrite(queue, w.key, ok)
+      pendingWrites.value = r.queue
+      if (r.dead) notify('error', `离线写入 ${w.key} 重试超限，已转死信（POR-012）`)
+      if (ok) rev.value = rev.value + 1
+    }
+  }
+
+  /** 启动时探测后端并同步：后端有数据 → 采用后端；否则播种到后端；失败降级 localStorage */
+  async function syncFromBackend() {
+    try {
+      const health = await checkBackend()
+      if (!health.ok) {
+        repoMode.value = 'local'
+        // POR-012：降级本地存储时打缓存时间戳标识（只读判定由引擎求值）
+        cacheStamp.value = stampCache(Date.now())
+        return
+      }
+      repoMode.value = 'rest'
+      cacheStamp.value = { cachedAt: new Date().toISOString(), version: 'current', fromCache: false }
+      const remote = await loadRemoteState()
+      if (remote && typeof remote === 'object' && (remote as unknown as PersistShape).version === SEED_VERSION) {
+        const rs = remote as unknown as PersistShape
+        data.value = rs.data
+        userId.value = rs.userId
+        projectId.value = rs.projectId
+        rev.value = rs.rev ?? 0
+        localStorage.setItem(KEY, JSON.stringify(rs))
+        notify('info', '已从服务端加载最新数据（跨端共享）')
+      } else {
+        // 后端无数据或版本不符：将当前（本地种子）播种/迁移到后端。
+        // 版本不符（如 v1.0.4 → v1.0.5）属合法 seed 升级：携带后端当前 rev 覆盖写入，避免乐观锁 409。
+        const backendRev = (remote && typeof remote === 'object' ? (remote as unknown as PersistShape).rev : undefined) ?? 0
+        const payload: PersistShape = { version: SEED_VERSION, data: data.value, userId: userId.value, projectId: projectId.value, rev: backendRev }
+        const ok = await saveRemoteState({ ...payload, expectedRev: backendRev })
+        if (ok) {
+          rev.value = backendRev + 1
+          notify('info', '数据已播种至服务端（REST 持久化已启用）')
+        }
+      }
+      // 审计链播种：仅当服务端审计为空时，把本地种子审计链推上去（服务端权威重算哈希）
+      void seedRemoteAudit(data.value.audit as unknown[])
+    } catch {
+      repoMode.value = 'local'
+      cacheStamp.value = stampCache(Date.now())
+    }
+  }
+
+  function reset() {
+    data.value = buildSeed()
+    userId.value = 'U003'
+    projectId.value = 'P-001'
+    persist()
+    notify('success', '演示数据已重置为初始种子（3 个项目 / 48 控制点 / 40 条审计）')
+  }
+
+  function notify(type: 'success' | 'warning' | 'error' | 'info', text: string) {
+    toast.value = { type, text }
+    setTimeout(() => (toast.value = null), 3600)
+  }
+
+  function setUser(id: string) {
+    userId.value = id
+    persist()
+  }
+
+  function setProject(id: string) {
+    projectId.value = id
+    persist()
+  }
+
+  /**
+   * PRJ-022 项目结构复制：复制当前项目的 WBS 骨架 + Gate 定义（全局模板）+ 交付物清单，
+   * 需求/样件/变更/风险/工时/基线等业务数据一律不复制（业务数据 0 条），
+   * 复制结果标记来源模板版本。复制前后各校验一次结构与数据清零口径。
+   */
+  function cloneProjectStructure(sourceProjectId: string, newProjectId: string): boolean {
+    const src = {
+      wbs: data.value.wbs.filter((w) => w.projectId === sourceProjectId),
+      deliverables: data.value.deliverables.filter((d) => d.projectId === sourceProjectId),
+      gates: GATE_TEMPLATES as GateDef[],
+      sourceCode: data.value.projects.find((p) => p.id === sourceProjectId)?.code ?? sourceProjectId
+    }
+    const result = cloneStructure(src, newProjectId)
+    const check = validateClone(src, result)
+    if (!check.ok) {
+      notify('error', `结构复制校验未通过：${check.issues.join('；')}`)
+      return false
+    }
+    log('CLONE', '项目结构', sourceProjectId, { newProjectId, sourceTemplateVersion: result.sourceTemplateVersion, stats: result.stats })
+    notify('success', `已复制项目结构：WBS ${result.stats.wbsCount} 节点 / 交付物 ${result.stats.deliverableCount} / Gate ${result.stats.gateCount}（业务数据 0 条，模板版本 ${result.sourceTemplateVersion}）`)
+    return true
+  }
+
+  /** RES-005/C-40 超分配裁决：登记 userId+week 为已处置，闸门放行 */
+  function resolveOverallocation(userId: string, week: string, remedy: string): void {
+    const key = `${userId}\u0000${week}`
+    if (resolvedOverallocIds.value.includes(key)) return
+    resolvedOverallocIds.value = [...resolvedOverallocIds.value, key]
+    log('UPDATE', '资源', userId, { action: '超分配裁决', week, remedy })
+    notify('success', `已裁决超分配（${remedy}），资源闸门放行`)
+  }
+
+  /** RES-006 资源平衡：延后非关键活动消除超分配，里程碑零移动，可回退 */
+  function balanceResources(roles: string[]): void {
+    const result = levelResources(projectWbs.value, roles)
+    if (!result.changes.length) {
+      notify('info', '无可延后的非关键活动（关键路径/里程碑/HARD 约束均不可移动）')
+      return
+    }
+    // 回写 WBS（差异清单已由引擎输出）
+    data.value.wbs = data.value.wbs.map((w) => {
+      const moved = result.after.find((a) => a.id === w.id)
+      return moved ?? w
+    })
+    log('UPDATE', '资源', '平衡', { moved: result.changes.length, finishDelta: result.finishDeltaDays })
+    notify('success', `资源平衡完成：延后 ${result.changes.length} 个非关键活动，里程碑零移动，完工日期变化 ${result.finishDeltaDays} 天`)
+    persist()
+  }
+
+  /** RES-007 资源平滑：完工日期不变约束下削峰，峰值下降可量化，可回退 */
+  function smoothResourcesAction(roles: string[]): void {
+    const result = smoothResources(projectWbs.value, roles)
+    if (!result.changes.length) {
+      notify('info', '无可平滑的非关键活动（峰值已最优或均关键）')
+      return
+    }
+    data.value.wbs = data.value.wbs.map((w) => {
+      const moved = result.after.find((a) => a.id === w.id)
+      return moved ?? w
+    })
+    log('UPDATE', '资源', '平滑', { moved: result.changes.length, peakReduction: result.peakReduction, finishDelta: result.finishDeltaDays })
+    notify('success', `资源平滑完成：峰值下降 ${result.peakReduction}，完工日期变化 ${result.finishDeltaDays} 天`)
+    persist()
+  }
+
+  /** SUP-016 外链：为文档生成外链（内部文件不可外链，内外分离） */
+  function createDocShareLink(docId: string): ShareLink | null {
+    const doc = data.value.docs.find((d) => d.id === docId)
+    if (!doc) {
+      notify('error', '文档不存在')
+      return null
+    }
+    const link = createShareLink({ id: doc.id, name: doc.name }, new Date(), LINK_TTL_MS, 'external')
+    if (!link) {
+      notify('error', '内部文件不可生成外链（内外分离 SUP-016）')
+      return null
+    }
+    shareLinks.value.push(link)
+    log('CREATE', '外链', link.id, { docId, expireAt: link.expireAt })
+    notify('success', `已生成外链（7 天有效）：${doc.name}`)
+    return link
+  }
+
+  /** SUP-016 外链：主动撤销（撤销后不可访问，幂等） */
+  function revokeDocShareLink(linkId: string): boolean {
+    const link = shareLinks.value.find((l) => l.id === linkId)
+    if (!link) return false
+    const revoked = revokeLink(link, currentUser.value.name, new Date())
+    shareLinks.value = shareLinks.value.map((l) => (l.id === linkId ? revoked : l))
+    log('REVOKE', '外链', linkId, { revokedAt: revoked.revokedAt, revokedBy: revoked.revokedBy })
+    notify('success', `外链已撤销，立即不可访问`)
+    return true
+  }
+
+  /** SUP-016 外链：仍可访问的外链列表（未撤销 + 未到期 + external） */
+  const activeShareLinks = computed(() => activeLinks(shareLinks.value, new Date()))
+
+  /** TEN-012 租户配额：当前用量快照（用户数取自 users；存储/并发/token 为演示口径） */
+  const quotaUsage = computed<QuotaUsage>(() => ({
+    users: users.value.length,
+    storageMb: Math.round((data.value.audit.length + data.value.docs.length + data.value.wbs.length) * 0.5),
+    concurrency: 1,
+    aiToken: data.value.messages.length * 100
+  }))
+
+  /** TEN-012 配额判定：仅「新增」受配额限制，读动作永远放行 */
+  function checkTenantQuota(action: 'create' | 'read' = 'create'): boolean {
+    const v = checkQuota(action, quotaConfig.value, quotaUsage.value)
+    if (!v.ok) {
+      notify('error', v.reason)
+      return false
+    }
+    return true
+  }
+
+  /** 权限校验入口（三层取交集：角色 × 作用域 × 字段策略） */
+  function guard(action: ActionKey): boolean {
+    const r = can(currentUser.value.roleCode, action)
+    if (!r.allowed) notify('error', r.reason)
+    else if (r.conditional) notify('warning', r.reason)
+    return r.allowed
+  }
+
+  function log(action: string, objType: string, objId: string, after?: unknown, before?: unknown, result: 'OK' | 'DENY' = 'OK') {
+    const row = appendAudit(data.value.audit, actor.value, { action, objType, objId, after, before, result })
+    // 审计 append 独立通道：服务端权威重算哈希、append-only（不与主文档全量覆盖）
+    if (repoMode.value === 'rest') {
+      const a = actor.value
+      void appendRemoteAudit({
+        actorId: a.userId,
+        actorName: a.userName,
+        actorRole: a.roleName,
+        action,
+        objType,
+        objId,
+        before: before ?? null,
+        after: after ?? null,
+        result,
+        tenantId: a.tenantId
+      })
+    }
+    persist()
+    return row
+  }
+
+  // —— 派生数据：控制点 / Gate / 计划 / 追溯 / 挣值 ——
+  const projectWbs = computed(() => data.value.wbs.filter((w) => w.projectId === projectId.value))
+  const projectReqs = computed(() => data.value.reqs.filter((r) => r.projectId === projectId.value))
+  const projectLinks = computed(() => data.value.links.filter((l) => projectReqs.value.some((r) => r.id === l.srcId) || projectReqs.value.some((r) => r.id === l.dstId)))
+  const projectRisks = computed(() => data.value.risks.filter((r) => r.projectId === projectId.value))
+  const projectEcrs = computed(() => data.value.ecrs.filter((e) => e.projectId === projectId.value))
+  const projectBaselines = computed(() => data.value.baselines.filter((b) => b.projectId === projectId.value))
+  const projectDeliverables = computed(() => data.value.deliverables.filter((d) => d.projectId === projectId.value))
+  const projectDocs = computed(() => data.value.docs.filter((d) => d.projectId === projectId.value))
+  const projectHours = computed(() => data.value.hours.filter((h) => h.projectId === projectId.value))
+  /** PRJ-016 资源冲突：按人按周聚合工时，负荷率 >110% 判冲突（时段 = 周） */
+  const resourceConflicts = computed(() => detectConflicts(projectHours.value).conflicts)
+  /** RES-005 超分配三级：按人按周，L1<120% / L2 120~150% / L3 >150% */
+  const overallocations = computed(() => detectOverallocations(projectHours.value, 40, resolvedOverallocIds.value))
+  /** RES-005/C-40 闸门阻断：未处置的 L2/L3 超分配阻断资源闸门 */
+  const resourceGateBlock = computed(() => gateBlocked(overallocations.value))
+  /** RES-012 瓶颈资源：占用率 ≥90% 且位于关键路径 */
+  const bottlenecks = computed(() => analyzeBottlenecks(projectWbs.value, 60))
+  /** RES-004 供需分析：需求侧按角色聚合 WBS 工期，净可用按周窗口折算（演示口径） */
+  const supplyDemand = computed(() => {
+    const assignments = projectWbs.value.map((w) => ({
+      id: w.id,
+      projectId: w.projectId,
+      role: w.ownerRole || '未分配',
+      week: '2026-W45',
+      demandHours: w.duration * 8,
+      activityId: w.id,
+      committed: true
+    }))
+    return analyzeSupplyDemand(assignments, (role) => {
+      // 净可用：按资源池成员数 × 40h（有该角色成员即 40h/周）
+      const members = resourcePool.value.filter((m) => m.role === role).length
+      return members ? members * 40 : 40
+    })
+  })
+  // —— RQA 风险量化域 ——
+  /** RQA-005 高 RPN 风险关联率：高 RPN（≥200）风险必须 100% 关联活动/成本项 */
+  const riskLinks = ref<Map<string, RiskLink>>(new Map())
+  /** RQA-001 三点估算登记（riskId → 三点） */
+  const threePoints = ref<Map<string, ThreePoint>>(new Map())
+  const riskLinkage = computed(() => highRpnLinkage(projectRisks.value, riskLinks.value))
+  /** RQA-012 定量风险与门禁联动（C-44 L4）：高风险未量化阻断 Gate */
+  const riskGateCheck = computed(() =>
+    gateQuantifiedCheck(
+      projectRisks.value.map((r) => ({
+        rpn: r.severity * r.occurrence * r.detection,
+        quantified: threePoints.value.has(r.id),
+        strategy: r.strategy
+      }))
+    )
+  )
+  /** RQA-002/003 蒙特卡洛模拟结果（基于三点估算 + 关联风险） */
+  const simResult = ref<ReturnType<typeof runMonteCarlo> | null>(null)
+  /** RQA-001 PERT：对已登记三点估算的风险求 PERT */
+  function pertOf(riskId: string) {
+    const tp = threePoints.value.get(riskId)
+    return tp ? pert(tp) : null
+  }
+  /** RQA-006 储备（由模拟复算） */
+  function reserveOf() {
+    return simResult.value ? computeReserveFromSim(simResult.value) : null
+  }
+  /** RQA-008 风险调整后计划 */
+  function adjustedPlanOf() {
+    return simResult.value ? riskAdjustedPlan(simResult.value) : null
+  }
+  /** RQA-002 运行蒙特卡洛：三点缺失或未关联的风险不进入模拟 */
+  function runQuantSim(seed = 42, iterations = 1000) {
+    const { included, excluded } = filterLinkedRisks(projectRisks.value, riskLinks.value)
+    const activities = included.map(({ risk, link }) => {
+      const tp = threePoints.value.get(risk.id)
+      return {
+        id: risk.id,
+        pert: tp ? pert(tp) : { expected: 0, stdDev: 0, complete: false, missing: [] as ('乐观' | '最可能' | '悲观')[] },
+        baseline: tp ? pert(tp).expected : 0,
+        baselineCost: 1000,
+        risks: [link]
+      }
+    }).filter((a) => a.pert.complete)
+    if (activities.length === 0) {
+      notify('warning', '无可量化活动：请先登记三点估算并关联风险（RQA-001/RQA-005）')
+      return
+    }
+    const cfg: Omit<SimConfig, 'snapshot'> = { modelVersion: QUANT_MODEL_VERSION, iterations, seed }
+    const input = {
+      activities,
+      baselineDuration: activities.reduce((s, a) => s + a.baseline, 0),
+      baselineCost: activities.reduce((s, a) => s + a.baselineCost, 0)
+    }
+    simResult.value = runMonteCarlo(input, cfg)
+    log('CREATE', '定量模拟', 'SIM-001', { seed, iterations, snapshot: simResult.value.inputSnapshot })
+    notify('success', `蒙特卡洛模拟完成：P50=${simResult.value.durationP50}，P80=${simResult.value.durationP80}，快照 ${simResult.value.inputSnapshot}（RQA-011 可复算）`)
+  }
+  /** RQA-001 登记三点估算 */
+  function setThreePoint(riskId: string, tp: ThreePoint) {
+    const p = pert(tp)
+    if (!p.complete) {
+      notify('warning', '三点估算缺失，不得进入定量分析（RQA-001）')
+      return
+    }
+    threePoints.value.set(riskId, tp)
+    log('UPDATE', '三点估算', riskId, tp)
+    notify('success', `三点估算已登记：期望 ${p.expected}，标准差 ${p.stdDev}`)
+  }
+  /** RQA-005 关联风险到活动/成本项 */
+  function linkRisk(link: RiskLink) {
+    riskLinks.value.set(link.riskId, link)
+    log('UPDATE', '风险关联', link.riskId, link)
+    notify('success', '风险已关联，纳入模拟范围')
+  }
+
+  // —— RES 资源域剩余项 ——
+  /** RES-001 三层资源池节点（演示数据：企业/部门/项目） */
+  const poolNodes = ref<ResourcePoolNode[]>([
+    { id: 'NODE-1', name: '九甲科技（企业）', level: '企业' },
+    { id: 'NODE-2', name: '汽车电子研发中心', level: '部门', parentId: 'NODE-1' },
+    { id: 'NODE-3', name: 'EPS 转向项目群', level: '项目', parentId: 'NODE-2' }
+  ])
+  /** RES-002 角色技能检索结果（缓存） */
+  const skillSearchResult = ref<ReturnType<typeof searchCandidates>>([])
+  /** RES-009 派工承诺（请求 → 承诺） */
+  const assignmentCommitments = ref<AssignmentCommitment[]>([])
+  /** RES-013 工时回填记录 */
+  const hourBackfills = ref<HourBackfill[]>([])
+  /** RES-015 外部供应商产能 */
+  const externalCapacities = ref<ExternalCapacity[]>([
+    { id: 'EXT-1', supplierName: '精工 CNC 外协', role: '机加工', committedCapacity: 80, actualDelivery: 68, week: '2026-W45' },
+    { id: 'EXT-2', supplierName: '华测台架', role: '试验', committedCapacity: 100, actualDelivery: 100, week: '2026-W45' }
+  ])
+  /** RES-016 投入偏差记录 */
+  const effortDeviations = ref<EffortDeviation[]>([
+    { id: 'ED-1', projectId: 'P-001', estimatedHours: 100, actualHours: 118, efficiencyFactor: 1.18, week: '2026-W43' },
+    { id: 'ED-2', projectId: 'P-001', estimatedHours: 100, actualHours: 116, efficiencyFactor: 1.16, week: '2026-W44' }
+  ])
+  /** RES-011 资源费率 */
+  const resourceRates = ref<ResourceRate[]>([
+    { id: 'RT-1', resourceId: 'RM1', role: '项目经理', rate: 150, currency: 'CNY', effectiveFrom: '2026-01-01', effectiveTo: '2026-06-30' },
+    { id: 'RT-2', resourceId: 'RM1', role: '项目经理', rate: 165, currency: 'CNY', effectiveFrom: '2026-07-01' }
+  ])
+  /** RES-010 情景副本 */
+  const resourceScenarios = ref<ResourceScenario[]>([])
+
+  /** RES-001 三层资源池校验 */
+  const poolHierarchyCheck = computed(() => validatePoolHierarchy(poolNodes.value))
+  /** RES-016 投入偏差：连续两周 ≥15% 判定估算失效 */
+  const effortStale = computed(() => {
+    const rates = effortDeviations.value.map((d) => ({ rate: effortDeviationRate(d) }))
+    return isEstimateStale(rates)
+  })
+  /** RES-015 外部产能偏差合计 */
+  const externalDeviation = computed(() => externalCapacities.value.map((c) => ({ ...c, dev: externalCapacityDeviation(c) })))
+
+  /** RES-002 按角色技能检索候选人 */
+  function searchBySkill(role: string, skills: string[]) {
+    skillSearchResult.value = searchCandidates(resourcePool.value, role, skills)
+    return skillSearchResult.value
+  }
+  /** RES-009 提交派工承诺（未承诺不得进基线） */
+  function commitAssignment(req: ResourceRequest, resourceId: string, hours: number) {
+    const c: AssignmentCommitment = {
+      id: `CMT-${Date.now()}`,
+      requestId: req.id,
+      resourceId,
+      role: req.role,
+      committedHours: hours,
+      week: req.week,
+      status: '已承诺',
+      approvedAt: new Date().toISOString()
+    }
+    assignmentCommitments.value.push(c)
+    log('CREATE', '派工承诺', c.id, c)
+    notify('success', `派工承诺已形成：${req.role} ${hours}h（进入基线）`)
+  }
+  /** RES-013 工时回填 */
+  function submitBackfill(assignmentId: string, taskId: string, plannedHours: number, actualHours: number, date: string) {
+    const r = backfillHours({ plannedHours, actualHours, taskId })
+    if (!r.ok) {
+      notify('warning', r.note)
+      return false
+    }
+    const rec: HourBackfill = {
+      id: `HB-${Date.now()}`,
+      assignmentId,
+      taskId,
+      plannedHours,
+      actualHours,
+      remainingHours: r.remaining ?? 0,
+      date,
+      varianceNote: r.variance && r.variance !== 0 ? `差额 ${r.variance}h` : undefined
+    }
+    hourBackfills.value.push(rec)
+    log('CREATE', '工时回填', rec.id, rec)
+    notify('success', `工时回填成功：剩余 ${rec.remainingHours}h（${rec.varianceNote ?? '无差额'}）`)
+    return true
+  }
+  /** RES-010 创建情景副本 */
+  function addResourceScenario(name: string, assignments: ResourceScenario['assignments']) {
+    const sc = createScenario(projectId.value, name, assignments)
+    resourceScenarios.value.push(sc)
+    log('CREATE', '资源情景', sc.id, sc)
+    notify('success', `情景「${name}」已创建，与主计划隔离`)
+  }
+  /** RES-010 选定情景 */
+  function pickScenario(id: string) {
+    resourceScenarios.value = selectScenario(resourceScenarios.value, id)
+    const sc = resourceScenarios.value.find((s) => s.id === id)
+    if (sc && canWriteBack(sc).ok) {
+      notify('success', `情景「${sc.name}」已选定，可回写主计划`)
+    }
+  }
+
+  // —— EXA 报表与互操作域 ——
+  /** EXA-001 口径字典 + 标准报表库（演示数据） */
+  const metricDict = ref<MetricDictEntry[]>([
+    { id: 'M1', name: '加权完成率', numerator: 'Σ(EV×权重)', denominator: 'Σ(权重)', timeBase: '周', excludeRule: '无', source: 'plan', refreshRate: 'daily' },
+    { id: 'M2', name: 'SPI', numerator: 'EV', denominator: 'PV', timeBase: '周', excludeRule: '未审核填报', source: 'evm', refreshRate: 'daily' },
+    { id: 'M3', name: 'CPI', numerator: 'EV', denominator: 'AC', timeBase: '周', excludeRule: '未审核填报', source: 'evm', refreshRate: 'daily' },
+    { id: 'M4', name: '资源负荷率', numerator: '分配工时', denominator: '可用工时', timeBase: '周', excludeRule: '草稿', source: 'resource', refreshRate: 'daily' },
+    { id: 'M5', name: '高风险关联率', numerator: '已关联高风险', denominator: '高风险总数', timeBase: '周', excludeRule: '无', source: 'risk', refreshRate: 'daily' }
+  ])
+  const reportLibrary = ref<ReportDef[]>([
+    { id: 'R1', name: '项目进度报表', group: '进度', metricIds: ['M1'], source: 'plan' },
+    { id: 'R2', name: '成本挣值报表', group: '成本', metricIds: ['M2', 'M3'], source: 'evm' },
+    { id: 'R3', name: '资源负荷报表', group: '资源', metricIds: ['M4'], source: 'resource' },
+    { id: 'R4', name: '风险台账报表', group: '风险', metricIds: ['M5'], source: 'risk' },
+    { id: 'R5', name: '质量缺陷报表', group: '质量', metricIds: ['M1'], source: 'plan' },
+    { id: 'R6', name: '组合视图报表', group: '组合', metricIds: ['M1'], source: 'portfolio' }
+  ])
+  /** EXA-001 口径绑定率（100% 达标） */
+  const reportBinding = computed(() => metricBindingRate(reportLibrary.value, metricDict.value))
+  /** EXA-001 分组覆盖（六大分组） */
+  const reportGroups = computed(() => groupCoverage(reportLibrary.value))
+  /** EXA-010 指标三处同值（演示：10 指标三处同值） */
+  const metricConsistency = computed(() => {
+    const metrics = [
+      { metricId: 'M1', report: 68.96, dashboard: 68.96, detail: 68.96 },
+      { metricId: 'M2', report: 0.92, dashboard: 0.92, detail: 0.92 },
+      { metricId: 'M3', report: 0.88, dashboard: 0.88, detail: 0.88 },
+      { metricId: 'M4', report: 95, dashboard: 95, detail: 95 },
+      { metricId: 'M5', report: 100, dashboard: 100, detail: 100 }
+    ]
+    return threeWayConsistency(metrics)
+  })
+  /** EXA-005 计划工具导入校验（演示） */
+  function validatePlanImport(rows: { lineNo: number; fields: Record<string, string> }[], mapping: FieldMapping[]) {
+    const r = validateImport(rows, mapping)
+    log('READ', '计划导入校验', 'IMP-001', { total: r.totalRows, success: r.successRows, errors: r.errors.length })
+    notify(r.errors.length ? 'warning' : 'success', `导入校验：${r.successRows}/${r.totalRows} 行成功，${r.errors.length} 处异常（逐行定位）`)
+    return r
+  }
+
+  // —— ARC-020 扩展点 + NFR-017 可访问性 ——
+  /** ARC-020 自定义表单（配置驱动，无需发版） */
+  const customForms = ref<CustomFormDef[]>([
+    defineForm({
+      id: 'CF-1', name: '客户审批单', targetType: '项目', enabled: true,
+      fields: [
+        { key: 'approver', label: '审批人', type: 'text', required: true },
+        { key: 'approveDate', label: '审批日期', type: 'date', required: true },
+        { key: 'comment', label: '意见', type: 'text', required: false }
+      ]
+    })
+  ])
+  /** ARC-020 事件钩子（失败不影响主流程） */
+  const eventHooks = ref<EventHook[]>([
+    { id: 'HK-1', name: '保存后通知', point: 'afterSave', enabled: true, handler: () => undefined },
+    { id: 'HK-2', name: 'Gate 前校验', point: 'beforeGate', enabled: true, handler: () => undefined }
+  ])
+  /** ARC-020 开放 API（OpenAPI 3.1 契约） */
+  const openApis = ref<OpenApiEndpoint[]>([
+    { id: 'API-1', path: '/api/risks', method: 'GET', schema: 'openapi: 3.1.0', errorCodes: ['E400', 'E401', 'E404'], idempotent: false },
+    { id: 'API-2', path: '/api/baselines', method: 'POST', schema: 'openapi: 3.1.0', errorCodes: ['E400', 'E409'], idempotent: true }
+  ])
+  /** ARC-020 扩展点完备性（四类均有落地；UDF 复用 governanceConfig 的 udfs） */
+  const extensionCheck = computed(() =>
+    extensionPointsComplete({
+      udfCount: data.value.udfs?.length ?? 0,
+      customForms: customForms.value,
+      hooks: eventHooks.value,
+      apis: openApis.value
+    })
+  )
+  /** NFR-017 可访问性审计（关键页面抽查） */
+  const accessibilityAudit = computed(() => {
+    const contrastChecks = [
+      checkContrast('#e5e7eb', '#0b1220'), // 正文文字 / 深色背景
+      checkContrast('#93c5fd', '#0b1220'), // 次要文字
+      checkContrast('#f87171', '#0b1220') // 危险提示
+    ]
+    const keyboardCheck = checkKeyboardAccessible([
+      { id: 'nav', tabbable: true, keyboardActivatable: true, focusIndicator: true },
+      { id: 'btn', tabbable: true, keyboardActivatable: true, focusIndicator: true }
+    ])
+    const labelCheck = checkFormLabels([
+      { id: 'name', hasLabel: true, labelText: '项目名称' },
+      { id: 'owner', hasLabel: true, labelText: '负责人' }
+    ])
+    return { contrastChecks, keyboardCheck, labelCheck }
+  })
+  /** NFR-017 关键页面抽查通过率 */
+  const accessibilityRate = computed(() => accessibilityPassRate([accessibilityAudit.value]))
+  /** ARC-020 事件钩子执行（失败不影响主流程） */
+  function fireHook(point: EventHook['point'], payload: unknown) {
+    const r = runHooksAtPoint(eventHooks.value, point, payload)
+    const failed = r.results.filter((x) => !x.success)
+    if (failed.length) notify('warning', `${failed.length} 个钩子执行失败，主流程不受影响（ARC-020）`)
+    return r
+  }
+
+  const projectRetros = computed(() => data.value.retros.filter((r) => r.projectId === projectId.value))
+  const projectLessons = computed(() => data.value.lessons.filter((l) => l.projectId === projectId.value))
+  const projectDeviations = computed(() => data.value.deviations.filter((d) => d.projectId === projectId.value))
+  const projectMeetings = computed(() => data.value.meetings.filter((m) => m.projectId === projectId.value))
+  const projectResolutions = computed(() => data.value.resolutions.filter((r) => r.projectId === projectId.value))
+  const projectSendAudits = computed(() => data.value.sendAudits.filter((s) => s.projectId === projectId.value))
+  const projectSupervises = computed(() => data.value.supervises.filter((s) => s.projectId === projectId.value))
+  const projectInvestments = computed(() => data.value.investments.filter((i) => i.projectId === projectId.value))
+  const calendars = computed<CalendarDef[]>(() => (data.value.calendars ?? []) as CalendarDef[])
+
+  // —— 我的工作中心（POR-004 四类聚合 + POR-005 四段分组）——
+  const myTasks = computed(() =>
+    aggregateMyTasks(
+      { name: currentUser.value.name, roleCode: currentUser.value.roleCode },
+      {
+        wbs: data.value.wbs,
+        resolutions: data.value.resolutions,
+        supervises: data.value.supervises,
+        approvals: data.value.flowInstances
+          .filter((f) => f.status === '运行中')
+          .map((f) => {
+            const v = flowView(f)
+            return {
+              id: f.id,
+              title: f.title,
+              code: f.defCode,
+              submitter: f.submitter,
+              approverRole: v.node?.approverRole ?? '',
+              due: '',
+              status: v.overdue ? '已超时' : '进行中',
+              projectId: ''
+            }
+          })
+      }
+    )
+  )
+  const myTodos = computed(() => bucketTodos(myTasks.value, new Date().toISOString().slice(0, 10)))
+
+  // —— 治理配置（TEN-016）与消息中心（POR-006/008）——
+  const codeDicts = computed(() => (data.value.codeDicts ?? []) as import('@/domain/types').CodeDict[])
+  const udfs = computed(() => (data.value.udfs ?? []) as import('@/domain/types').UdfDef[])
+  const stepTemplates = computed(() => (data.value.stepTemplates ?? []) as import('@/domain/types').StepTemplate[])
+  const stepRuns = computed(() => (data.value.stepRuns ?? []) as import('@/domain/types').StepRun[])
+  const messages = computed(() => (data.value.messages ?? []) as import('@/domain/types').MessageItem[])
+  const inboxItems = computed(() => (data.value.inboxItems ?? []) as import('@/domain/types').InboxItem[])
+  const myUnreadCount = computed(() => unreadCount(messages.value, currentUser.value.id))
+  const myInbox = computed(() => inboxFor(inboxItems.value, currentUser.value.id))
+
+  // —— 跨节点资源共享（PFM-016）+ 门户区块（POR-003）+ 草稿（POR-007）——
+  const resourcePool = computed(() => (data.value.resourcePool ?? []) as import('@/domain/types').ResourcePoolMember[])
+  const resourceShares = computed(() => (data.value.resourceShares ?? []) as import('@/domain/types').ResourceShareApply[])
+  const portalSections = computed(() => (data.value.portalSections ?? []) as import('@/domain/types').PortalSectionConfig[])
+  const drafts = computed(() => (data.value.drafts ?? []) as import('@/domain/types').FormDraft[])
+  /** 当前角色可见的门户区块（POR-003：越权区块前端不渲染） */
+  const myPortalSections = computed(() => visibleSections(portalSections.value, currentUser.value.roleCode))
+  /** 当前有效共享关系（已生效且未到期，供资源负荷视图叠加） */
+  const activeShareRelations = computed(() => activeShares(resourceShares.value, new Date().toISOString().slice(0, 10)))
+  /** 我的超期草稿（POR-007：超期提示，不静默删除） */
+  const myExpiredDrafts = computed(() => expiredDrafts(drafts.value, currentUser.value.id, new Date().toISOString().slice(0, 10)))
+  const myDrafts = computed(() => drafts.value.filter((d) => d.userId === currentUser.value.id))
+
+  /** POR-012：缓存只读标识（过期本地缓存 → 只读 + 提示重拉） */
+  const cacheBadgeInfo = computed(() => cacheBadge(cacheStamp.value, Date.now()))
+
+  const auditChain = computed(() => verifyChain(data.value.audit))
+  const chainOk = computed(() => auditChain.value.ok)
+
+  // —— 派生：计划 / 挣值（必须先于控制点，控制点 C-05/C-11 要引用同一份 EVM）——
+  const cpm = computed(() => computeCpm(projectWbs.value))
+  const quality = computed(() => planQualityChecks(projectWbs.value))
+  const completion = computed(() => weightedCompletion(projectWbs.value, currentProject.value.budget))
+  /** 统计日（状态日期）：PV 起算基准，锚定在计划工期的 65%（口径可见于挣值页） */
+  const statusDay = computed(() => statusDayOf(projectWbs.value))
+  /** PV 唯一来源：按 CPM 早时间 + 统计日算 BCWS（禁止再出现 budget×0.66 之类的自造比例） */
+  const pvInfo = computed(() => plannedValue(projectWbs.value, currentProject.value.budget, statusDay.value))
+  const evm = computed(() => {
+    const ev = (completion.value.weightedPercent / 100) * currentProject.value.budget
+    return computeEvm({ pv: pvInfo.value.pv, ev, ac: currentProject.value.spent, bac: currentProject.value.budget })
+  })
+
+  const cpContext = computed<CpContext>(() => ({
+    project: currentProject.value,
+    wbs: projectWbs.value,
+    reqs: projectReqs.value,
+    links: projectLinks.value,
+    risks: projectRisks.value,
+    ecrs: projectEcrs.value,
+    baselines: projectBaselines.value,
+    suppliers: data.value.suppliers,
+    samples: data.value.samples,
+    boms: data.value.boms,
+    docs: projectDocs.value,
+    deliverables: projectDeliverables.value,
+    hours: projectHours.value,
+    retros: projectRetros.value,
+    lessons: projectLessons.value,
+    deviations: projectDeviations.value,
+    auditChainOk: chainOk.value,
+    flags: data.value.flags,
+    evm: evm.value
+  }))
+
+  const cpResults = computed(() => evaluateControlPoints(cpContext.value))
+  const gateResults = computed<Record<string, GateRun>>(() => {
+    const frozen = projectBaselines.value.some((b) => b.status === '已冻结')
+    const safetySigned = data.value.flags['C-31']?.ok ?? false
+    const out: Record<string, GateRun> = {}
+    for (const g of ['G1', 'G2', 'G3', 'G4', 'G5']) {
+      out[g] = runGate({ gate: g, projectId: projectId.value, cpResults: cpResults.value, submitter: currentUser.value.name, baselineFrozen: frozen, safetySigned })
+    }
+    return out
+  })
+
+  const traceBreaks = computed(() => detectBreaks(projectReqs.value, projectLinks.value))
+  const traceCoverage = computed(() => coverage(projectReqs.value, projectLinks.value))
+  const portfolio = computed(() => rankProjects(visibleProjects.value))
+
+  // —— 动作 ——
+  function saveWbs(nodes: WbsNode[]) {
+    const others = data.value.wbs.filter((w) => w.projectId !== projectId.value)
+    data.value.wbs = [...others, ...nodes]
+    log('UPDATE', 'WBS', projectId.value, { count: nodes.length })
+  }
+
+  function updateTaskProgress(id: string, percent: number) {
+    const t = data.value.wbs.find((w) => w.id === id)
+    if (!t) return
+    const before = { percent: t.percent }
+    t.percent = percent
+    log('UPDATE', 'WBS', id, { percent }, before)
+    notify('success', `任务「${t.name}」进度已更新为 ${percent}%，加权完成率已重算`)
+  }
+
+  function freeze(id: string) {
+    const b = data.value.baselines.find((x) => x.id === id)
+    if (!b) return
+    if (b.status === '已冻结') {
+      notify('error', `BASELINE_IMMUTABLE：基线 ${b.no} 已冻结，任何修改被拒绝`)
+      log('UPDATE', '基线', id, undefined, undefined, 'DENY')
+      return
+    }
+    const frozen = freezeBaseline(b, `${currentUser.value.name}（${currentUser.value.roleName}）`)
+    Object.assign(b, frozen)
+    log('FREEZE', '基线', id, { no: b.no, manifestHash: b.manifestHash })
+    notify('success', `基线 ${b.no} 已冻结，manifest=${b.manifestHash.slice(0, 16)}…`)
+  }
+
+  function verify(id: string) {
+    const b = data.value.baselines.find((x) => x.id === id) as Baseline | undefined
+    if (!b) return null
+    const current = new Map<string, Record<string, unknown>>()
+    for (const it of b.items) {
+      const req = data.value.reqs.find((r) => r.id === it.objId)
+      if (req) current.set(`需求:${req.id}`, { code: req.code, title: req.title, asil: req.asil, status: req.status })
+    }
+    const result = verifyBaseline(b, current)
+    log('APPROVE', '基线校验', id, { ok: result.ok, mismatches: result.mismatches.length })
+    notify(result.ok ? 'success' : 'error', result.ok ? '逐项哈希与 manifest 校验一致' : `校验失败：${result.mismatches.length} 项不一致（定位到条目）`)
+    return result
+  }
+
+  function confirmClosure(ecrId: string, objId: string, decision: '' | '修改' | '确认无影响' | '废弃', note = '') {
+    const ecr = data.value.ecrs.find((e) => e.id === ecrId)
+    if (!ecr) return
+    const item = ecr.closure.find((c) => c.objId === objId)
+    if (!item) return
+    item.decision = decision
+    item.note = note
+    log('UPDATE', 'ECR', ecrId, { objId, decision })
+    notify('success', `闭包项 ${item.objCode} 已确认为「${decision || '未确认'}」`)
+  }
+
+  function advanceEcr(ecrId: string) {
+    const ecr = data.value.ecrs.find((e) => e.id === ecrId)
+    if (!ecr) return
+    const unconfirmed = ecr.closure.filter((c) => !c.decision)
+    if (ecr.stage === 'ECN执行' && unconfirmed.length) {
+      notify('error', `CHG_UNCONFIRMED：仍有 ${unconfirmed.length} 项未确认，ECR 不得关闭（C-17）`)
+      log('UPDATE', 'ECR', ecrId, undefined, undefined, 'DENY')
+      return
+    }
+    const order: EcrItemStage[] = ['影响评估', '审批中', 'ECN执行', 'ECN验证', '已关闭']
+    const i = order.indexOf(ecr.stage)
+    if (i < order.length - 1) {
+      // C-18：从「ECN执行」推进到「已关闭」必须经过「ECN验证」，且验证未通过时阻断
+      const next = order[i + 1]
+      if (next === '已关闭' && !ecr.ecnVerification?.verified) {
+        notify('error', `CHG_UNVERIFIED：ECN 已执行但未通过验证，不得标记完成（C-18）`)
+        log('UPDATE', 'ECR', ecrId, undefined, undefined, 'DENY')
+        return
+      }
+      ecr.stage = next
+      log('UPDATE', 'ECR', ecrId, { stage: ecr.stage })
+      notify('success', `ECR ${ecr.code} 已流转至「${ecr.stage}」`)
+    }
+  }
+
+  /** C-18：记录 ECN 验证结论（验证通过/不通过） */
+  function verifyEcn(ecrId: string, verified: boolean, note = '') {
+    const ecr = data.value.ecrs.find((e) => e.id === ecrId)
+    if (!ecr) return
+    ecr.ecnVerification = { verified, note }
+    log('UPDATE', 'ECR', ecrId, { ecnVerification: { verified, note } })
+    notify(verified ? 'success' : 'warning', verified ? `ECN 验证通过：${note || '执行结果已确认'}` : `ECN 验证不通过：${note || '待整改后重验'}`)
+  }
+
+  type EcrItemStage = '影响评估' | '审批中' | 'ECN执行' | 'ECN验证' | '已关闭'
+
+  /** C-46：纠偏项回写计划 + 重算偏差（两者完成方可关闭） */
+  function addDeviation(measure: string) {
+    const id = 'DV' + (data.value.deviations.length + 1)
+    const code = `DEV-2026-${String(data.value.deviations.length + 1).padStart(2, '0')}`
+    data.value.deviations.push({ id, projectId: projectId.value, code, measure, planUpdated: false, deviationRecomputed: false, status: '开放' })
+    log('CREATE', '纠偏', id, { code, measure })
+    notify('success', `纠偏项 ${code} 已登记；须回写计划并重算偏差后方可关闭（C-46）`)
+  }
+
+  function closeDeviation(devId: string) {
+    const d = data.value.deviations.find((x) => x.id === devId)
+    if (!d) return
+    if (!d.measure.trim()) {
+      notify('error', '纠偏措施不能为空，无法回写（C-46）')
+      return
+    }
+    d.planUpdated = true
+    d.deviationRecomputed = true
+    d.status = '已关闭'
+    log('UPDATE', '纠偏', devId, { planUpdated: true, deviationRecomputed: true })
+    notify('success', `纠偏项 ${d.code} 已回写计划并重算偏差，允许关闭（C-46）`)
+  }
+
+  /** COM-010：经验教训登记（主题+阶段必填，缺一拒收），入库并打标签 */
+  function addLesson(input: { title: string; content: string; stage: string; category: string; tags: string[] }): boolean {
+    const errors = validateLesson(input)
+    if (errors.length) {
+      notify('error', `经验登记被拒：${errors.join('；')}（COM-010）`)
+      return false
+    }
+    const id = 'LS' + (data.value.lessons.length + 1)
+    const code = nextLessonCode(data.value.lessons, projectId.value)
+    const tags = input.tags.filter((t) => t.trim()).map((t) => t.trim())
+    data.value.lessons.push({
+      id,
+      projectId: projectId.value,
+      code,
+      title: input.title.trim(),
+      content: input.content.trim(),
+      tags,
+      stage: input.stage,
+      category: input.category,
+      pushedTo: [],
+      pushLog: [],
+      reusedBy: [],
+      createdAt: new Date().toISOString().slice(0, 10)
+    })
+    log('CREATE', '经验', id, { code, stage: input.stage, category: input.category })
+    notify('success', `经验 ${code} 已入库并打 ${tags.length} 个标签（COM-010）`)
+    return true
+  }
+
+  /** COM-010：跨项目检索同类经验（立项时复用）；projectId '*' 表示全量 */
+  function searchLessons(query: { projectId?: string; stage?: string; category?: string; keyword?: string }) {
+    return searchLessonsEngine(data.value.lessons, query)
+  }
+
+  /** COM-010：回存资料库（幂等去重 + 推送记录可查） */
+  function pushLessonToLibrary(lessonId: string, target: string): boolean {
+    const l = data.value.lessons.find((x) => x.id === lessonId)
+    if (!l) return false
+    const at = new Date().toISOString()
+    const { lesson, pushed } = pushToLibrary(l, target, currentUser.value.name, at)
+    if (!pushed) {
+      notify('warning', `经验 ${l.code} 已回存过资料库「${target}」，不重复推送（幂等）`)
+      return false
+    }
+    Object.assign(l, lesson)
+    log('PUSH', '经验', lessonId, { target, by: currentUser.value.name })
+    notify('success', `经验 ${l.code} 已回存资料库「${target}」，推送记录已留痕（COM-010）`)
+    return true
+  }
+
+  /** COM-010：后续项目复用同类经验（记录复用关系，供复用次数统计） */
+  function reuseLesson(lessonId: string, targetProjectId: string) {
+    const l = data.value.lessons.find((x) => x.id === lessonId)
+    if (!l) return
+    const updated = markReused(l, targetProjectId)
+    Object.assign(l, updated)
+    log('REUSE', '经验', lessonId, { byProject: targetProjectId })
+  }
+
+  // —— COM 协同沟通域（会议决议 / 送审件 / 督办，FUN-024）——
+
+  const todayStr = () => new Date().toISOString().slice(0, 10)
+
+  /** COM-006：会议决议条目化登记（缺责任人/期限不可保存） */
+  function addResolution(meetingId: string, input: ResolutionInput): boolean {
+    const errors = validateResolution(input)
+    if (errors.length) {
+      notify('error', `决议登记被拒：${errors.join('；')}（COM-006）`)
+      return false
+    }
+    const m = data.value.meetings.find((x) => x.id === meetingId)
+    const id = 'RS' + (data.value.resolutions.length + 1)
+    const code = nextResolutionCode(data.value.resolutions, projectId.value)
+    data.value.resolutions.push({
+      id,
+      projectId: projectId.value,
+      meetingId,
+      code,
+      content: input.content.trim(),
+      owner: input.owner.trim(),
+      due: input.due,
+      status: '待执行',
+      createdAt: todayStr()
+    })
+    if (m) m.resolutions.push(id)
+    log('CREATE', '决议', id, { code, meetingId, owner: input.owner, due: input.due })
+    notify('success', `决议 ${code} 已条目化并挂责任人/期限（COM-006）`)
+    return true
+  }
+
+  /** COM-007：决议转任务（幂等，同一决议不重复建任务） */
+  function resolutionToTask(resolutionId: string): boolean {
+    const r = data.value.resolutions.find((x) => x.id === resolutionId)
+    if (!r) return false
+    if (r.taskId) {
+      notify('warning', `决议 ${r.code} 已转任务 ${r.taskId}，不重复建（COM-007）`)
+      return false
+    }
+    const taskId = 'TASK-' + (data.value.resolutions.length + 1).toString().padStart(3, '0')
+    const next = resolutionToTaskEngine(r, taskId)
+    Object.assign(r, next)
+    log('CREATE', '任务', taskId, { fromResolution: r.code })
+    notify('success', `决议 ${r.code} 已转任务 ${taskId}（COM-007）`)
+    return true
+  }
+
+  /** COM-008：决议关闭（无证据关闭被拒） */
+  function closeResolution(resolutionId: string, evidence: string): boolean {
+    const r = data.value.resolutions.find((x) => x.id === resolutionId)
+    if (!r) return false
+    const { resolution, closed, errors } = closeResolutionEngine(r, evidence, todayStr())
+    if (!closed) {
+      notify('error', errors.join('；'))
+      return false
+    }
+    Object.assign(r, resolution)
+    log('CLOSE', '决议', resolutionId, { evidence })
+    notify('success', `决议 ${r.code} 已闭环（证据已留痕，COM-008）`)
+    return true
+  }
+
+  /** COM-008：决议逾期列表（未闭环且逾期的决议，门户可见） */
+  const overdueResolutionsList = () => overdueResolutions(data.value.resolutions, todayStr())
+
+  /** COM-005：会议策划（四要素齐备方可发邀请） */
+  function addMeeting(input: { title: string; agenda: string; host: string; date: string; attendees: string[] }): boolean {
+    const errors = validateMeeting(input)
+    if (errors.length) {
+      notify('error', `会议策划被拒：${errors.join('；')}（COM-005）`)
+      return false
+    }
+    const id = 'M' + (data.value.meetings.length + 1)
+    const code = `MTG-${String(data.value.meetings.length + 1).padStart(3, '0')}`
+    data.value.meetings.push({
+      id,
+      projectId: projectId.value,
+      code,
+      title: input.title.trim(),
+      date: input.date,
+      host: input.host.trim(),
+      attendees: input.attendees,
+      agenda: input.agenda.trim(),
+      minutes: '',
+      resolutions: [],
+      status: '策划中'
+    })
+    log('CREATE', '会议', id, { code, title: input.title })
+    notify('success', `会议 ${code} 已策划（四要素齐备，COM-005）`)
+    return true
+  }
+
+  /** COM-001：送审件登记（必带版本与期限） */
+  function addSendAudit(input: SendAuditInput): boolean {
+    const errors = validateSendAudit(input)
+    if (errors.length) {
+      notify('error', `送审件登记被拒：${errors.join('；')}（COM-001）`)
+      return false
+    }
+    const id = 'SA' + (data.value.sendAudits.length + 1)
+    const code = `SA-${String(data.value.sendAudits.length + 1).padStart(3, '0')}`
+    data.value.sendAudits.push({
+      id,
+      projectId: projectId.value,
+      code,
+      title: input.title.trim(),
+      version: input.version.trim(),
+      reviewerType: input.reviewerType,
+      reviewer: input.reviewer.trim(),
+      sentAt: todayStr(),
+      dueAt: input.dueAt,
+      status: '待答复',
+      answers: [],
+      escalated: false
+    })
+    log('CREATE', '送审件', id, { code, title: input.title, version: input.version })
+    notify('success', `送审件 ${code} 已登记（版本+期限齐备，COM-001）`)
+    return true
+  }
+
+  /** COM-001/002：送审件答复（留痕 + 超期升级） */
+  function answerSendAudit(sendAuditId: string, content: string): boolean {
+    const s = data.value.sendAudits.find((x) => x.id === sendAuditId)
+    if (!s) return false
+    const { item, errors } = answerSendAuditEngine(s, currentUser.value.name, content, new Date().toISOString(), todayStr())
+    if (errors.length) {
+      notify('error', errors.join('；'))
+      return false
+    }
+    Object.assign(s, item)
+    log('ANSWER', '送审件', sendAuditId, { by: currentUser.value.name, escalated: item.escalated })
+    notify('success', `送审件 ${s.code} 已答复留痕${item.escalated ? '（超期已升级）' : ''}`)
+    return true
+  }
+
+  /** COM-009：新建督办（交办态） */
+  function dispatchSupervise(title: string, owner: string, due: string): boolean {
+    if (!title.trim() || !owner.trim() || !due.trim()) {
+      notify('error', '督办须明确事项、责任人与时限（COM-009）')
+      return false
+    }
+    const id = 'SV' + (data.value.supervises.length + 1)
+    const code = `SUP-${String(data.value.supervises.length + 1).padStart(4, '0')}`
+    data.value.supervises.push({
+      id,
+      projectId: projectId.value,
+      code,
+      title: title.trim(),
+      owner: owner.trim(),
+      due,
+      status: '交办',
+      actions: [{ at: new Date().toISOString(), by: currentUser.value.name, action: '交办', note: '' }],
+      escalated: false
+    })
+    log('CREATE', '督办', id, { code, owner, due })
+    notify('success', `督办 ${code} 已交办（COM-009）`)
+    return true
+  }
+
+  /** COM-009：督办推进（交办→反馈→复核→销项，四动作留痕） */
+  function advanceSupervise(superviseId: string, action: SuperviseActionType, note: string): boolean {
+    const s = data.value.supervises.find((x) => x.id === superviseId)
+    if (!s) return false
+    const { item, advanced, errors } = advanceSuperviseEngine(s, action, currentUser.value.name, note, new Date().toISOString(), todayStr())
+    if (!advanced) {
+      notify('error', errors.join('；'))
+      return false
+    }
+    Object.assign(s, item)
+    log('ADVANCE', '督办', superviseId, { action, status: item.status })
+    notify('success', `督办 ${s.code} 已推进至「${item.status}」${item.escalated ? '（超期已升级）' : ''}`)
+    return true
+  }
+
+  // —— PFM 组合与投资域（决策留痕 / ROI / What-if，FUN-023）——
+
+  /** PFM-020：优选决策留痕（四要素 + 终止项目必带收尾计划） */
+  function addDecision(input: { reason: string; decider: string; alternatives: string; closurePlan?: string; affectedProjectIds: string[]; action: '延后' | '缩减' | '终止' | '采纳' }): boolean {
+    const check = decisionComplete(input)
+    if (!check.ok) {
+      notify('error', `决策登记被拒：缺 ${check.missing.join('、')}（PFM-020）`)
+      return false
+    }
+    if (input.action === '终止' && !input.closurePlan?.trim()) {
+      notify('error', '终止项目必须提供收尾安排，缺项不可提交（PFM-020）')
+      return false
+    }
+    const id = 'DC' + (data.value.decisions.length + 1)
+    const code = `DEC-${String(data.value.decisions.length + 1).padStart(3, '0')}`
+    data.value.decisions.push({
+      id,
+      code,
+      reason: input.reason.trim(),
+      decider: input.decider.trim(),
+      date: todayStr(),
+      affectedProjectIds: input.affectedProjectIds,
+      alternatives: input.alternatives.trim(),
+      closurePlan: input.closurePlan?.trim(),
+      action: input.action,
+      createdAt: new Date().toISOString()
+    })
+    log('CREATE', '组合决策', id, { code, action: input.action, affected: input.affectedProjectIds })
+    notify('success', `决策 ${code} 已留痕（含理由/决策人/日期/影响项目清单，PFM-020）`)
+    return true
+  }
+
+  /** PFM-022：投资回报分析（三指标可复算，缺收益计划不出结论） */
+  function roiOfProject(projectId: string) {
+    const inv = data.value.investments.find((i) => i.projectId === projectId)
+    return roiOf(inv)
+  }
+
+  /** PFM-024：金额币种校验（无币种保存被拒） */
+  function validateCurrencyAmount(amount: CurrencyAmount): string[] {
+    return validateCurrency(amount)
+  }
+
+  /** PFM-025：What-if 场景隔离（模拟不碰主计划，返回模拟结果副本） */
+  function whatIfSimulate(scenarioId: string) {
+    const sc = data.value.whatIfs.find((s) => s.id === scenarioId)
+    if (!sc) return { base: [], simulated: [], diffs: [] }
+    const base = visibleProjects.value.filter((p) => sc.baseProjectIds.includes(p.id))
+    const simulated = applyAdjustments(base, sc)
+    const diffs = diffScenarios(base, sc)
+    return { base, simulated, diffs }
+  }
+
+  /** PFM-026：What-if 合并（仅待审批态可合并） */
+  function whatIfMerge(scenarioId: string): boolean {
+    const sc = data.value.whatIfs.find((s) => s.id === scenarioId)
+    if (!sc) return false
+    if (!canMerge(sc)) {
+      notify('error', '未经审批的合并入口不存在（PFM-026）')
+      return false
+    }
+    const base = visibleProjects.value.filter((p) => sc.baseProjectIds.includes(p.id))
+    const merged = mergeScenario(base, sc)
+    merged.forEach((m) => {
+      const t = data.value.projects.find((p) => p.id === m.id)
+      if (t) Object.assign(t, m)
+    })
+    sc.mergeStatus = '已合并'
+    log('MERGE', 'What-if', scenarioId, { name: sc.name })
+    notify('success', `What-if「${sc.name}」已合并（PFM-026）`)
+    return true
+  }
+
+  /** PFM-025：What-if 场景删除（不影响主计划） */
+  function whatIfRemove(scenarioId: string) {
+    data.value.whatIfs = removeScenario(data.value.whatIfs, scenarioId)
+    log('DELETE', 'What-if', scenarioId, {})
+    notify('info', '模拟场景已删除，主计划不受影响（PFM-025）')
+  }
+
+  /** PFM-026：提交合并审批（草稿→待审批） */
+  function whatIfSubmitForMerge(scenarioId: string) {
+    const sc = data.value.whatIfs.find((s) => s.id === scenarioId)
+    if (!sc) return
+    if (sc.mergeStatus !== '草稿') {
+      notify('warning', '仅草稿态可提交审批')
+      return
+    }
+    sc.mergeStatus = '待审批'
+    log('SUBMIT', 'What-if', scenarioId, { to: '待审批' })
+    notify('success', `What-if「${sc.name}」已提交合并审批（PFM-026）`)
+  }
+
+  // —— 三层日历（TEN-015）：例外日维护 + 继承解析 + 排程计算 ——
+  function addException(calendarId: string, input: { date: string; type: '工作日' | '休息日'; reason: string }): boolean {
+    const v = validateException(calendars.value, calendarId, input)
+    if (!v.ok) {
+      notify('error', v.errors[0])
+      return false
+    }
+    const cal = calendars.value.find((c) => c.id === calendarId)
+    if (!cal) return false
+    cal.exceptions.push({ id: `CE-${Date.now()}`, ...input })
+    log('UPDATE', '日历', calendarId, { addException: input })
+    notify('success', `已为「${cal.name}」登记例外日 ${input.date}（${input.type}），相关计划将提示重算（TEN-015）`)
+    return true
+  }
+
+  function calendarLineage(calendarId: string) {
+    return lineage(calendars.value, calendarId)
+  }
+
+  function calendarIsWorkday(calendarId: string, date: string) {
+    return isWorkday(calendars.value, calendarId, date)
+  }
+
+  function calendarWorkdaysBetween(calendarId: string, start: string, end: string) {
+    return workdaysBetween(calendars.value, calendarId, start, end)
+  }
+
+  function calendarEndDateAfter(calendarId: string, start: string, workdays: number) {
+    return endDateAfter(calendars.value, calendarId, start, workdays)
+  }
+
+  function calendarAffectedPlans(changedCalendarId: string) {
+    const planCalendars = data.value.wbs.map((w) => ({ planId: w.id, calendarId: w.calendar ?? '' })).filter((p) => p.calendarId)
+    return affectedPlans(calendars.value, changedCalendarId, planCalendars)
+  }
+
+  // —— 治理配置（TEN-016）：分类码 / UDF / 步骤模板 ——
+  function addCodeDictValue(dictId: string, value: string): boolean {
+    const { dicts, added } = addCodeValue(codeDicts.value, dictId, value)
+    if (!added) {
+      notify('warning', '码值已存在或为空')
+      return false
+    }
+    data.value.codeDicts = dicts
+    log('UPDATE', '分类码', dictId, { addValue: value })
+    notify('success', `分类码已新增码值「${value}」（TEN-016 新增码值不追溯历史）`)
+    return true
+  }
+
+  function saveUdf(input: { target: import('@/domain/types').UdfTarget; name: string; type: import('@/domain/types').UdfDef['type']; enumValues?: string[]; min?: number; max?: number }): boolean {
+    const v = validateUdf(input)
+    if (!v.ok) {
+      notify('error', v.errors[0])
+      return false
+    }
+    const item = { id: `UD-${Date.now()}`, core: false, ...input } as import('@/domain/types').UdfDef
+    data.value.udfs = [...udfs.value, item]
+    log('CREATE', 'UDF', item.id, { target: input.target, name: input.name, type: input.type })
+    notify('success', `UDF「${input.name}」已创建（挂接 ${input.target}）`)
+    return true
+  }
+
+  function bumpStepTemplate(templateId: string): boolean {
+    const t = stepTemplates.value.find((x) => x.id === templateId)
+    if (!t) return false
+    data.value.stepTemplates = bumpTemplateVersion(stepTemplates.value, templateId)
+    log('UPDATE', '步骤模板', templateId, { version: t.version + 1 })
+    notify('success', `步骤模板「${t.name}」升版至 v${t.version + 1}（已执行活动不受影响）`)
+    return true
+  }
+
+  function stepRunStats(runId: string) {
+    const run = stepRuns.value.find((r) => r.id === runId)
+    const tpl = run ? stepTemplates.value.find((t) => t.id === run.templateId) : undefined
+    return run && tpl ? stepCompletion(run, tpl) : null
+  }
+
+  // —— 消息中心（POR-006 已读回执 + POR-008 收件箱）——
+  function readMessage(messageId: string) {
+    const at = new Date().toISOString()
+    data.value.messages = markRead(messages.value, currentUser.value.id, messageId, at)
+  }
+
+  function readAllMessages() {
+    const at = new Date().toISOString()
+    data.value.messages = markAllRead(messages.value, currentUser.value.id, at)
+    notify('success', '已全部标记为已读')
+  }
+
+  function pushMessage(input: { eventKey: string; title: string; content: string; category: import('@/domain/types').MessageItem['category']; refType?: string; refId?: string }) {
+    const now = new Date().toISOString()
+    if (!shouldNotify(messages.value, currentUser.value.id, input.eventKey, now)) return false
+    data.value.messages = [...messages.value, { id: `MSG-${Date.now()}`, userId: currentUser.value.id, read: false, createdAt: now, ...input }]
+    return true
+  }
+
+  function inboxBatchApprove(ids: string[]): number {
+    const at = new Date().toISOString()
+    const { inbox, affected } = batchApprove(inboxItems.value, currentUser.value.id, ids, currentUser.value.name, at)
+    data.value.inboxItems = inbox
+    if (affected) log('APPROVE', '收件箱', ids.join(','), { affected })
+    return affected
+  }
+
+  function inboxReject(id: string, note: string): boolean {
+    const at = new Date().toISOString()
+    const { inbox, ok, note: msg } = rejectInbox(inboxItems.value, currentUser.value.id, id, currentUser.value.name, note, at)
+    if (!ok) {
+      notify('error', msg)
+      return false
+    }
+    data.value.inboxItems = inbox
+    log('REJECT', '收件箱', id, { note })
+    return true
+  }
+
+  // —— 跨节点资源共享（PFM-016）——
+  function addShareApply(input: { fromNodeId: string; toNodeId: string; resourceId: string; resourceName: string; startAt: string; expireAt: string }): boolean {
+    const { ok, errors } = validateShareApply(input)
+    if (!ok) {
+      notify('error', errors[0])
+      return false
+    }
+    const apply: import('@/domain/types').ResourceShareApply = {
+      id: `RS-${Date.now()}`,
+      code: `SHARE-${new Date().getFullYear()}-${String(resourceShares.value.length + 1).padStart(2, '0')}`,
+      fromNodeId: input.fromNodeId,
+      toNodeId: input.toNodeId,
+      resourceId: input.resourceId,
+      resourceName: input.resourceName,
+      startAt: input.startAt,
+      expireAt: input.expireAt,
+      status: '草稿',
+      createdAt: new Date().toISOString().slice(0, 10)
+    }
+    data.value.resourceShares = [...resourceShares.value, apply]
+    log('CREATE', '资源共享', apply.id, { from: input.fromNodeId, to: input.toNodeId })
+    notify('success', `共享申请 ${apply.code} 已登记（草稿，未审批不得占用）`)
+    return true
+  }
+
+  function submitShareForApproval(id: string): boolean {
+    const a = resourceShares.value.find((x) => x.id === id)
+    if (!a) return false
+    const { result, errors } = submitForApproval(a)
+    if (!result) {
+      notify('error', errors[0])
+      return false
+    }
+    data.value.resourceShares = resourceShares.value.map((x) => (x.id === id ? result : x))
+    log('SUBMIT', '资源共享', id, { to: '待审批' })
+    notify('success', `共享申请 ${a.code} 已提交审批`)
+    return true
+  }
+
+  function approveShareApply(id: string, approve: boolean): boolean {
+    const a = resourceShares.value.find((x) => x.id === id)
+    if (!a) return false
+    const { result, errors } = approveShare(a, approve, currentUser.value.name, new Date().toISOString())
+    if (!result) {
+      notify('error', errors[0])
+      return false
+    }
+    data.value.resourceShares = resourceShares.value.map((x) => (x.id === id ? result : x))
+    log(approve ? 'APPROVE' : 'DENY', '资源共享', id, { by: currentUser.value.name })
+    notify('success', `共享申请 ${a.code} 已${approve ? '生效' : '拒绝'}`)
+    return true
+  }
+
+  function renewShareApply(id: string, newExpireAt: string): boolean {
+    const a = resourceShares.value.find((x) => x.id === id)
+    if (!a) return false
+    const { result, errors } = renewShare(a, newExpireAt, new Date().toISOString().slice(0, 10))
+    if (!result) {
+      notify('error', errors[0])
+      return false
+    }
+    data.value.resourceShares = resourceShares.value.map((x) => (x.id === id ? result : x))
+    log('UPDATE', '资源共享', id, { expireAt: newExpireAt })
+    notify('success', `共享申请 ${a.code} 已续期至 ${newExpireAt}`)
+    return true
+  }
+
+  function releaseShareApply(id: string, reason: string): boolean {
+    const a = resourceShares.value.find((x) => x.id === id)
+    if (!a) return false
+    const { result, errors } = releaseShare(a, reason, new Date().toISOString().slice(0, 10))
+    if (!result) {
+      notify('error', errors[0])
+      return false
+    }
+    data.value.resourceShares = resourceShares.value.map((x) => (x.id === id ? result : x))
+    log('RELEASE', '资源共享', id, { reason })
+    notify('success', `共享申请 ${a.code} 已释放`)
+    return true
+  }
+
+  function sweepExpiredShares(): number {
+    const today = new Date().toISOString().slice(0, 10)
+    const { released, alerts } = expireOverdue(resourceShares.value, today)
+    if (!released.length) return 0
+    data.value.resourceShares = resourceShares.value.map((x) => released.find((r) => r.id === x.id) ?? x)
+    alerts.forEach((a) => notify('warning', a))
+    log('RELEASE', '资源共享', released.map((r) => r.id).join(','), { reason: '到期自动释放' })
+    return released.length
+  }
+
+  // —— 门户区块可配置（POR-003）——
+  function togglePortalSection(key: import('@/domain/types').PortalSectionKey, enabled: boolean) {
+    data.value.portalSections = toggleSection(portalSections.value, key, enabled)
+    log('UPDATE', '门户区块', key, { enabled })
+  }
+
+  function setPortalSectionRoles(key: import('@/domain/types').PortalSectionKey, roles: string[]) {
+    data.value.portalSections = setSectionRoles(portalSections.value, key, roles)
+    log('UPDATE', '门户区块', key, { visibleRoles: roles })
+  }
+
+  function resetPortalSections() {
+    data.value.portalSections = resetSections(portalSections.value)
+    log('UPDATE', '门户区块', '*', { reset: true })
+    notify('success', '门户区块已恢复默认配置')
+  }
+
+  // —— 我的草稿跨端续写（POR-007）——
+  function saveDraft(objectType: import('@/domain/types').DraftObjectType, objectId: string, content: string) {
+    const at = new Date().toISOString()
+    data.value.drafts = upsertDraft(drafts.value, { userId: currentUser.value.id, objectType, objectId, content, at })
+    persist()
+    notify('success', '草稿已保存（跨端可续写）')
+  }
+
+  function removeDraft(objectType: import('@/domain/types').DraftObjectType, objectId: string) {
+    data.value.drafts = clearDraft(drafts.value, currentUser.value.id, objectType, objectId)
+    persist()
+    notify('success', '草稿已清除（提交后自动清除）')
+  }
+
+  function submitGate(gate: string) {
+    const run = gateResults.value[gate]
+    if (!run.passed) {
+      notify('error', `${gate} 未通过：${run.missing.slice(0, 2).join('；')}${run.missing.length > 2 ? ` 等 ${run.missing.length} 项` : ''}`)
+      log('SUBMIT', 'Gate', gate, { passed: false, missing: run.missing }, undefined, 'DENY')
+      return
+    }
+    log('SUBMIT', 'Gate', gate, { passed: true })
+    notify('success', `${gate} 提交放行成功（提交人 ${currentUser.value.name}，放行人须分离，SOD-01）`)
+  }
+
+  function setLevel(level: Level) {
+    if (!guard('update')) return
+    const p = currentProject.value
+    const before = { level: p.level }
+    p.level = level
+    log('UPDATE', '项目', p.id, { level }, before)
+  }
+
+  function selectUser(id: string) {
+    setUser(id)
+    notify('info', `已切换为 ${currentUser.value.name} · ${currentUser.value.roleName}，菜单与操作权限已按附录 D 矩阵重算`)
+  }
+
+  /** TEN-013：切换界面语言。硬边界——仅改展示层，数据权限上下文（租户/角色）保持不变，并留审计 */
+  function setLocale(next: Locale) {
+    const before = { tenantId: data.value.tenantId, roleCode: currentUser.value.roleCode }
+    locale.value = normalizeLocale(next)
+    localStorage.setItem(LOCALE_KEY, locale.value)
+    const after = { tenantId: data.value.tenantId, roleCode: currentUser.value.roleCode }
+    // 权限不变性断言：语言切换绝不允许改变任何权限判定输入（TEN-013）
+    if (!localeInvariant(before, after)) {
+      // 防御性：若断言失败立即回滚语言并告警（理论上不可达，但作为硬闸门存在）
+      locale.value = 'zh-CN'
+      localStorage.setItem(LOCALE_KEY, 'zh-CN')
+      notify('error', '语言切换异常：数据权限上下文被改动，已回滚（TEN-013）')
+      return
+    }
+    log('UPDATE', LOCALE_AUDIT_KEY, locale.value, { from: before, to: after })
+    notify('success', locale.value === 'en-US' ? 'Language switched to English（界面语言已切换，数据权限不变）' : '界面语言已切换为中文（数据权限不变）')
+  }
+
+  // —— 通用写操作（P1 页使用）：所有变更走审计链 + 持久化 ——
+  /** 样件状态推进（A/B/C/OTS 状态机） */
+  function advanceSample(id: string, to: string) {
+    const s = data.value.samples.find((x) => x.id === id)
+    if (!s) return
+    const before = { status: s.status }
+    s.status = to
+    log('UPDATE', '样件', s.code, { status: to }, before)
+    persist()
+    notify('success', `样件 ${s.code} 状态已推进为「${to}」`)
+  }
+
+  /** OTS 认可：放行须 Gate4 已通过且提交人≠放行人（SOD-01） */
+  function approveOts(id: string, conclusion: '已认可' | '有条件认可' | '拒收', note = '') {
+    if (!guard('approve')) return
+    const s = data.value.samples.find((x) => x.id === id)
+    if (!s) return
+    const g4 = gateResults.value['G4']
+    if (!g4.passed) {
+      notify('error', `OTS 认可被拒：Gate4 未放行（${g4.missing.slice(0, 2).join('；')}）`)
+      log('APPROVE', 'OTS', s.code, { conclusion }, undefined, 'DENY')
+      return
+    }
+    const before = { status: s.status }
+    s.status = conclusion
+    log('APPROVE', 'OTS', s.code, { conclusion, note }, before)
+    persist()
+    notify('success', `OTS ${s.code} 认可结论：${conclusion}`)
+  }
+
+  /** 工时填报（POR-009：本人填报；他人仅可代录且标记来源 SUP-014 同源规则） */
+  function submitHour(taskId: string, hours: number, week: string) {
+    const before = data.value.hours.filter((h) => h.userId === currentUser.value.id && h.taskId === taskId && h.week === week).map((h) => h.hours)
+    const existing = data.value.hours.find((h) => h.userId === currentUser.value.id && h.taskId === taskId && h.week === week)
+    if (existing) {
+      existing.hours = hours
+      existing.status = '已提交'
+      log('UPDATE', '工时', existing.id, { hours, status: '已提交' }, { hours: before[0] })
+    } else {
+      data.value.hours.push({
+        id: `H${Date.now()}`,
+        projectId: projectId.value,
+        userId: currentUser.value.id,
+        userName: currentUser.value.name,
+        week,
+        taskId,
+        hours,
+        status: '已提交'
+      })
+      log('CREATE', '工时', taskId, { hours, week, status: '已提交' })
+    }
+    persist()
+    notify('success', `工时已提交：${hours}h`)
+  }
+
+  /** 工时审核（POR-010：审核人≠填报人） */
+  function approveHour(id: string, approve: boolean) {
+    if (!guard('approve')) return
+    const h = data.value.hours.find((x) => x.id === id)
+    if (!h) return
+    if (h.userId === currentUser.value.id) {
+      notify('error', '工时审核人与填报人不得为同一人（POR-010 / SOD-01）')
+      log('APPROVE', '工时', h.id, { approve }, undefined, 'DENY')
+      return
+    }
+    const before = { status: h.status }
+    h.status = approve ? '已审核' : '草稿'
+    log('APPROVE', '工时', h.id, { approve, status: h.status }, before)
+    persist()
+    notify('success', `工时 ${h.id} ${approve ? '审核通过' : '退回'}`)
+  }
+
+  // —— 文档受控引擎（SRS 第 19 章 / DOC-001~010）——
+  function findDoc(id: string) {
+    return data.value.docs.find((d) => d.id === id)
+  }
+
+  /** 引擎结果统一落地：写回 data、审计留痕、持久化 */
+  function applyDocOp(id: string, action: string, op: { ok: boolean; doc?: ControlledDoc; error?: string }): boolean {
+    const idx = data.value.docs.findIndex((d) => d.id === id)
+    if (idx < 0) return false
+    if (!op.ok) {
+      log(action, '文档', id, { error: op.error }, undefined, 'DENY')
+      return false
+    }
+    data.value.docs[idx] = op.doc! as import('@/domain/types').DocItem
+    log(action, '文档', id, { status: op.doc!.status, version: op.doc!.version })
+    persist()
+    return true
+  }
+
+  function docSignoff(id: string, role: string) {
+    if (!guard('approve')) return
+    const d = findDoc(id)
+    if (!d) return
+    const op = signoff(d as unknown as ControlledDoc, role, currentUser.value.name, new Date().toISOString())
+    if (!applyDocOp(id, 'APPROVE', op)) {
+      notify('error', op.error || '会签失败')
+      return
+    }
+    const done = op.doc!.signoffs.filter((s) => s.signed).length
+    const total = op.doc!.signoffs.length
+    notify(op.code === 'COMPLETE' ? 'success' : 'info', `${d.code} 会签推进 ${done}/${total}${op.code === 'COMPLETE' ? '，会签齐备（可受控发布）' : ''}`)
+  }
+
+  function docVeto(id: string, role: string, comment: string) {
+    if (!guard('approve')) return
+    const d = findDoc(id)
+    if (!d) return
+    const op = veto(d as unknown as ControlledDoc, role, currentUser.value.name, comment, new Date().toISOString())
+    if (!applyDocOp(id, 'REJECT', op)) {
+      notify('error', op.error || '否决失败')
+      return
+    }
+    notify('warning', `${d.code} 被 ${role} 否决，整体退回草稿，意见已条目化（DOC-007/014）`)
+  }
+
+  function docPublish(id: string) {
+    if (!guard('approve')) return
+    const d = findDoc(id)
+    if (!d) return
+    const op = publish(d as unknown as ControlledDoc, currentUser.value.name, new Date().toISOString())
+    if (!applyDocOp(id, 'PUBLISH', op)) {
+      notify('error', op.error || '发布失败')
+      return
+    }
+    notify('success', `${d.code} ${d.version} 已受控发布，哈希 ${op.doc!.hash!.slice(0, 12)}（DOC-004/C-45）`)
+  }
+
+  function docSubmitSignoff(id: string) {
+    if (!guard('approve')) return
+    const d = findDoc(id)
+    if (!d) return
+    const op = submitForSignoff(d as unknown as ControlledDoc, currentUser.value.id)
+    if (!applyDocOp(id, 'SIGNOFF', op)) {
+      notify('error', op.error || '发起会签失败')
+      return
+    }
+    notify('success', `${d.code} 已进入会签中`)
+  }
+
+  function docCheckout(id: string) {
+    if (!guard('update')) return
+    const d = findDoc(id)
+    if (!d) return
+    const op = checkout(d as unknown as ControlledDoc, currentUser.value.id, new Date().toISOString())
+    if (!applyDocOp(id, 'CHECKOUT', op)) {
+      notify('error', op.error || '检出失败')
+      return
+    }
+    notify('success', `${d.code} 已检出（并发编辑锁，DOC-003）`)
+  }
+
+  function docCheckin(id: string) {
+    if (!guard('update')) return
+    const d = findDoc(id)
+    if (!d) return
+    const op = checkin(d as unknown as ControlledDoc, currentUser.value.id)
+    if (!applyDocOp(id, 'CHECKIN', op)) {
+      notify('error', op.error || '检入失败')
+      return
+    }
+    notify('success', `${d.code} 已检入，锁已释放（DOC-003）`)
+  }
+
+  function docRevisionUp(id: string, newVersion: string) {
+    if (!guard('update')) return
+    const d = findDoc(id)
+    if (!d) return
+    const op = revisionUp(d as unknown as ControlledDoc, newVersion, currentUser.value.name)
+    if (!applyDocOp(id, 'REVISION', op)) {
+      notify('error', op.error || '升版失败')
+      return
+    }
+    notify('success', `${d.code} 升版至 ${newVersion}，旧版已标记失效（DOC-002）`)
+  }
+
+  function docObsolete(id: string) {
+    if (!guard('approve')) return
+    const d = findDoc(id)
+    if (!d) return
+    const op = obsolete(d as unknown as ControlledDoc, currentUser.value.name, new Date().toISOString())
+    if (!applyDocOp(id, 'OBSOLETE', op)) {
+      notify('error', op.error || '作废失败')
+      return
+    }
+    notify('warning', `${d.code} 已作废，仅历史查询，禁止新引用（DOC-001）`)
+  }
+
+  function docArchive(id: string) {
+    if (!guard('approve')) return
+    const d = findDoc(id)
+    if (!d) return
+    const op = archive(d as unknown as ControlledDoc, currentUser.value.name, new Date().toISOString())
+    if (!applyDocOp(id, 'ARCHIVE', op)) {
+      notify('error', op.error || '归档失败')
+      return
+    }
+    notify('success', `${d.code} 已归档，只读（DOC-010）`)
+  }
+
+  function docAddComment(id: string, content: string) {
+    const d = findDoc(id)
+    if (!d) return
+    const op = addComment(d as unknown as ControlledDoc, currentUser.value.roleName, currentUser.value.name, content, new Date().toISOString())
+    if (!applyDocOp(id, 'COMMENT', op)) {
+      notify('error', op.error || '追加意见失败')
+      return
+    }
+    notify('success', `${d.code} 已追加评审意见（DOC-007）`)
+  }
+
+  function docResolveComment(id: string, commentId: string, resolution: string) {
+    const d = findDoc(id)
+    if (!d) return
+    const op = resolveComment(d as unknown as ControlledDoc, commentId, currentUser.value.name, resolution, new Date().toISOString())
+    if (!applyDocOp(id, 'RESOLVE', op)) {
+      notify('error', op.error || '关闭意见失败')
+      return
+    }
+    notify('success', `${d.code} 评审意见已关闭并留痕（DOC-007）`)
+  }
+
+  function docDownload(id: string): boolean {
+    const d = findDoc(id)
+    if (!d) return false
+    const check = canDownload(d as unknown as ControlledDoc)
+    if (!check.ok) {
+      notify('error', check.reason || '禁止下载')
+      log('DOWNLOAD', '文档', id, { reason: check.reason }, undefined, 'DENY')
+      return false
+    }
+    log('DOWNLOAD', '文档', id, { code: d.code, version: d.version, by: currentUser.value.name })
+    return true
+  }
+
+  function docSearch(query: string) {
+    return searchDocs(data.value.docs as unknown as ControlledDoc[], query)
+  }
+
+  // —— 流程引擎（SRS 4.4 审批能力 / FUN-017）——
+  const flowDefinitions = computed<FlowDefinition[]>(() => (data.value.flowDefinitions ?? []) as FlowDefinition[])
+  const flowInstances = computed(() => (data.value.flowInstances ?? []) as import('@/domain/flowEngine').FlowInstance[])
+
+  function flowDef(id: string) {
+    return flowDefinitions.value.find((d) => d.id === id)
+  }
+
+  /** 启动流程（配置驱动，新增实例即按定义生效，无需发版） */
+  function launchFlow(defId: string, title: string, form: Record<string, string | number | boolean> = {}) {
+    const def = flowDef(defId)
+    if (!def) return
+    const inst = startFlow({ def, title, submitter: currentUser.value.name, form })
+    data.value.flowInstances = [...(data.value.flowInstances ?? []), inst]
+    log('START', '流程', inst.id, { defCode: def.code, title })
+    persist()
+    notify('success', `流程已发起：${title}`)
+  }
+
+  /** 审批通过：校验 SOD-01（提交人≠审批人）+ 引擎推进（含分支求值） */
+  function approveFlow(id: string, note = '') {
+    const inst = data.value.flowInstances.find((x) => x.id === id)
+    if (!inst) return
+    const def = flowDef(inst.defId)
+    if (!def) return
+    if (inst.submitter === currentUser.value.name) {
+      notify('error', `SOD-01：${inst.submitter} 不得审批本人提交的流程，放行被拒`)
+      log('APPROVE', '流程', id, undefined, undefined, 'DENY')
+      return
+    }
+    const node = getNode(def, inst.currentNodeId)
+    if (node && (node.type === 'sign') && (node.signMode === 'all')) {
+      // 会签节点：走 signNode 登记当前审批人，未全签不推进
+      const res = signNode(inst, def, { approverRole: currentUser.value.roleName, approverName: currentUser.value.name })
+      inst.history = res.inst.history
+      if (!res.nodePassed) {
+        const sigs = res.inst.history.length ? res.inst.history[res.inst.history.length - 1].signatures : undefined
+        log('APPROVE', '流程', id, { nodeId: node.id, partial: true })
+        persist()
+        notify('info', `会签进行中：${node.name}（${sigs?.length ?? 0}/${node.signRoles?.length ?? 0}）`)
+        return
+      }
+    }
+    const next = approveNode(inst, def, { approverRole: currentUser.value.roleName, approverName: currentUser.value.name, note })
+    Object.assign(inst, next)
+    log('APPROVE', '流程', id, { to: next.currentNodeId, status: next.status })
+    persist()
+    notify('success', next.status === '已完成' ? `${inst.title} 流程已走完` : `${inst.title} 已推进至下一节点`)
+  }
+
+  /** 审批驳回：退回发起人 */
+  function rejectFlow(id: string, note = '') {
+    const inst = data.value.flowInstances.find((x) => x.id === id)
+    if (!inst) return
+    const def = flowDef(inst.defId)
+    if (!def) return
+    const next = rejectNode(inst, def, { approverRole: currentUser.value.roleName, approverName: currentUser.value.name, note })
+    Object.assign(inst, next)
+    log('REJECT', '流程', id, { status: next.status })
+    persist()
+    notify('warning', `${inst.title} 已驳回，退回 ${inst.submitter}`)
+  }
+
+  /** 超时升级：升级到上级角色并留触达记录 */
+  function escalateFlow(id: string) {
+    const inst = data.value.flowInstances.find((x) => x.id === id)
+    if (!inst) return
+    const def = flowDef(inst.defId)
+    if (!def) return
+    const next = escalate(inst, def)
+    Object.assign(inst, next)
+    log('ESCALATE', '流程', id, { to: next.escalatedToRole })
+    persist()
+    notify('warning', `${inst.title} 超时已升级至 ${next.escalatedToRole ?? '上级'}`)
+  }
+
+  /** 加签：在会签/审批节点追加签署角色 */
+  function addSignFlow(id: string, role: string) {
+    const inst = data.value.flowInstances.find((x) => x.id === id)
+    if (!inst) return
+    const def = flowDef(inst.defId)
+    if (!def) return
+    const next = addSigner(inst, def, role)
+    Object.assign(inst, next)
+    log('ADDSIGN', '流程', id, { role })
+    persist()
+    notify('info', `已加签 ${role}`)
+  }
+
+  /** 转办：转交另一角色处理 */
+  function transferFlow(id: string, toRole: string, note = '') {
+    const inst = data.value.flowInstances.find((x) => x.id === id)
+    if (!inst) return
+    const def = flowDef(inst.defId)
+    if (!def) return
+    const next = transferNode(inst, def, toRole, note)
+    Object.assign(inst, next)
+    log('TRANSFER', '流程', id, { to: toRole })
+    persist()
+    notify('info', `已转办至 ${toRole}`)
+  }
+
+  /** 更新流程定义（配置持久化，新实例即生效，不发版——GAT-013 边界：业务规则仍写死） */
+  function saveFlowDefinition(def: FlowDefinition) {
+    const idx = data.value.flowDefinitions.findIndex((d) => d.id === def.id)
+    const next = [...data.value.flowDefinitions]
+    if (idx >= 0) next[idx] = { ...def, version: (def.version ?? 1) + 1 }
+    else next.push({ ...def, version: 1 })
+    data.value.flowDefinitions = next
+    log('UPDATE', '流程配置', def.id, { version: next[idx >= 0 ? idx : next.length - 1].version })
+    persist()
+    notify('success', `流程配置 ${def.code} 已保存（v${next[idx >= 0 ? idx : next.length - 1].version}，新实例即时生效）`)
+  }
+
+  /** 流程实例的当前节点 + 超时状态（供视图读取） */
+  function flowView(inst: import('@/domain/flowEngine').FlowInstance) {
+    const def = flowDef(inst.defId)
+    const node = def ? getNode(def, inst.currentNodeId) : undefined
+    const overdue = def ? isOverdue(inst, def) : false
+    const acts = def ? availableActions(inst, def) : []
+    return { def, node, overdue, acts }
+  }
+
+  return {
+    data,
+    userId,
+    projectId,
+    toast,
+    repoMode,
+    repoBase,
+    locale,
+    users,
+    currentUser,
+    currentProject,
+    actor,
+    tenants,
+    tenantContext,
+    visibleProjects,
+    guardTenantAccess,
+    guardGroupDrillDown,
+    projectWbs,
+    projectReqs,
+    projectLinks,
+    projectRisks,
+    projectEcrs,
+    riskLinks,
+    threePoints,
+    riskLinkage,
+    riskGateCheck,
+    simResult,
+    pertOf,
+    reserveOf,
+    adjustedPlanOf,
+    runQuantSim,
+    setThreePoint,
+    linkRisk,
+    poolNodes,
+    poolHierarchyCheck,
+    skillSearchResult,
+    searchBySkill,
+    assignmentCommitments,
+    commitAssignment,
+    hourBackfills,
+    submitBackfill,
+    externalCapacities,
+    externalDeviation,
+    effortDeviations,
+    effortStale,
+    resourceRates,
+    resourceScenarios,
+    addResourceScenario,
+    pickScenario,
+    metricDict,
+    reportLibrary,
+    reportBinding,
+    reportGroups,
+    metricConsistency,
+    validatePlanImport,
+    customForms,
+    eventHooks,
+    openApis,
+    extensionCheck,
+    accessibilityAudit,
+    accessibilityRate,
+    fireHook,
+    projectBaselines,
+    projectDeliverables,
+    projectDocs,
+    projectHours,
+    resourceConflicts,
+    overallocations,
+    resourceGateBlock,
+    bottlenecks,
+    supplyDemand,
+    resolveOverallocation,
+    balanceResources,
+    smoothResourcesAction,
+    shareLinks,
+    activeShareLinks,
+    createDocShareLink,
+    revokeDocShareLink,
+    quotaConfig,
+    quotaUsage,
+    checkTenantQuota,
+    projectRetros,
+    projectLessons,
+    projectDeviations,
+    projectMeetings,
+    projectResolutions,
+    projectSendAudits,
+    projectSupervises,
+    projectInvestments,
+    calendars,
+    myTasks,
+    myTodos,
+    codeDicts,
+    udfs,
+    stepTemplates,
+    stepRuns,
+    messages,
+    inboxItems,
+    myUnreadCount,
+    myInbox,
+    resourcePool,
+    resourceShares,
+    portalSections,
+    drafts,
+    myPortalSections,
+    activeShareRelations,
+    myExpiredDrafts,
+    myDrafts,
+    pendingWrites,
+    cacheStamp,
+    cacheBadgeInfo,
+    cpResults,
+    gateResults,
+    cpm,
+    quality,
+    completion,
+    evm,
+    statusDay,
+    pvInfo,
+    traceBreaks,
+    traceCoverage,
+    portfolio,
+    auditChain,
+    chainOk,
+    persist,
+    reset,
+    notify,
+    syncFromBackend,
+    flushPendingWrites,
+    setUser,
+    selectUser,
+    setLocale,
+    setProject,
+    cloneProjectStructure,
+    guard,
+    log,
+    saveWbs,
+    updateTaskProgress,
+    freeze,
+    verify,
+    confirmClosure,
+    advanceEcr,
+    verifyEcn,
+    addDeviation,
+    closeDeviation,
+    addLesson,
+    searchLessons,
+    pushLessonToLibrary,
+    reuseLesson,
+    knowledgeStats: () => knowledgeStats(data.value.lessons),
+    addResolution,
+    resolutionToTask,
+    closeResolution,
+    overdueResolutionsList,
+    addMeeting,
+    addSendAudit,
+    answerSendAudit,
+    dispatchSupervise,
+    advanceSupervise,
+    addDecision,
+    roiOfProject,
+    validateCurrencyAmount,
+    whatIfSimulate,
+    whatIfMerge,
+    whatIfRemove,
+    whatIfSubmitForMerge,
+    addException,
+    calendarLineage,
+    calendarIsWorkday,
+    calendarWorkdaysBetween,
+    calendarEndDateAfter,
+    calendarAffectedPlans,
+    addCodeDictValue,
+    saveUdf,
+    bumpStepTemplate,
+    stepRunStats,
+    readMessage,
+    readAllMessages,
+    pushMessage,
+    inboxBatchApprove,
+    inboxReject,
+    addShareApply,
+    submitShareForApproval,
+    approveShareApply,
+    renewShareApply,
+    releaseShareApply,
+    sweepExpiredShares,
+    togglePortalSection,
+    setPortalSectionRoles,
+    resetPortalSections,
+    saveDraft,
+    removeDraft,
+    submitGate,
+    setLevel,
+    advanceSample,
+    approveOts,
+    submitHour,
+    approveHour,
+    flowDefinitions,
+    flowInstances,
+    launchFlow,
+    approveFlow,
+    rejectFlow,
+    escalateFlow,
+    addSignFlow,
+    transferFlow,
+    saveFlowDefinition,
+    flowView,
+    docSignoff,
+    docVeto,
+    docPublish,
+    docSubmitSignoff,
+    docCheckout,
+    docCheckin,
+    docRevisionUp,
+    docObsolete,
+    docArchive,
+    docAddComment,
+    docResolveComment,
+    docDownload,
+    docSearch
+  }
+})

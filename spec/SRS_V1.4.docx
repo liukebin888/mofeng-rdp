@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<Error>
+	<Code>InvalidAccessKeyId</Code>
+	<Message>The Access Key Id you provided does not exist in our records</Message>
+	<Resource>/smh2mf8nq7i9cemv/AAAAAAAAAAAAAAquGxmrbck87fS5RN7Fd891ea1ce88daaba00065f1ef48c4ffc.docx</Resource>
+	<RequestId>NmFlNWNjZmVfYzRkMTZiMGJfYmMyYV82MjlkMTM4</RequestId>
+	<TraceId>OGVmYzZiMmQzYjA2OWNhODk0NTRkMTBiOWVmMDAxODc0OWRkZjk0ZDM1NmI1M2E2MTRlY2MzZDhmNmI5MWI1OTQyYWVlY2QwZTk2MDVmZDQ3MmI2Y2I4ZmI5ZmM4ODFjOGFiNDViMGQzNmIzMDlhZmFjNDkzMDU5ZjY5M2M0Yzk=</TraceId>
+</Error>
+

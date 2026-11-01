@@ -1,0 +1,195 @@
+{
+  "seedVersion": "mofeng.rdp.v1.0.3",
+  "seedChecks": {
+    "projects": 3,
+    "wbs": 32,
+    "reqs": 29,
+    "links": 24,
+    "baselines": 2,
+    "audit": 40,
+    "hash": "b0d857fbd6e4864706c9908c53ff96fef323c64dc922eff8cf2cd6d9d26685e8"
+  },
+  "project": {
+    "id": "P-001",
+    "code": "PRJ-2026-018",
+    "name": "E15 车身域控制器开发",
+    "level": "L1",
+    "budget": 1280,
+    "spent": 812.6,
+    "hitRowNo": 1
+  },
+  "wbs": {
+    "nodes": 32,
+    "duration": 179,
+    "criticalPath": [
+      "1.1",
+      "2.1",
+      "2.2",
+      "3.1",
+      "3.2",
+      "5.1",
+      "5.2",
+      "5.3",
+      "5.4",
+      "5.5",
+      "5.6",
+      "6.1",
+      "6.2",
+      "6.3"
+    ],
+    "criticalCount": 14,
+    "zeroFloatCount": 14,
+    "weightSum": 100,
+    "weightedPercent": 68.96,
+    "evPathPercent": 68.96,
+    "evByWeight": 882.69,
+    "consistent": true,
+    "health": 86.6,
+    "qualityPass": 5,
+    "qualityTotal": 13,
+    "future": 0
+  },
+  "evm": {
+    "pv": 844.8,
+    "ev": 882.69,
+    "ac": 812.6,
+    "bac": 1280,
+    "sv": 37.89,
+    "cv": 70.09,
+    "spi": 1.04,
+    "cpi": 1.09,
+    "etc": 365.76,
+    "eac": 1178.36,
+    "vac": 101.64,
+    "tcpi": 0.85,
+    "spiZone": "green",
+    "cpiZone": "green",
+    "eacWarn": "none"
+  },
+  "gates": {
+    "G1": {
+      "passed": false,
+      "okItems": 5,
+      "total": 6,
+      "missing": [
+        "G1-04 需求基线已形成、无孤儿需求"
+      ]
+    },
+    "G2": {
+      "passed": false,
+      "okItems": 3,
+      "total": 6,
+      "missing": [
+        "G2-01 WBS 分解至可估算层级、依赖完整",
+        "G2-03 风险四要素齐全且完成 RPN 量化",
+        "G2-04 高风险已完成策略登记与储备测算"
+      ]
+    },
+    "G3": {
+      "passed": false,
+      "okItems": 2,
+      "total": 6,
+      "missing": [
+        "G3-01 安全链路追溯覆盖率 ≥98%、断链为空",
+        "G3-02 图纸与关键文档多专业会签齐备",
+        "G3-03 交付物清单齐套（缺件率 0）",
+        "G3-05 ECR 影响闭包已逐项确认"
+      ]
+    },
+    "G4": {
+      "passed": false,
+      "okItems": 2,
+      "total": 6,
+      "missing": [
+        "G4-01 供应商已准入且在有效期内",
+        "G4-02 PPAP 要素齐全并批准",
+        "G4-03 关键物料齐套率 100%",
+        "G4-05 高风险项已完成量化与策略登记"
+      ]
+    },
+    "G5": {
+      "passed": false,
+      "okItems": 5,
+      "total": 6,
+      "missing": [
+        "G5-02 交付物齐套、缺件率 0"
+      ]
+    }
+  },
+  "controlPoints": {
+    "total": 48,
+    "pass": 27,
+    "conditional": 5,
+    "fail": 16,
+    "c05": "SPI=1.11（阈值 0.9/0.8）",
+    "c11": "CPI=1.09（阈值 0.95/0.90）",
+    "spiSignal": 1.112258064516129
+  },
+  "trace": {
+    "coverage": {
+      "denominator": 25,
+      "numerator": 13,
+      "overall": 52,
+      "safety": 56.52,
+      "pass": false
+    },
+    "breaks": 16,
+    "breakKinds": [
+      "版本错配",
+      "跨基线漂移",
+      "缺失下游",
+      "孤儿需求"
+    ],
+    "impactR01": {
+      "total": 16,
+      "maxDepth": 4,
+      "frozenStopped": 16,
+      "includesSource": true
+    }
+  },
+  "audit": {
+    "rows": 40,
+    "chainOk": true,
+    "checked": 40,
+    "denied": 3,
+    "actions": [
+      "CREATE",
+      "UPDATE",
+      "SUBMIT",
+      "APPROVE",
+      "RELEASE",
+      "FREEZE",
+      "EXPORT"
+    ]
+  },
+  "today": {
+    "myTasks": 23,
+    "pending": 4,
+    "lateCritical": 8,
+    "hoursUnapproved": 3
+  },
+  "portfolio": [
+    {
+      "code": "PRJ-2026-018",
+      "score": 93,
+      "rank": 1
+    },
+    {
+      "code": "PRJ-2026-023",
+      "score": 80,
+      "rank": 2
+    },
+    {
+      "code": "PRJ-2026-031",
+      "score": 47,
+      "rank": 3
+    }
+  ],
+  "baseline": {
+    "no": "BL-REQ-2026-003",
+    "status": "已冻结",
+    "items": 19,
+    "verifyOk": true,
+    "manifestMatch": true
+  }
+}
