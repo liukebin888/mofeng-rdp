@@ -847,6 +847,7 @@ export const useAppStore = defineStore('app', () => {
     deviations: projectDeviations.value,
     auditChainOk: chainOk.value,
     flags: data.value.flags,
+    complianceItems: data.value.complianceItems,
     evm: evm.value
   }))
 

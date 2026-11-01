@@ -57,8 +57,9 @@ import type {
 } from '@/domain/types'
 import { ROLES } from '@/domain/rbac'
 import type { FlowDefinition, FlowInstance } from '@/domain/flowEngine'
+import type { ComplianceItem } from '@/domain/compliance'
 
-export const SEED_VERSION = 'mofeng.rdp.v1.0.13'
+export const SEED_VERSION = 'mofeng.rdp.v1.0.14'
 const TENANT = 'T-1001'
 
 export interface SeedUser {
@@ -999,6 +1000,81 @@ export function buildSeed() {
     'C-48': { ok: true, note: '控制点变更回归 68 条用例全部通过' }
   }
 
+  /**
+   * 合规测评证据链（C-30 / NFR-009/010/011 / SEC-012/013）
+   * 取代 C-30 的 flag 静态登记「等保三级测评已通过」——此处为结构化证据：
+   * 机构 / 报告编号 / 结论 / 符合率 / 高风险 / 整改项 / 有效期。
+   * 注意：seed 为演示基线，等保三级与国密传输的「真实测评」由外部机构出具，
+   * 此处登记的是「待启动/待整改」的真实状态，而非虚假的「已通过」——
+   * 因此 C-30 在演示基线中应如实判 FAIL，而非 flag 兜底通过（杜绝虚假闭环）。
+   */
+  const complianceItems: ComplianceItem[] = [
+    {
+      id: 'COMP-001',
+      kind: '等保三级',
+      ref: 'NFR-009',
+      agency: '（待定）等保测评机构',
+      reportNo: '待启动',
+      conclusion: '待整改',
+      complianceRate: 0,
+      highRiskCount: 0,
+      assessedAt: '2026-10-01',
+      validUntil: '2027-10-01',
+      rectifications: [
+        { id: 'DJ-1', issue: '等保三级测评尚未启动（D-07 第 8 周前须预约）', severity: '高', status: '开放', deadline: '2026-11-21' }
+      ]
+    },
+    {
+      id: 'COMP-002',
+      kind: '商用密码(密评)',
+      ref: 'NFR-010',
+      agency: '（待定）密评机构',
+      reportNo: '待启动',
+      conclusion: '待整改',
+      complianceRate: 0,
+      highRiskCount: 0,
+      assessedAt: '2026-10-01',
+      validUntil: '2027-10-01',
+      rectifications: [
+        { id: 'MM-1', issue: '商用密码应用密评尚未启动', severity: '高', status: '开放', deadline: '2026-11-21' }
+      ],
+      cipherSubItems: [
+        { dimension: '算法', pass: false },
+        { dimension: '密钥管理', pass: false },
+        { dimension: '传输', pass: false },
+        { dimension: '存储', pass: false }
+      ]
+    },
+    {
+      id: 'COMP-003',
+      kind: '国密传输',
+      ref: 'SEC-012',
+      agency: '平台网关',
+      reportNo: 'GM-TLS-未部署',
+      conclusion: '待整改',
+      complianceRate: 0,
+      highRiskCount: 0,
+      assessedAt: '2026-10-01',
+      validUntil: '2027-10-01',
+      rectifications: [
+        { id: 'GM-1', issue: '国密网关（SM2/SM3/SM4 套件）尚未部署，当前为明文 HTTP', severity: '高', status: '开放', deadline: '2026-12-01' }
+      ]
+    },
+    {
+      id: 'COMP-004',
+      kind: '数据分类分级',
+      ref: 'NFR-011',
+      agency: '平台内部',
+      reportNo: 'CLS-2026-001',
+      conclusion: '通过',
+      complianceRate: 100,
+      highRiskCount: 0,
+      assessedAt: '2026-09-15',
+      validUntil: '2027-09-15',
+      rectifications: []
+    }
+  ]
+
   const schemeLinked = true
   const quoteLinked = true
 
@@ -1058,6 +1134,7 @@ export function buildSeed() {
     drafts,
     audit,
     flags,
+    complianceItems,
     flowDefinitions: [
       // ① 含「条件分支 + 超时升级」的 ECR 审批流程（FUN-017 验收样例：不发版生效）
       {

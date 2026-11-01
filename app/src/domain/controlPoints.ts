@@ -12,6 +12,7 @@ import { planQualityChecks, plannedValue, weightedCompletion } from './schedule'
 import { computeEvm, type EvmResult } from './evm'
 import { closureStatus, impactComplete } from './change'
 import { closeCheck, completeness, quantified, rpn } from './risk'
+import { evaluateCompliance, complianceGate, type ComplianceItem } from './compliance'
 
 export interface CpDefinition {
   code: string
@@ -95,6 +96,8 @@ export interface CpContext {
   flags: Record<string, { ok: boolean; note: string; evidence?: Evidence[] }>
   /** 挣值结果：由应用层注入，保证 C-05/C-11 与挣值报表同源（C-28 / C-47） */
   evm?: EvmResult
+  /** 合规测评证据链（C-30）：等保/密评/国密/数据分类分级的结构化证据，取代 flag 静态登记 */
+  complianceItems?: ComplianceItem[]
 }
 
 const ev = (ref: string, label: string, value?: string | number): Evidence => ({ kind: 'metric', ref, label, value })
@@ -231,9 +234,29 @@ export function evaluateControlPoints(ctx: CpContext): ControlPointResult[] {
     R.push(mk('C-28', v, note, e))
   }
   R.push(mk('C-29', ctx.auditChainOk ? 'PASS' : 'FAIL', ctx.auditChainOk ? '哈希链连续，11 类受控动作全覆盖' : '哈希链断裂', [ev('audit', '链校验', ctx.auditChainOk ? 'OK' : 'BROKEN')]))
+  // C-30 同源判定：合规底线由「证据链」驱动（等保/密评/国密/数据分类分级的结构化测评证据），
+  // 不再用 flag 静态登记「已通过」——凡证据缺失、结论未通过、到期未重评、高风险未关闭，即判 FAIL（阻断上线）。
   {
-    const [v, note, e] = flag('C-30', '等保三级测评已通过，密码应用合规')
-    R.push(mk('C-30', v, note, e))
+    const items = ctx.complianceItems ?? []
+    if (items.length === 0) {
+      // 无合规证据：视为未启动合规底线，判 FAIL（不得上线）
+      R.push(mk('C-30', 'FAIL', '合规证据台账为空，等保/密评/国密均无测评证据', [ev('compliance', '证据链', '空')], '缺合规测评证据'))
+    } else {
+      const results = evaluateCompliance(items)
+      const gate = complianceGate(results)
+      const bad = results.filter((r) => r.verdict !== 'PASS')
+      R.push(
+        mk(
+          'C-30',
+          gate.pass ? 'PASS' : 'FAIL',
+          gate.pass
+            ? `合规底线通过（等保/密评/国密 ${results.filter((r) => r.verdict === 'PASS').length}/${gate.blockers.length + results.filter((r) => r.verdict === 'PASS').length} 项合格）`
+            : `合规底线未通过：${gate.blockers.map((b) => `${b.kind}（${b.note}）`).join('；')}`,
+          results.map((r) => ev(r.kind, r.note, r.verdict)),
+          gate.blockers.map((b) => b.kind).join(',')
+        )
+      )
+    }
   }
   {
     const [v, note, e] = flag('C-31', '安全评审独立通过（安全项不可豁免）')

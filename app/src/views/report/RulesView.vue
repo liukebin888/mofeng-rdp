@@ -39,6 +39,24 @@
         </el-table>
       </div>
 
+      <div class="panel">
+        <div class="panel-title">合规底线（C-30 证据链驱动）</div>
+        <div class="cgate" :class="complianceGatePass ? 'ok' : 'fail'">
+          <span class="tag" :class="complianceGatePass ? 'ok' : 'fail'">{{ complianceGatePass ? '准予上线' : '阻断上线' }}</span>
+          <span class="nm">等保三级 / 商用密码 / 国密传输 硬闸门</span>
+          <em class="mono">{{ complianceSummary.byVerdict.PASS }}/{{ complianceSummary.total }} 通过</em>
+        </div>
+        <div v-for="r in complianceResults" :key="r.id" class="rrow" style="grid-template-columns: 50px 1fr auto">
+          <span class="tag" :class="r.verdict.toLowerCase()">{{ r.verdict }}</span>
+          <span class="nm">{{ r.kind }}<em class="mono" style="margin-left:6px">（{{ r.ref }}）</em></span>
+          <em class="mono" :style="{ color: r.verdict === 'PASS' ? '#4ade80' : r.verdict === 'CONDITIONAL' ? '#fbbf24' : '#f87171' }">{{ r.expired ? '已到期未重评' : conclusionNote(r.verdict) }}</em>
+        </div>
+        <div class="src-note" style="margin-top: 8px">
+          合规底线由<b>结构化测评证据</b>判定（机构 / 报告编号 / 结论 / 符合率 / 高风险 / 整改 / 有效期），
+          取代此前 C-30 的 flag 静态登记「已通过」；<b>到期未重评自动判 FAIL</b>，杜绝虚假闭环（NFR-009/010、SEC-012）。
+        </div>
+      </div>
+
       <div class="grid" style="gap: 12px">
         <div class="panel">
           <div class="panel-title">规则回归（C-48：变更须回归通过方可生效）</div>
@@ -70,10 +88,16 @@ import { useAppStore } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
 import { CP_DEFINITIONS, strengthDistribution } from '@/domain/controlPoints'
 import { GRADING_ROWS, grade } from '@/domain/grading'
+import { evaluateCompliance, complianceGate, summarizeCompliance } from '@/domain/compliance'
 
 const store = useAppStore()
 const { te } = useI18n()
 const dist = computed(() => strengthDistribution(CP_DEFINITIONS))
+
+const complianceResults = computed(() => evaluateCompliance(store.data.complianceItems))
+const complianceSummary = computed(() => summarizeCompliance(complianceResults.value))
+const complianceGatePass = computed(() => complianceSummary.value.gatePass)
+const conclusionNote = (v: string) => (v === 'PASS' ? '通过' : v === 'CONDITIONAL' ? '条件放行' : '未通过')
 
 const discrepancy = computed(() => [
   { item: 'L4 硬阻断', summary: '28 个', table: `${dist.value.L4} 个`, diff: dist.value.L4 - 28 || '0', note: '以逐行配置为准；C-37/38/39/48 的强度在摘要句中未计入' },

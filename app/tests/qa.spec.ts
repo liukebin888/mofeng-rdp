@@ -217,7 +217,8 @@ describe('QA-c 48 个控制点：编号连续 / 强度分布 / 五要素与证�
       lessons: seed.lessons,
       deviations: seed.deviations,
       auditChainOk: true,
-      flags: seed.flags
+      flags: seed.flags,
+      complianceItems: seed.complianceItems
     })
     expect(results.length).toBe(48)
     expect(results.map((r) => r.code)).toEqual(CP_DEFINITIONS.map((c) => c.code))
