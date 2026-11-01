@@ -56,7 +56,7 @@ import type {
 import { ROLES } from '@/domain/rbac'
 import type { FlowDefinition, FlowInstance } from '@/domain/flowEngine'
 
-export const SEED_VERSION = 'mofeng.rdp.v1.0.10'
+export const SEED_VERSION = 'mofeng.rdp.v1.0.11'
 const TENANT = 'T-1001'
 
 export interface SeedUser {
@@ -128,22 +128,34 @@ function buildOrgNodes(): OrgNode[] {
     c('HR', '人力资源中心', '职能系统', 12, '马强'),
     c('ADM', '企业管理中心', '职能系统', 13, '顾晨'),
     c('EXEC', '总经办', '职能系统', 14, '沈雅'),
-    // 部门（电子研发中心下属，示范三级下钻）
-    { id: 'ELEC-D1', name: '电子硬件部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', leaderName: '许国栋', order: 1 },
-    { id: 'ELEC-D2', name: '电子软件部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 2 },
+    // 部门（电子研发中心下属）
+    { id: 'ELEC-D1', name: '智能交互一部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 1 },
+    { id: 'ELEC-D2', name: '智能交互二部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 2 },
+    { id: 'ELEC-D3', name: '智能交互三部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 3 },
+    { id: 'ELEC-D4', name: '智能控制一部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 4 },
+    { id: 'ELEC-D5', name: '智能控制二部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 5 },
+    { id: 'ELEC-D6', name: '智能座舱一部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 6 },
+    { id: 'ELEC-D7', name: '智能座舱二部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 7 },
+    { id: 'ELEC-D8', name: '智能驾驶一部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 8 },
+    { id: 'ELEC-D9', name: '智能驾驶二部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 9 },
+    { id: 'ELEC-D10', name: '验证中心', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 10 },
+    { id: 'ELEC-D11', name: '技术中心', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 11 },
+    { id: 'ELEC-D12', name: '综合管理部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 12 },
+    { id: 'ELEC-D13', name: 'AI 实验室', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 13 },
+    // 科室（技术中心下）
+    { id: 'ELEC-D11-S1', name: '标准化科', level: 'section', parentId: 'ELEC-D11', leaderTitle: '高级经理', order: 1 },
+    { id: 'ELEC-D11-S2', name: '体系科', level: 'section', parentId: 'ELEC-D11', leaderTitle: '高级经理', order: 2 },
+    { id: 'ELEC-D11-S3', name: '原器件科', level: 'section', parentId: 'ELEC-D11', leaderTitle: '高级经理', order: 3 },
+    // 科室（综合管理部下）
+    { id: 'ELEC-D12-S1', name: '项目管理科', level: 'section', parentId: 'ELEC-D12', leaderTitle: '高级经理', order: 1 },
+    { id: 'ELEC-D12-S2', name: '行政管理科', level: 'section', parentId: 'ELEC-D12', leaderTitle: '高级经理', order: 2 },
     { id: 'STRU-D1', name: '结构设计部', level: 'department', parentId: 'STRU', leaderTitle: '总监', order: 1 },
     { id: 'PROC-D1', name: '工艺工程部', level: 'department', parentId: 'PROC', leaderTitle: '总监', order: 1 },
-    { id: 'MKT-D1', name: '销售部', level: 'department', parentId: 'MKT', leaderTitle: '总监', order: 1 },
-    // 科室（电子硬件部下）
-    { id: 'ELEC-D1-S1', name: '硬件设计一科', level: 'section', parentId: 'ELEC-D1', leaderTitle: '高级经理', order: 1 },
-    { id: 'ELEC-D1-S2', name: '硬件测试科', level: 'section', parentId: 'ELEC-D1', leaderTitle: '高级经理', order: 2 },
-    // 小组（硬件设计一科下）
-    { id: 'ELEC-D1-S1-T1', name: '电源小组', level: 'team', parentId: 'ELEC-D1-S1', leaderTitle: '经理', order: 1 },
-    { id: 'ELEC-D1-S1-T2', name: '车身控制小组', level: 'team', parentId: 'ELEC-D1-S1', leaderTitle: '经理', order: 2 }
+    { id: 'MKT-D1', name: '销售部', level: 'department', parentId: 'MKT', leaderTitle: '总监', order: 1 }
   ]
 }
 
-/** 人员挂靠（跨组织兼职 + 岗位序列；U-004 吴敏兼职电子软件部 + 制造中心） */
+/** 人员挂靠（跨组织兼职 + 岗位序列；U-004 吴敏主职智能座舱一部 + 兼职制造中心） */
 function buildOrgMemberships(users: SeedUser[]): OrgMembership[] {
   const u = (id: string) => users.find((x) => x.id === id)!
   const m = (userId: string, orgId: string, track: OrgMembership['track'], postLevel: string, primary = false): OrgMembership => ({
@@ -153,7 +165,7 @@ function buildOrgMemberships(users: SeedUser[]): OrgMembership[] {
     m('U001', 'G', 'tech-mgmt', '首席总工', true),
     m('U002', 'C', 'tech-mgmt', '总工', true),
     m('U003', 'ELEC', 'tech', '资深高级工程师', true),
-    m('U004', 'ELEC-D2', 'tech', '高级工程师', true),
+    m('U004', 'ELEC-D6', 'tech', '高级工程师', true),
     m('U004', 'MFG', 'project', '项目工程师', false), // 跨组织兼职
     m('U005', 'STRU', 'tech', '工程师', true),
     m('U006', 'PROC', 'tech', '高级工程师', true),
@@ -168,7 +180,7 @@ function buildOrgMemberships(users: SeedUser[]): OrgMembership[] {
     m('U015', 'MKT', 'project', '项目管理员', true),
     m('U016', 'ADM', 'tech-mgmt', '主任工程师', true),
     m('U017', 'EXEC', 'software', '架构师', true),
-    m('U018', 'ELEC-D1-S1-T1', 'software', '网络工程师', true)
+    m('U018', 'ELEC-D4', 'software', '网络工程师', true)
   ]
 }
 
