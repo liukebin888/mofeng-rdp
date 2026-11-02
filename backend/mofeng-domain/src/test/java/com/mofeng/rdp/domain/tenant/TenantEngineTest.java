@@ -2,6 +2,7 @@ package com.mofeng.rdp.domain.tenant;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -57,5 +58,14 @@ class TenantEngineTest {
         assertTrue(TenantEngine.validateIsolationMode("SCHEMA"));
         assertTrue(TenantEngine.validateIsolationMode("INSTANCE"));
         assertFalse(TenantEngine.validateIsolationMode("XXX"));
+    }
+
+    @Test
+    void 跨租户列表过滤() {
+        TenantEngine.TenantContext ctx = new TenantEngine.TenantContext("T1", "PM");
+        // 无 tenantId 旧数据 + 本租户 + 他租户：过滤后仅剩无标注与本租户
+        List<String> filtered = TenantEngine.visibleInTenant(ctx, Arrays.asList(null, "T1", "T2", ""));
+        assertEquals(3, filtered.size());
+        assertFalse(filtered.contains("T2"), "他租户对象应被过滤，不泄露存在性");
     }
 }

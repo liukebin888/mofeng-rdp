@@ -83,6 +83,18 @@ public final class TenantEngine {
         return tenantId == null || tenantId.isEmpty() || tenantId.equals(ctx.tenantId);
     }
 
+    /**
+     * 跨租户查询拦截（数据库面）：以 A 租户查询，过滤掉他租户对象（不泄露存在性）。
+     * 无 tenantId 的旧数据默认本租户可见；有 tenantId 的须严格等于上下文租户。
+     */
+    public static List<String> visibleInTenant(TenantContext ctx, List<String> tenantIds) {
+        List<String> out = new ArrayList<>();
+        for (String t : tenantIds) {
+            if (t == null || t.isEmpty() || t.equals(ctx.tenantId)) out.add(t);
+        }
+        return out;
+    }
+
     // ------------------------------------------------------------------
     // TEN-008 集团视图
     // ------------------------------------------------------------------
