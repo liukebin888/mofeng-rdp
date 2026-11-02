@@ -175,8 +175,7 @@ SOLUTION 12.2 已裁定：**R1 单一部署单元，模块化单体**。核心�
 
 - **批次 1（安全/变更）✅ 已完成**：gate（权威模板+runGate+SOD）、baseline（哈希链+冻结）、audit（审计链）、change（ECR 闭环）、risk/riskQuant（RPN/PERT/关联/复算）——6 引擎迁移，44 用例，领域层合计 62 例全过（提交 `7f9a717`）
 - **批次 2（进度/资源）✅ 已完成**：schedule（CPM/成环/13项质量检查）、pmc（十二类对象/PDCA/质量指标/偏差分级/纠偏升级）、resource（周冲突/超分配三级/资源池层级/跨项目冲突）——3 引擎迁移，25 用例，领域层合计 87 例全过（提交 `747ceea`）
-- **批次 3（供应链/质量）**：supplier、sample、defect、softwareVersion、requirement、trace、evm
-- **批次 3（供应链/质量）**：supplier、sample、defect、softwareVersion、requirement、trace、evm
+- **批次 3（供应链/质量）✅ 已完成**：supplier（SUP 状态机/准入/定点/PPAP/代录）、sample+kitting（HW 状态机/先BOM后样件/齐套/EBOM冻结/工装/检验/送样/发运）、defect（QMS 三台账/8D/遗留风险）、software（VER SCI/分支/变体/兼容回滚/双签/组合基线）、requirement（REQ 字段齐全/HARA/TARA/标识/安全评审/废弃）、evm（挣值四值/预算/超支）——6 引擎迁移，72 用例，领域层合计 159 例全过（提交 `3919a87`）；trace 因依赖需求类型/状态机复杂类型暂缓，待 B1-3 闭包表双写时一并迁移
 - **批次 4（横切/治理）**：rbac、tenant、projectControl、naming、cipher、password、compliance、governanceConfig 等
 
 > 迁移顺序遵循「高风险管控优先」（安全/变更/追溯）→「支撑能力」→「横切治理」。
