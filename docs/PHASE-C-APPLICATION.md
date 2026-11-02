@@ -203,3 +203,23 @@ POST /api/v1/projects/initiate
 2. **轻量切面替代重量级 Spring Security 全栈**：当前无认证 provider/登录态，引入 Spring Security 6.2.4 整套过滤器链属超前投入；先落 @RequiresPermission + AOP 切面把「权限校验入口」职责落地，认证层（JWT/网关）就位后再接 Spring Security 过滤器填充 CurrentUserContext，切面逻辑不变。
 3. **403 与 422 语义分离**：权限不足（403 FORBIDDEN）与领域规则阻断（422 BLOCKED）分开映射，避免「无权限」被误报为「规则不通过」。
 4. **○ 受限允许放行 + 限制后置**：切面对 ○ 放行，具体限制（如「删除仅限本人草稿」）由业务方法内按 `RbacEngine.Role.limits` 进一步校验——切面管「能不能」，业务方法管「在什么条件下能」。
+
+---
+
+## 11. C-3 落地结论（2026-11-02）——六门禁全链路实测全绿
+
+**结论**：阶段 C 后端应用层改动后，前端六门禁全量重跑零回退，后端隔离面由 ArchUnit 架构守护固化。阶段 C 可试点闭环的交付门禁全部通过。
+
+| 门禁 | 实测结果 | 状态 |
+|---|---|---|
+| 1. vue-tsc 类型检查 | 0 error | ✅ |
+| 2. vitest 单元测试 | **744/744**（47 spec）零回退 | ✅ |
+| 3. build 生产构建 | 6.22s 成功 | ✅ |
+| 4. smoke 路由冒烟 | total **79** / placeholder **0** / bad **[]** | ✅ |
+| 5. e2e 端到端 | **PASS 31 / FAIL 0**（10 链路：审计链/冻结基线/分级判定/CPM/状态机/导出等） | ✅ |
+| 6. 隔离面 | 前端 domain 零 vue/element-plus/pinia import；后端 mofeng-domain 零框架依赖 + **DomainLayerArchitectureTest 5 例**（Spring/MyBatis/HTTP/JPA 四禁 + 白名单收口） | ✅ |
+
+**关键结论**：
+1. **前后端门禁各自闭环、互不破坏**：阶段 C 全部改动在后端（应用层编排 + 横切 + 权限入口），前端六门禁 744/744 零回退，证明「领域层权威在 TS、Java 同构迁移」的分层纪律成立——后端改动不触碰前端权威。
+2. **隔离面从「约定」升级为「可执行守护」**：后端 `DomainLayerArchitectureTest` 用 ArchUnit 把「领域层禁 Spring/MyBatis/HTTP/JPA」白名单收口固化进 `mvn test`，出现反向依赖即构建失败，不再依赖人工评审。
+3. **六门禁是交付级判据，非阶段性一过式检查**：阶段 A（前端）与阶段 B/C（后端）各自维护一套门禁基线，每次提交前全量跑，零回退是硬约束。
