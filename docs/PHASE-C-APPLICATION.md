@@ -65,6 +65,7 @@ POST /api/v1/projects/initiate
 | C-1 应用层编排骨架 ✅ | ApplicationService + Controller + DTO + 事务 + 权限 + 幂等 | 一个用例方法跑通，领域层判定 + 基础设施持久化串联（提交 `待推送`）|
 | C-2 首个闭环：立项 ✅ | 分级 → 门禁 G1 → 受控对象入库 → 审计链 | 端到端可复算，缺项阻断可验证（提交 `待推送`）|
 | C-4 第二个闭环：需求追溯 ✅ | 字段齐全率 → 追溯断链 → 覆盖率 → 基线哈希链组装 | fail-closed 三态（缺项/BLOCK/覆盖率）零基线可验证（提交 `待推送`）|
+| C-6 第三个闭环：变更→ECR ✅ | 四维影响评估 → 审批角色 → 闭包 → ECN 验证关闭 | fail-closed（缺评估/未确认/未验证）拒关闭可验证（提交 `待推送`）|
 | C-3 六门禁全链路 | vue-tsc / vitest / build / smoke / e2e / 隔离面 | 全绿（待前端联调）|
 
 ---
@@ -122,3 +123,21 @@ POST /api/v1/projects/initiate
 1. **fail-closed 三态**：字段缺项 / BLOCK 断链 / 覆盖率不达标（<95%）任一触发即零写入零基线，与「缺项阻断」纪律一致。
 2. **覆盖率语义忠实传递**：领域引擎 `TraceEngine.coverage` 的权威语义是「分母含必须有下游的对象、covered 需 dst 也在分母池」，完整 V 模型链路（含末端 VER）覆盖率上限 75%——应用层如实传递不「修正」，避免两套规则各说各话（TS 权威同构，coverage 无 pass 用例）。
 3. **编排聚焦调用顺序与分支**：应用层测试聚焦「编排正确性」（调用顺序 / DTO 映射 / fail-closed 分支 / 基线组装触发），不重复验证领域引擎数值（已由 264 例领域层测试锁定）。
+
+---
+
+## 7. C-6 落地结论（2026-11-02）
+
+**结论**：第三个端到端闭环「变更 → ECR」落地，验证 fail-closed（缺评估 / 闭包未确认 / ECN 未验证）拒关闭 + 通过关闭。
+
+| 项 | 内容 |
+|---|---|
+| 应用层 | `change/`：ChangeRequest（DTO）+ ChangeResult（结果）+ ChangeApplicationService（编排）+ ChangeController（REST /api/v1/changes/ecr） |
+| 编排链路 | 四维影响评估完整性（ChangeEngine.impactComplete，C-16）→ 审批角色（requiredApprovers，CHG-003 高风险增补）→ 闭包统计（closureStatus）→ 关闭资格（closeEcr，C-17/C-18） |
+| 测试结果 | 应用层 8→14 例全过（+ChangeApplicationServiceTest 6），领域层 264 例全过，backend 5 模块 BUILD SUCCESS |
+| 验收判据 | 四维评估齐全 + 闭包确认 + ECN 验证通过 → 允许关闭；缺评估 / 未确认 / 未验证 / 非 ECN 验证阶段 → 拒关闭（CHG_UNCONFIRMED / CHG_UNVERIFIED / CHG_STAGE） |
+
+**关键设计决策**：
+1. **fail-closed 四态**：影响评估缺一维（C-16）、闭包存在未确认项（C-17）、ECN 未验证（C-18）、阶段未到 ECN 验证，任一即拒关闭。
+2. **高风险审批自动增补**：CHG-003 高风险变更在基础角色（研发项目经理 + 系统工程师）上增补功能安全经理 / 信息安全经理 / 架构师。
+3. **「缺评估」用 assessed=false 表达**：领域引擎 `impactComplete` 只校验「已提供维度的 assessed 标志」，不校验「四维是否齐全对象」——应用层 DTO 装配忠实传递，未评估维度须以 assessed=false 提供而非省略维度对象，避免「缺对象」被误判为「已齐全」。
