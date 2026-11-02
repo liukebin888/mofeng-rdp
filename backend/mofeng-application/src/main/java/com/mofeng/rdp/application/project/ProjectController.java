@@ -1,5 +1,6 @@
 package com.mofeng.rdp.application.project;
 
+import com.mofeng.rdp.application.security.RequiresPermission;
 import com.mofeng.rdp.application.web.ApiResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -30,6 +31,7 @@ public class ProjectController {
      * 返回 200（门禁通过，含审计链哈希）或 422（门禁未通过/分级缺项，阻断立项）。
      */
     @PostMapping("/initiate")
+    @RequiresPermission(action = "create")
     public ResponseEntity<ApiResponse<Object>> initiate(
             @Valid @RequestBody ProjectInitiateRequest request) {
         ProjectInitiateResult result = projectApplicationService.initiate(request);

@@ -60,6 +60,13 @@ public class GlobalExceptionHandler {
             .body(ApiResponse.badRequest("参数类型不匹配：" + ex.getName()));
     }
 
+    /** 权限不足 → 403 FORBIDDEN（与领域规则阻断 422 区分）。 */
+    @ExceptionHandler(PermissionDeniedException.class)
+    public ResponseEntity<ApiResponse<Object>> handlePermissionDenied(PermissionDeniedException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+            .body(ApiResponse.blocked(ex.getMessage() == null ? "权限不足" : ex.getMessage(), null));
+    }
+
     /** 领域规则阻断（fail-closed）→ 422。 */
     @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
     public ResponseEntity<ApiResponse<Object>> handleBlocked(RuntimeException ex) {

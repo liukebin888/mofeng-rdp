@@ -1,5 +1,6 @@
 package com.mofeng.rdp.application.requirement;
 
+import com.mofeng.rdp.application.security.RequiresPermission;
 import com.mofeng.rdp.application.web.ApiResponse;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,6 +23,7 @@ public class RequirementController {
 
     /** 需求追溯完整性校验：字段齐全率 → 追溯断链 → 覆盖率 → 基线组装。 */
     @PostMapping("/trace")
+    @RequiresPermission(action = "view")
     public ApiResponse<RequirementTraceResult> trace(@Valid @RequestBody RequirementTraceRequest request) {
         return ApiResponse.ok(applicationService.check(request));
     }

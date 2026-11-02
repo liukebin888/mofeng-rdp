@@ -1,5 +1,6 @@
 package com.mofeng.rdp.application.change;
 
+import com.mofeng.rdp.application.security.RequiresPermission;
 import com.mofeng.rdp.application.web.ApiResponse;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,6 +23,7 @@ public class ChangeController {
 
     /** 处理 ECR 变更单：四维评估 → 审批角色 → 闭包 → 关闭资格。 */
     @PostMapping("/ecr")
+    @RequiresPermission(action = "update")
     public ApiResponse<ChangeResult> process(@Valid @RequestBody ChangeRequest request) {
         return ApiResponse.ok(applicationService.process(request));
     }

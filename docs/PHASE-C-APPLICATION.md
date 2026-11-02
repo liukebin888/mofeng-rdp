@@ -180,3 +180,26 @@ POST /api/v1/projects/initiate
 1. **fail-closed 语义收敛到全局处理器**：领域层/基础设施层抛出的 `IllegalArgumentException`/`IllegalStateException`（含 AuditImmutableError/BaselineImmutableError/CyclicDependencyError/IncompleteControlledObjectError 等 RuntimeException 子类）统一映射 422 BLOCKED，而非 500——体现「规则不通过即阻断」而非「服务器错误」。
 2. **表现边界不泄漏堆栈**：未预期异常统一记日志、前端仅得 `内部错误`，避免堆栈细节外泄（安全基线）。
 3. **校验前置到表现边界**：TEN-004 租户隔离 + 业务主键（projectId/ecrId/orderId）在 @Valid 阶段即拦截，不进领域层。
+
+---
+
+## 10. C-12 落地结论（2026-11-02）——应用层权限校验入口
+
+**结论**：应用层权限校验入口落地，`@RequiresPermission` 注解 + AOP 切面 + 权限上下文，判定复用领域层 `RbacEngine.can()`，未授权映射 403。
+
+| 项 | 内容 |
+|---|---|
+| 权限注解 | `security/RequiresPermission`：声明方法所需动作（view/create/update/delete/approve/export） |
+| 权限切面 | `security/PermissionAspect`（@Aspect @Order(0)）：拦截注解，取当前角色，调 RbacEngine.can()，未授权抛 PermissionDeniedException |
+| 权限上下文 | `security/CurrentUserContext`：ThreadLocal 承载当前 userId/roleCode/tenantId，由认证层填充、切面读取 |
+| 异常映射 | `web/PermissionDeniedException` → GlobalExceptionHandler 403 FORBIDDEN（与领域规则阻断 422 区分） |
+| Controller 接入 | 四个 Controller 标注 @RequiresPermission（立项=create / 变更=update / 样件=create / 需求校验=view） |
+| 依赖引入 | spring-boot-starter-aop（aspectjweaver） |
+| 测试结果 | 应用层 26→31 例全过（+PermissionAspectTest 5），领域层 264 例全过，backend 5 模块 BUILD SUCCESS |
+| 验收判据 | 未认证→403；允许动作（●）→放行；禁止动作（—）→403；受限允许（○）→放行（限制由业务方法按 Role.limits 校验）；未登记角色→403（SEC-006） |
+
+**关键设计决策**：
+1. **判定复用领域层 RbacEngine，应用层不维护权限表**：18 角色矩阵 + 动作 ●/○/— + SOD-01~07 全在领域层权威，切面只做「取主体 + 调 can() + 未授权即拒」编排（ARC-001）。
+2. **轻量切面替代重量级 Spring Security 全栈**：当前无认证 provider/登录态，引入 Spring Security 6.2.4 整套过滤器链属超前投入；先落 @RequiresPermission + AOP 切面把「权限校验入口」职责落地，认证层（JWT/网关）就位后再接 Spring Security 过滤器填充 CurrentUserContext，切面逻辑不变。
+3. **403 与 422 语义分离**：权限不足（403 FORBIDDEN）与领域规则阻断（422 BLOCKED）分开映射，避免「无权限」被误报为「规则不通过」。
+4. **○ 受限允许放行 + 限制后置**：切面对 ○ 放行，具体限制（如「删除仅限本人草稿」）由业务方法内按 `RbacEngine.Role.limits` 进一步校验——切面管「能不能」，业务方法管「在什么条件下能」。

@@ -1,5 +1,6 @@
 package com.mofeng.rdp.application.sample;
 
+import com.mofeng.rdp.application.security.RequiresPermission;
 import com.mofeng.rdp.application.web.ApiResponse;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,6 +23,7 @@ public class SampleController {
 
     /** 处理样件试制：字段齐全率 → 下达资格 → 齐套 → 状态机 → 检验。 */
     @PostMapping("/trial")
+    @RequiresPermission(action = "create")
     public ApiResponse<SampleResult> process(@Valid @RequestBody SampleRequest request) {
         return ApiResponse.ok(applicationService.process(request));
     }
