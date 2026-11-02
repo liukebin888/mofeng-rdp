@@ -23,7 +23,7 @@ afterEach(() => {
 })
 
 function mockFetchOnce(json: unknown, status = 200) {
-  const fn = vi.fn(async () => ({
+  const fn = vi.fn(async (_url: string, _init?: RequestInit) => ({
     ok: status >= 200 && status < 300,
     status,
     json: async () => json
@@ -37,9 +37,9 @@ describe('issueJwt（HS256 签发）', () => {
     const token = await issueJwt('u-1001', 'PM', 't-01', DEV_JWT_SECRET, 3600)
     const parts = token.split('.')
     expect(parts).toHaveLength(3)
-    // 解码 payload（base64url）
+    // 解码 payload（base64url → base64 → atob）
     const payload = JSON.parse(
-      Buffer.from(parts[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString()
+      atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))
     )
     expect(payload.sub).toBe('u-1001')
     expect(payload.role).toBe('PM')
@@ -78,28 +78,28 @@ describe('4 端点 URL 与请求头', () => {
   it('initiateProject → POST /api/v1/projects/initiate + Bearer', async () => {
     const fn = mockFetchOnce({ code: 'OK', data: null }, 200)
     await initiateProject({ projectId: 'P-1', tenantId: 't-01' }, 'tok-123')
-    const [url, init] = fn.mock.calls[0]
+    const [url, init] = fn.mock.calls[0] as [string, { method?: string; headers?: Record<string, string> }]
     expect(url).toBe(`${API_V1_BASE}/api/v1/projects/initiate`)
     expect(init.method).toBe('POST')
-    expect((init.headers as Record<string, string>)['Authorization']).toBe('Bearer tok-123')
+    expect(init.headers?.['Authorization']).toBe('Bearer tok-123')
   })
 
   it('traceRequirements → /api/v1/requirements/trace', async () => {
     const fn = mockFetchOnce({ code: 'OK', data: null }, 200)
     await traceRequirements({ tenantId: 't-01', projectId: 'P-1' }, 'tok')
-    expect(fn.mock.calls[0][0]).toBe(`${API_V1_BASE}/api/v1/requirements/trace`)
+    expect((fn.mock.calls[0] as [string])[0]).toBe(`${API_V1_BASE}/api/v1/requirements/trace`)
   })
 
   it('submitEcr → /api/v1/changes/ecr', async () => {
     const fn = mockFetchOnce({ code: 'OK', data: null }, 200)
     await submitEcr({ tenantId: 't-01', projectId: 'P-1', ecrId: 'E-1' }, 'tok')
-    expect(fn.mock.calls[0][0]).toBe(`${API_V1_BASE}/api/v1/changes/ecr`)
+    expect((fn.mock.calls[0] as [string])[0]).toBe(`${API_V1_BASE}/api/v1/changes/ecr`)
   })
 
   it('submitSample → /api/v1/samples/trial', async () => {
     const fn = mockFetchOnce({ code: 'OK', data: null }, 200)
     await submitSample({ tenantId: 't-01', projectId: 'P-1', orderId: 'S-1' }, 'tok')
-    expect(fn.mock.calls[0][0]).toBe(`${API_V1_BASE}/api/v1/samples/trial`)
+    expect((fn.mock.calls[0] as [string])[0]).toBe(`${API_V1_BASE}/api/v1/samples/trial`)
   })
 })
 
