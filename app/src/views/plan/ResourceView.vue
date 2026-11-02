@@ -4,6 +4,7 @@
       <template #actions>
         <el-button size="small" @click="doBalance">资源平衡</el-button>
         <el-button size="small" @click="doSmooth">资源平滑</el-button>
+        <el-button v-if="store.levelingSnapshot" size="small" type="warning" plain @click="doRevert">回退</el-button>
         <el-button size="small" type="primary" @click="resolveOverload">裁决超分配</el-button>
       </template>
     </PageHeader>
@@ -18,6 +19,31 @@
     <div class="panel" style="margin-bottom: 12px">
       <div class="panel-title">资源负荷（>110% 红色高亮）</div>
       <SvgLine :labels="barLabels" :series="[{ name: '负荷率 %', color: '#3b82f6', data: barValues }]" :y-max="140" />
+    </div>
+
+    <div v-if="store.levelingSnapshot" class="panel" style="margin-bottom: 12px">
+      <div class="panel-title">
+        平衡/平滑差异清单（RES-006/007：完整可回退）
+        <span class="dim">里程碑 {{ store.levelingSnapshot.milestoneChanged ? '有变化' : '零移动' }} · 完工日期变化 {{ store.levelingSnapshot.finishDeltaDays }} 天 · 峰值下降 {{ store.levelingSnapshot.peakReduction }}</span>
+      </div>
+      <table class="matrix" style="width: 100%">
+        <thead>
+          <tr>
+            <th class="ro">活动</th>
+            <th class="ro">原起止</th>
+            <th class="ro">新起止</th>
+            <th class="ro">原因</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="c in store.levelingSnapshot.changes" :key="c.activityId">
+            <td class="ro">{{ c.code }}</td>
+            <td class="ro">{{ c.from.planStart }} → {{ c.from.planFinish }}</td>
+            <td class="ro">{{ c.to.planStart }} → {{ c.to.planFinish }}</td>
+            <td class="ro dim">{{ c.reason }}</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     <div class="panel" style="margin-bottom: 12px">
@@ -241,6 +267,10 @@ function doBalance() {
 
 function doSmooth() {
   store.smoothResourcesAction(allRoles.value)
+}
+
+function doRevert() {
+  store.revertLeveling()
 }
 
 // 按资源角色聚合 WBS 任务，负荷率以「计划工期 / 窗口 60 工作日」为口径（演示）

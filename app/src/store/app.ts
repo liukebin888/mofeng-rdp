@@ -81,7 +81,7 @@ import { enqueueWrite, settleWrite, dedupeQueue, stampCache, cacheBadge, type Pe
 import { detectConflicts } from '@/domain/resourceConflict'
 import { analyzeSupplyDemand } from '@/domain/supplyDemand'
 import { detectOverallocations, gateBlocked } from '@/domain/overallocation'
-import { levelResources, smoothResources } from '@/domain/leveling'
+import { levelResources, smoothResources, revert, type LevelingResult } from '@/domain/leveling'
 import { scanThresholds, DEFAULT_THRESHOLD_RULES, type ThresholdMetrics } from '@/domain/thresholdEngine'
 import { evaluateHandoffs } from '@/domain/handoffEngine'
 import { aggregatePortfolio, interventionRows, type ProjectHealthSnapshot } from '@/domain/portfolioAggregate'
@@ -158,6 +158,8 @@ export const useAppStore = defineStore('app', () => {
   const quotaConfig = ref<QuotaConfig>({ ...DEFAULT_QUOTA })
   /** RES-005：已裁决的超分配（key = userId\0week），裁决后闸门放行 */
   const resolvedOverallocIds = ref<string[]>([])
+  /** RES-006/007：最近一次平衡/平滑操作的差异清单快照（含回退快照 before，供视图展示与回退） */
+  const levelingSnapshot = ref<LevelingResult | null>(null)
   /** 临界值自动触发问题台账（对标 Oracle Thresholds：阈值越限→自动生成问题→分派） */
   const thresholdIssues = computed<ThresholdIssue[]>(() => (data.value.thresholdIssues ?? []) as ThresholdIssue[])
 
@@ -361,6 +363,7 @@ export const useAppStore = defineStore('app', () => {
       const moved = result.after.find((a) => a.id === w.id)
       return moved ?? w
     })
+    levelingSnapshot.value = result
     log('UPDATE', '资源', '平衡', { moved: result.changes.length, finishDelta: result.finishDeltaDays })
     notify('success', `资源平衡完成：延后 ${result.changes.length} 个非关键活动，里程碑零移动，完工日期变化 ${result.finishDeltaDays} 天`)
     persist()
@@ -377,8 +380,26 @@ export const useAppStore = defineStore('app', () => {
       const moved = result.after.find((a) => a.id === w.id)
       return moved ?? w
     })
+    levelingSnapshot.value = result
     log('UPDATE', '资源', '平滑', { moved: result.changes.length, peakReduction: result.peakReduction, finishDelta: result.finishDeltaDays })
     notify('success', `资源平滑完成：峰值下降 ${result.peakReduction}，完工日期变化 ${result.finishDeltaDays} 天`)
+    persist()
+  }
+
+  /** RES-006/007 回退：恢复到最近一次平衡/平滑操作前的 WBS（差异清单可回退） */
+  function revertLeveling(): void {
+    if (!levelingSnapshot.value) {
+      notify('info', '无可回退的平衡/平滑操作')
+      return
+    }
+    const before = revert(levelingSnapshot.value.before)
+    data.value.wbs = data.value.wbs.map((w) => {
+      const orig = before.find((b) => b.id === w.id)
+      return orig ?? w
+    })
+    log('UPDATE', '资源', '回退', { reverted: levelingSnapshot.value.changes.length })
+    levelingSnapshot.value = null
+    notify('success', '已回退到平衡/平滑前的计划')
     persist()
   }
 
@@ -2680,6 +2701,8 @@ export const useAppStore = defineStore('app', () => {
     resolveOverallocation,
     balanceResources,
     smoothResourcesAction,
+    revertLeveling,
+    levelingSnapshot,
     shareLinks,
     activeShareLinks,
     createDocShareLink,
