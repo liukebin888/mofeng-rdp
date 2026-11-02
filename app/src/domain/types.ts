@@ -318,6 +318,60 @@ export interface Deliverable {
   gate: string
 }
 
+/** 四类成本单据类型（Oracle 成本归集表对标） */
+export type CostDocType = '人工时' | '采购合同' | '服务合同' | '其它费用'
+
+/** 成本单据（四类之一） */
+export interface CostDoc {
+  id: string
+  projectId: string
+  type: CostDocType
+  code: string
+  costCode: string
+  amount: number
+  currency: string
+  date: string
+  note?: string
+}
+
+/** 成本科目（预算挂 WBS，8 列归集表输入） */
+export interface CostSubject {
+  code: string
+  name: string
+  wbsCode: string
+  estimate: number
+  budget: number
+  control: number
+  change: number
+}
+
+/** 跨专业交接点状态（界面计划管理 / Oracle Interface Plan 对标） */
+export type HandoffStatus = 'pending' | 'handed' | 'received'
+
+/** 跨专业交接点（交接点/接收点/交付点三态闭环 + 必须完成时间硬约束） */
+export interface HandoffPoint {
+  id: string
+  projectId: string
+  code: string
+  name: string
+  /** 发出方角色（from） */
+  fromRole: string
+  /** 接收方角色（to） */
+  toRole: string
+  /** 交付物 */
+  deliverable: string
+  /** 必须完成时间（硬约束，YYYY-MM-DD） */
+  mustFinishBy: string
+  /** 交接完成时间（已交接） */
+  handedAt?: string
+  /** 接收确认时间（已接收 = 闭环） */
+  receivedAt?: string
+  /** 所属阶段 */
+  stage?: string
+  /** 关联 WBS 节点 */
+  wbsId?: string
+}
+
 export interface Project {
   id: string
   code: string
@@ -841,6 +895,34 @@ export interface RiskTrigger {
   operator: '>' | '>=' | '<' | '<=' | '=='
   threshold: number
   hit: boolean
+}
+
+/** 临界值自动触发问题（对标 Oracle Primavera Thresholds：阈值越限→自动生成问题→分派） */
+export interface ThresholdIssue {
+  id: string
+  projectId: string
+  code: string
+  /** 触发规则 id */
+  ruleId: string
+  /** 监测指标 */
+  metric: string
+  /** 问题标题 */
+  title: string
+  /** 问题描述（含当前值与阈值） */
+  desc: string
+  /** 严重级别 P1~P4 */
+  severity: 'P1' | 'P2' | 'P3' | 'P4'
+  /** 自动分派角色 */
+  assignTo: string
+  /** 生成来源（自动触发） */
+  source: '自动触发'
+  /** 处理状态：开放→处理中→已关闭 */
+  status: '开放' | '处理中' | '已关闭'
+  /** 触发时间（ISO） */
+  createdAt: string
+  /** 关闭人 / 关闭时间（闭环留痕） */
+  closedBy?: string
+  closedAt?: string
 }
 
 /** 风险相关性（RQA-010：多项风险叠加不能简单相加） */
