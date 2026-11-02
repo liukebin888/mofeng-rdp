@@ -21,8 +21,8 @@ public final class BaselineEngine {
     private BaselineEngine() {
     }
 
-    /** 基线冻结后修改异常（BAS-002）。 */
-    public static final class BaselineImmutableError extends RuntimeException {
+    /** 基线冻结后修改异常（BAS-002）。继承 IllegalArgumentException 使全局处理器映射 422 阻断（非 500）。 */
+    public static final class BaselineImmutableError extends IllegalArgumentException {
         public BaselineImmutableError(String baselineNo) {
             super("基线 " + baselineNo + " 已冻结，任何修改被拒绝（BASELINE_IMMUTABLE）");
         }

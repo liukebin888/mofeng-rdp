@@ -25,8 +25,8 @@ public interface ControlledObjectRepository {
     /** 按项目查询受控对象清单。 */
     List<ControlledObjectEntity> listByProject(String tenantId, String projectId);
 
-    /** 五要素不齐全异常（ARC-004：缺一不得入库）。 */
-    final class IncompleteControlledObjectError extends RuntimeException {
+    /** 五要素不齐全异常（ARC-004：缺一不得入库）。继承 IllegalArgumentException 使全局处理器映射 422 阻断（非 500）。 */
+    final class IncompleteControlledObjectError extends IllegalArgumentException {
         public IncompleteControlledObjectError(String objectType, List<String> missing) {
             super("受控对象[" + objectType + "]五要素不齐全，拒绝入库；缺失：" + String.join("、", missing));
         }

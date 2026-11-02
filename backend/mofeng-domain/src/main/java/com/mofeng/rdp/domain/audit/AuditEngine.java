@@ -26,8 +26,8 @@ public final class AuditEngine {
         "RELEASE", "FREEZE", "EXEMPT", "EXPORT", "AI_REVIEW"
     );
 
-    /** append-only 违规异常（SOD-06）。 */
-    public static final class AuditImmutableError extends RuntimeException {
+    /** append-only 违规异常（SOD-06）。继承 IllegalArgumentException 使全局处理器映射 422 阻断（非 500）。 */
+    public static final class AuditImmutableError extends IllegalArgumentException {
         public AuditImmutableError() {
             super("审计日志为 append-only，UPDATE/DELETE 被拒绝（SOD-06）");
         }

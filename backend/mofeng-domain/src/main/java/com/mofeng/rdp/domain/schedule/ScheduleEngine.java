@@ -21,8 +21,8 @@ public final class ScheduleEngine {
     private ScheduleEngine() {
     }
 
-    /** 依赖成环异常（PRJ-004：成环即拒绝保存）。 */
-    public static final class CyclicDependencyError extends RuntimeException {
+    /** 依赖成环异常（PRJ-004：成环即拒绝保存）。继承 IllegalArgumentException 使全局处理器映射 422 阻断（非 500）。 */
+    public static final class CyclicDependencyError extends IllegalArgumentException {
         public CyclicDependencyError(String path) {
             super("依赖成环，拒绝保存：" + path);
         }

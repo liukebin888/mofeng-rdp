@@ -1,6 +1,7 @@
 package com.mofeng.rdp.application.security;
 
 import com.mofeng.rdp.application.web.PermissionDeniedException;
+import com.mofeng.rdp.application.web.UnauthorizedException;
 import com.mofeng.rdp.domain.rbac.RbacEngine;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
@@ -19,8 +20,8 @@ import java.lang.reflect.Method;
  *
  * <p>判定语义（收敛于 {@link #authorize(String, String)}，可独立测试）：</p>
  * <ul>
- *   <li>未认证（无当前角色）→ 抛 {@link PermissionDeniedException}（403，未登录）；</li>
- *   <li>{@code can().allowed == false}（角色未登记 / 动作 —）→ 抛 403（无权限）；</li>
+ *   <li>未认证（无当前角色）→ 抛 {@link UnauthorizedException}（401，未登录）；</li>
+ *   <li>{@code can().allowed == false}（角色未登记 / 动作 —）→ 抛 {@link PermissionDeniedException}（403，无权限）；</li>
  *   <li>{@code allowed == true}（● 允许 / ○ 受限允许）→ 放行，受限原因由领域层承载。</li>
  * </ul>
  */
@@ -42,11 +43,12 @@ public class PermissionAspect {
 
     /**
      * 权限判定核心（纯编排，可独立测试）：
-     * 未认证 / 无权限抛 {@link PermissionDeniedException}，允许（含 ○ 受限）静默放行。
+     * 未认证抛 {@link UnauthorizedException}（401）、无权限抛 {@link PermissionDeniedException}（403），
+     * 允许（含 ○ 受限）静默放行。
      */
     static void authorize(String roleCode, String action) {
         if (roleCode == null) {
-            throw new PermissionDeniedException("未认证：缺失当前用户身份（SEC-001）");
+            throw new UnauthorizedException("未认证：缺失当前用户身份（SEC-001）");
         }
         RbacEngine.CanResult result = RbacEngine.can(roleCode, action);
         if (!result.allowed) {

@@ -1,6 +1,7 @@
 package com.mofeng.rdp.application.security;
 
 import com.mofeng.rdp.application.web.PermissionDeniedException;
+import com.mofeng.rdp.application.web.UnauthorizedException;
 import com.mofeng.rdp.domain.rbac.RbacEngine;
 import org.junit.jupiter.api.Test;
 
@@ -12,13 +13,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 权限切面测试（C-12 应用层权限校验入口）。
  *
  * <p>聚焦切面「取主体 + 调领域层 RbacEngine + 未授权即拒」的编排正确性，
- * 角色×动作矩阵数值由领域层 RbacEngineTest 锁定（本测试不重复验证矩阵）。</p>
+ * 角色×动作矩阵数值由领域层 RbacEngineTest 锁定（本测试不重复验证矩阵）。
+ * 语义：未认证→401（UnauthorizedException），无权限→403（PermissionDeniedException）。</p>
  */
 class PermissionAspectTest {
 
     @Test
-    void 未认证拒绝() {
-        PermissionDeniedException ex = assertThrows(PermissionDeniedException.class,
+    void 未认证拒绝401() {
+        UnauthorizedException ex = assertThrows(UnauthorizedException.class,
             () -> PermissionAspect.authorize(null, "create"));
         assertTrue(ex.getMessage().contains("未认证"));
     }
