@@ -89,6 +89,7 @@ import { buildResourceProfile, type TaskResourceSpan } from '@/domain/resourcePr
 import { buildCostSheet } from '@/domain/costSheet'
 import { isOverdue as isCollabOverdue } from '@/domain/collabEngine'
 import { rpn } from '@/domain/risk'
+import { summarizePolarity, type PolarityRisk } from '@/domain/riskOpportunity'
 import { analyzeBottlenecks } from '@/domain/bottleneck'
 import { cloneStructure, validateClone } from '@/domain/projectClone'
 import { createShareLink, revokeLink, activeLinks, LINK_TTL_MS, type ShareLink } from '@/domain/shareLink'
@@ -490,6 +491,10 @@ export const useAppStore = defineStore('app', () => {
   const projectReqs = computed(() => data.value.reqs.filter((r) => r.projectId === projectId.value))
   const projectLinks = computed(() => data.value.links.filter((l) => projectReqs.value.some((r) => r.id === l.srcId) || projectReqs.value.some((r) => r.id === l.dstId)))
   const projectRisks = computed(() => data.value.risks.filter((r) => r.projectId === projectId.value))
+  /** 极性风险（机会型/威胁型，概率×影响量化，对标 Oracle P2） */
+  const projectPolarityRisks = computed<PolarityRisk[]>(() => (data.value.polarityRisks ?? []).filter((r) => r.projectId === projectId.value))
+  /** 极性风险 EMV 汇总（净期望 = 机会 − |威胁|） */
+  const polaritySummary = computed(() => summarizePolarity(projectPolarityRisks.value))
   const projectEcrs = computed(() => data.value.ecrs.filter((e) => e.projectId === projectId.value))
   const projectBaselines = computed(() => data.value.baselines.filter((b) => b.projectId === projectId.value))
   const projectDeliverables = computed(() => data.value.deliverables.filter((d) => d.projectId === projectId.value))
@@ -2643,6 +2648,8 @@ export const useAppStore = defineStore('app', () => {
     projectReqs,
     projectLinks,
     projectRisks,
+    projectPolarityRisks,
+    polaritySummary,
     projectEcrs,
     thresholdMetrics,
     thresholdIssues,

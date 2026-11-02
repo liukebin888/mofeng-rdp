@@ -84,6 +84,37 @@
     </div>
 
     <div class="panel" style="margin-top: 12px">
+      <div class="panel-title">
+        机会型风险（概率 × 影响量化 · Oracle 风险机会管理对标 P2）
+        <span class="dim">威胁（负向损失）| 机会（正向增益），EMV = 概率 × 影响金额</span>
+      </div>
+      <div class="grid grid-4" style="margin-bottom: 10px">
+        <KpiCard label="威胁数" :value="store.polaritySummary.threatCount" unit="项" :zone="store.polaritySummary.threatCount ? 'danger' : 'ok'" />
+        <KpiCard label="机会数" :value="store.polaritySummary.opportunityCount" unit="项" :zone="store.polaritySummary.opportunityCount ? 'ok' : 'warn'" />
+        <KpiCard label="威胁 EMV" :value="fmtMoney(store.polaritySummary.threatEmv)" unit="元" zone="danger" />
+        <KpiCard label="净期望值" :value="fmtMoney(store.polaritySummary.netEmv)" unit="元" :zone="store.polaritySummary.netEmv >= 0 ? 'ok' : 'danger'" sub="机会 EMV − |威胁 EMV|" />
+      </div>
+      <el-table :data="store.projectPolarityRisks" size="small">
+        <el-table-column prop="code" label="编号" width="90" />
+        <el-table-column prop="title" label="风险/机会" min-width="190" show-overflow-tooltip />
+        <el-table-column label="极性" width="80">
+          <template #default="{ row }"><span class="tag" :class="isOpportunity(row) ? 'ok' : 'fail'">{{ isOpportunity(row) ? '机会' : '威胁' }}</span></template>
+        </el-table-column>
+        <el-table-column label="概率" width="70"><template #default="{ row }"><span class="num">{{ (row.probability * 100).toFixed(0) }}%</span></template></el-table-column>
+        <el-table-column label="影响金额" width="100"><template #default="{ row }"><span class="num" :style="{ color: row.impactAmount >= 0 ? '#4ade80' : '#f87171' }">{{ fmtMoney(row.impactAmount) }}</span></template></el-table-column>
+        <el-table-column label="EMV" width="90"><template #default="{ row }"><b class="num" :style="{ color: emv(row) >= 0 ? '#4ade80' : '#f87171' }">{{ fmtMoney(emv(row)) }}</b></template></el-table-column>
+        <el-table-column label="应对策略" width="110"><template #default="{ row }"><span class="tag" :class="emvZone(row) === 'high' ? 'fail' : emvZone(row) === 'mid' ? 'cond' : 'ok'">{{ row.strategy }}</span></template></el-table-column>
+        <el-table-column prop="owner" label="责任人" width="90" />
+        <el-table-column label="校验" width="100">
+          <template #default="{ row }"><span class="tag" :class="opportunityCompleteness(row).ok ? 'ok' : 'fail'">{{ opportunityCompleteness(row).ok ? '完备' : '缺项' }}</span></template>
+        </el-table-column>
+      </el-table>
+      <div class="src-note" style="margin-top: 8px">
+        {{ strategyDirection({ polarity: 'threat' }) }}（威胁）；{{ strategyDirection({ polarity: 'opportunity' }) }}（机会）。EMV 分级：|EMV|≥5 万为高、≥1 万为中。
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top: 12px">
       <div class="panel-title">风险量化与储备（RQA-001/002/005/006/007/008/012）</div>
       <div class="grid grid-4" style="margin-bottom: 10px">
         <KpiCard label="高RPN关联率" :value="store.riskLinkage.rate" unit="%" :zone="store.riskLinkage.rate === 100 ? 'ok' : 'danger'" sub="未关联风险在模拟中排除（RQA-005）" />
@@ -145,6 +176,7 @@ import KpiCard from '@/components/KpiCard.vue'
 import { useAppStore } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
 import { closeCheck, completeness, rpn, zone, ZONE_LABEL } from '@/domain/risk'
+import { emv, emvZone, isOpportunity, strategyDirection, opportunityCompleteness } from '@/domain/riskOpportunity'
 import type { RiskItem } from '@/domain/types'
 
 const store = useAppStore()
@@ -161,6 +193,12 @@ function scan() {
 }
 const zoneLabel = (v: number) => (zone(v) === 'red' ? '红区' : zone(v) === 'orange' ? '橙区' : zone(v) === 'yellow' ? '黄区' : '绿区')
 const zoneColor = (v: number) => (zone(v) === 'red' ? '#f87171' : zone(v) === 'orange' ? '#fbbf24' : zone(v) === 'yellow' ? '#93c5fd' : '#4ade80')
+/** 金额格式化：万元（|v|≥10000）或元 */
+function fmtMoney(v: number): string {
+  const abs = Math.abs(v)
+  if (abs >= 10000) return (v / 10000).toFixed(1) + '万'
+  return v.toFixed(0)
+}
 
 // —— 三点估算对话框 ——
 const tpDialog = reactive({ visible: false, riskId: '', optimistic: 1, mostLikely: 1, pessimistic: 1 })

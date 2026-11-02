@@ -62,11 +62,12 @@ import type {
 import { ROLES } from '@/domain/rbac'
 import type { FlowDefinition, FlowInstance } from '@/domain/flowEngine'
 import type { ComplianceItem } from '@/domain/compliance'
+import type { PolarityRisk } from '@/domain/riskOpportunity'
 import type { AiCorpusItem, AiSwitchConfig, AiCallLog } from '@/domain/aiAssist'
 import type { VulnerabilityItem, Issue8D } from '@/domain/defect'
 import type { Sci, CompatibilityRecord, ReleaseSignoff } from '@/domain/softwareVersion'
 
-export const SEED_VERSION = 'mofeng.rdp.v1.0.18'
+export const SEED_VERSION = 'mofeng.rdp.v1.0.19'
 const TENANT = 'T-1001'
 
 export interface SeedUser {
@@ -711,6 +712,15 @@ export function buildSeed() {
     { id: 'RK5', projectId: 'P-001', code: 'RSK-011', title: '供应商 PPAP 资料延误', failureMode: 'PPAP 未按期提交', cause: '供应商新产线爬坡', consequence: '量产放行推迟', trigger: 'PPAP 里程碑逾期', severity: 3, occurrence: 2, detection: 5, strategy: '驻厂跟催 + 每周例会', owner: '沈雅', status: '已关闭', residual: 30, signatures: ['质量工程师 沈雅'] }
   ]
 
+  /** 机会型/威胁型极性风险（概率×影响量化，对标 Oracle 风险机会管理 P2） */
+  const polarityRisks: PolarityRisk[] = [
+    { id: 'PR1', projectId: 'P-001', code: 'OPP-001', title: '新工艺良率提升带来降本', polarity: 'opportunity', probability: 0.4, impactAmount: 80000, strategy: '增强', owner: '顾晨', status: '开放' },
+    { id: 'PR2', projectId: 'P-001', code: 'OPP-002', title: '平台化复用缩短开发周期', polarity: 'opportunity', probability: 0.6, impactAmount: 50000, strategy: '开拓', owner: '赵启明', status: '应对中' },
+    { id: 'PR3', projectId: 'P-001', code: 'OPP-003', title: '提前锁定长交期物料锁定价格', polarity: 'opportunity', probability: 0.5, impactAmount: 30000, strategy: '分享', owner: '郑昊', status: '开放' },
+    { id: 'PR4', projectId: 'P-001', code: 'THR-001', title: '芯片持续涨价侵蚀毛利', polarity: 'threat', probability: 0.6, impactAmount: -50000, strategy: '转移', owner: '郑昊', status: '应对中' },
+    { id: 'PR5', projectId: 'P-001', code: 'THR-002', title: '关键试验台架产能不足', polarity: 'threat', probability: 0.3, impactAmount: -40000, strategy: '缓解', owner: '冯磊', status: '开放' }
+  ]
+
   const ecrs: EcrItem[] = [
     {
       id: 'E1', projectId: 'P-001', code: 'ECR-2026-0042', title: '旋变解码芯片由 A 型替换为 B 型（降本 8%）', sourceObjType: '需求', sourceObjId: 'R04',
@@ -1243,6 +1253,7 @@ export function buildSeed() {
     suppliers,
     boms,
     risks,
+    polarityRisks,
     ecrs,
     deliverables,
     costSubjects,
