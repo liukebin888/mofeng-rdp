@@ -20,6 +20,46 @@
       <SvgLine :labels="barLabels" :series="[{ name: '负荷率 %', color: '#3b82f6', data: barValues }]" :y-max="140" />
     </div>
 
+    <div class="panel" style="margin-bottom: 12px">
+      <div class="panel-title">
+        资源剖析表（角色 × 周负荷矩阵 · Oracle Resource Profile 对标）
+        <span class="dim">从 CPM 最早时间 es/ef 派生，逐周展开；超负荷周 >110% 标红</span>
+      </div>
+      <div class="grid grid-3" style="margin-bottom: 10px">
+        <KpiCard label="覆盖周数" :value="profile.weeks.length" unit="周" sub="项目工期内" />
+        <KpiCard label="资源角色" :value="profile.roles.length" unit="类" sub="矩阵行数" />
+        <KpiCard label="超负荷周" :value="profile.overloadedWeeks.length" unit="周" :zone="profile.overloadedWeeks.length ? 'danger' : 'ok'" sub="周总负荷 >110%" />
+      </div>
+
+      <div class="panel-title dim" style="font-size: 11px">按周负荷直方图（总分配工时 vs 容量，柱越高越超载）</div>
+      <SvgLine :labels="profile.weeks" :series="[{ name: '负荷率 %', color: '#f59e0b', data: weekLoadValues }]" :y-max="120" />
+
+      <div class="hr" />
+      <div class="panel-title dim" style="font-size: 11px">角色 × 周负荷矩阵（单元格为该角色该周分配工时，峰值标红）</div>
+      <div class="matrix-scroll">
+        <table class="matrix">
+          <thead>
+            <tr>
+              <th class="ro">角色</th>
+              <th v-for="w in profile.weeks" :key="w" class="wk">{{ w }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(role, ri) in profile.roles" :key="role">
+              <td class="ro">{{ role }}</td>
+              <td v-for="(w, wi) in profile.weeks" :key="w" class="cell" :class="{ hot: profile.matrix[ri][wi] > 44 }">
+                {{ profile.matrix[ri][wi] || '' }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="src-note" style="margin-top: 8px">
+        角色峰值负荷（>110% 需裁决）：<span v-for="p in profile.rolePeak.filter((x) => x.loadRate > 110)" :key="p.role" class="tag fail" style="margin-right: 4px">{{ p.role }} {{ p.week }} {{ p.loadRate }}%</span>
+        <span v-if="!profile.rolePeak.some((x) => x.loadRate > 110)" class="dim">当前无角色峰值超负荷</span>
+      </div>
+    </div>
+
     <div class="grid" style="grid-template-columns: 1.4fr 1fr; align-items: start">
       <div class="panel">
         <div class="panel-title">负荷明细（按角色）</div>
@@ -178,6 +218,10 @@ const supplyForecast = computed(() => store.supplyDemand.forecast)
 /** 资源闸门阻断状态 */
 const gateBlock = computed(() => store.resourceGateBlock)
 
+/** 资源剖析表（Oracle Resource Profile 对标：角色 × 周负荷矩阵） */
+const profile = computed(() => store.resourceProfile)
+const weekLoadValues = computed(() => profile.value.buckets.map((b) => b.loadRate))
+
 /** 供需曲线（需求 vs 净可用，正值语义） */
 const supplyLabels = computed(() => supplyForecast.value.map((f) => f.week))
 const supplyDemandValues = computed(() => supplyForecast.value.map((f) => f.totalDemand))
@@ -245,4 +289,11 @@ function resolveOverload() {
 
 <style scoped>
 .rrow { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px dashed var(--line); font-size: 12.5px; }
+.matrix-scroll { overflow-x: auto; }
+.matrix { border-collapse: collapse; font-size: 11px; width: 100%; }
+.matrix th, .matrix td { border: 1px solid #16233a; padding: 4px 6px; text-align: center; white-space: nowrap; }
+.matrix .ro { text-align: left; font-weight: 600; color: var(--text-1); background: #0f1b2e; position: sticky; left: 0; }
+.matrix th.wk { color: var(--text-3); background: #0a1120; }
+.matrix td.cell { color: var(--text-2); font-variant-numeric: tabular-nums; }
+.matrix td.cell.hot { color: #ffb4b4; background: #2a1114; font-weight: 600; }
 </style>

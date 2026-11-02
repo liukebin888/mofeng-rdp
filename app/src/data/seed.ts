@@ -13,11 +13,14 @@ import type {
   BomNode,
   CalendarDef,
   CodeDict,
+  CostDoc,
+  CostSubject,
   DecisionRecord,
   Deliverable,
   DeviationItem,
   DocItem,
   EcrItem,
+  HandoffPoint,
   HourRecord,
   InboxItem,
   LessonItem,
@@ -39,6 +42,7 @@ import type {
   StepTemplate,
   SuperviseItem,
   Supplier,
+  ThresholdIssue,
   TraceLink,
   UdfDef,
   WbsNode,
@@ -62,7 +66,7 @@ import type { AiCorpusItem, AiSwitchConfig, AiCallLog } from '@/domain/aiAssist'
 import type { VulnerabilityItem, Issue8D } from '@/domain/defect'
 import type { Sci, CompatibilityRecord, ReleaseSignoff } from '@/domain/softwareVersion'
 
-export const SEED_VERSION = 'mofeng.rdp.v1.0.16'
+export const SEED_VERSION = 'mofeng.rdp.v1.0.18'
 const TENANT = 'T-1001'
 
 export interface SeedUser {
@@ -560,6 +564,17 @@ function buildWbs(): WbsNode[] {
   }))
 }
 
+/** 跨专业交接点（界面计划管理 / Oracle Interface Plan 对标）：覆盖三态闭环 + 逾期 + 硬约束 */
+function buildHandoffs(): HandoffPoint[] {
+  return [
+    { id: 'IF1', projectId: 'P-001', code: 'IF-001', name: '结构总成数模交接', fromRole: '结构工程师', toRole: '硬件工程师', deliverable: '结构总成数模 V1.2', mustFinishBy: '2026-10-28', handedAt: '2026-10-26', stage: '硬件开发', wbsId: 'w09' },
+    { id: 'IF2', projectId: 'P-001', code: 'IF-002', name: 'PCB Layout 交付', fromRole: '硬件工程师', toRole: '试制负责人', deliverable: 'Gerber + BOM + 坐标文件', mustFinishBy: '2026-11-12', handedAt: '2026-11-08', receivedAt: '2026-11-09', stage: '样件与试验', wbsId: 'w10' },
+    { id: 'IF3', projectId: 'P-001', code: 'IF-003', name: 'BSW 配置包移交', fromRole: '软件工程师', toRole: '测试工程师', deliverable: 'BSW 配置 + 接口头文件', mustFinishBy: '2026-11-20', stage: '软件开发', wbsId: 'w13' },
+    { id: 'IF4', projectId: 'P-001', code: 'IF-004', name: '安全分析报告送审', fromRole: '功能安全经理', toRole: '质量工程师', deliverable: 'HARA/TARA 报告', mustFinishBy: '2026-10-30', stage: '需求与系统方案', wbsId: 'w07' },
+    { id: 'IF5', projectId: 'P-001', code: 'IF-005', name: 'OTS 样件认可放行', fromRole: '质量工程师', toRole: '配置管理员', deliverable: 'OTS 放行单', mustFinishBy: '2026-12-05', stage: '样件与试验', wbsId: 'w23' }
+  ]
+}
+
 /** 需求：25 条，覆盖 SG→FSR→TSR/HSR/SSSR/SEC→TC→VER */
 function buildRequirements(): { reqs: Requirement[]; links: TraceLink[] } {
   const r = (
@@ -674,6 +689,7 @@ export function buildSeed() {
   const users = buildUsers()
   const projects = buildProjects(users)
   const wbs = buildWbs()
+  const handoffs = buildHandoffs()
   const { reqs, links } = buildRequirements()
   const suppliers = buildSuppliers()
   const boms = buildBom()
@@ -764,6 +780,26 @@ export function buildSeed() {
     { id: 'D10', projectId: 'P-001', code: 'DEL-010', name: '交付清单与签收单', category: '文档', required: true, provided: false, gate: 'G5' },
     { id: 'D11', projectId: 'P-001', code: 'DEL-011', name: 'DFMEA 经验库条目', category: '知识', required: false, provided: false, gate: 'G5' }
   ]
+
+  /** 成本科目（8 列归集表输入：估算/预算/控制/变更） */
+  const costSubjects: CostSubject[] = [
+    { code: 'C-100', name: '结构件材料', wbsCode: '3.1', estimate: 120, budget: 115, control: 115, change: 5 },
+    { code: 'C-200', name: '电子物料采购', wbsCode: '3.2', estimate: 260, budget: 250, control: 250, change: -10 },
+    { code: 'C-300', name: '软件外包', wbsCode: '4.1', estimate: 180, budget: 180, control: 180, change: 0 },
+    { code: 'C-400', name: '试验与认证', wbsCode: '5.5', estimate: 140, budget: 135, control: 135, change: 8 },
+    { code: 'C-500', name: '试制工装', wbsCode: '5.4', estimate: 90, budget: 85, control: 85, change: 0 }
+  ]
+
+  /** 四类成本单据（人工时/采购合同/服务合同/其它费用） */
+  const costDocs: CostDoc[] = [
+    { id: 'CD1', projectId: 'P-001', type: '人工时', code: 'TS-001', costCode: 'C-400', amount: 42, currency: 'CNY', date: '2026-08-10', note: 'DV 试验人工' },
+    { id: 'CD2', projectId: 'P-001', type: '采购合同', code: 'PO-100', costCode: 'C-100', amount: 60, currency: 'CNY', date: '2026-05-15', note: '壳体模具采购' },
+    { id: 'CD3', projectId: 'P-001', type: '采购合同', code: 'PO-101', costCode: 'C-200', amount: 130, currency: 'CNY', date: '2026-06-02', note: 'MCU 芯片采购' },
+    { id: 'CD4', projectId: 'P-001', type: '服务合同', code: 'SR-020', costCode: 'C-300', amount: 95, currency: 'CNY', date: '2026-07-18', note: '软件外包首付款' },
+    { id: 'CD5', projectId: 'P-001', type: '其它费用', code: 'OT-001', costCode: 'C-500', amount: 28, currency: 'CNY', date: '2026-08-22', note: '试制工装辅材' },
+    { id: 'CD6', projectId: 'P-001', type: '人工时', code: 'TS-002', costCode: 'C-400', amount: 18, currency: 'CNY', date: '2026-09-05', note: 'PV 试验人工' }
+  ]
+
 
   const docs: DocItem[] = ([
     { id: 'DC1', projectId: 'P-001', code: 'DOC-SYS-001', name: '系统需求规格书', discipline: '系统', version: 'V1.4', status: '已发布', required: true, signoffs: [{ role: '系统工程师', signed: true }, { role: '功能安全经理', signed: true }, { role: '质量工程师', signed: true }], mdrSet: 'MDR-A' },
@@ -1201,6 +1237,7 @@ export function buildSeed() {
     codeIssues,
     projects: projects.map((p) => ({ ...p, schemeLinked, quoteLinked }) as Project),
     wbs,
+    handoffs,
     reqs,
     links,
     suppliers,
@@ -1208,6 +1245,8 @@ export function buildSeed() {
     risks,
     ecrs,
     deliverables,
+    costSubjects,
+    costDocs,
     docs,
     samples,
     defects,
@@ -1231,6 +1270,7 @@ export function buildSeed() {
     stepRuns,
     messages,
     inboxItems,
+    thresholdIssues: [] as ThresholdIssue[],
     resourcePool,
     resourceShares,
     portalSections,

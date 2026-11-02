@@ -27,7 +27,7 @@ import { computeCpm, planQualityChecks, plannedValue, statusDayOf, weightedCompl
 import { computeEvm } from '@/domain/evm'
 import { rankProjects } from '@/domain/portfolio'
 import { coverage, detectBreaks } from '@/domain/trace'
-import type { ActorContext, Baseline, GateDef, GateRun, Level, WbsNode } from '@/domain/types'
+import type { ActorContext, Baseline, GateDef, GateRun, Level, WbsNode, ThresholdIssue } from '@/domain/types'
 import { can, type ActionKey } from '@/domain/rbac'
 import { guardTenant, visibleInTenant, groupDrillDown, type TenantContext } from '@/domain/tenant'
 import { advanceThroughBranch, approveNode, availableActions, escalate, getNode, isOverdue, rejectNode, startFlow, addSigner, transferNode, signNode, type FlowDefinition } from '@/domain/flowEngine'
@@ -82,6 +82,13 @@ import { detectConflicts } from '@/domain/resourceConflict'
 import { analyzeSupplyDemand } from '@/domain/supplyDemand'
 import { detectOverallocations, gateBlocked } from '@/domain/overallocation'
 import { levelResources, smoothResources } from '@/domain/leveling'
+import { scanThresholds, DEFAULT_THRESHOLD_RULES, type ThresholdMetrics } from '@/domain/thresholdEngine'
+import { evaluateHandoffs } from '@/domain/handoffEngine'
+import { aggregatePortfolio, interventionRows, type ProjectHealthSnapshot } from '@/domain/portfolioAggregate'
+import { buildResourceProfile, type TaskResourceSpan } from '@/domain/resourceProfile'
+import { buildCostSheet } from '@/domain/costSheet'
+import { isOverdue as isCollabOverdue } from '@/domain/collabEngine'
+import { rpn } from '@/domain/risk'
 import { analyzeBottlenecks } from '@/domain/bottleneck'
 import { cloneStructure, validateClone } from '@/domain/projectClone'
 import { createShareLink, revokeLink, activeLinks, LINK_TTL_MS, type ShareLink } from '@/domain/shareLink'
@@ -151,6 +158,8 @@ export const useAppStore = defineStore('app', () => {
   const quotaConfig = ref<QuotaConfig>({ ...DEFAULT_QUOTA })
   /** RES-005：已裁决的超分配（key = userId\0week），裁决后闸门放行 */
   const resolvedOverallocIds = ref<string[]>([])
+  /** 临界值自动触发问题台账（对标 Oracle Thresholds：阈值越限→自动生成问题→分派） */
+  const thresholdIssues = computed<ThresholdIssue[]>(() => (data.value.thresholdIssues ?? []) as ThresholdIssue[])
 
   const users = computed<SeedUser[]>(() => data.value.users)
   const currentUser = computed(() => users.value.find((u) => u.id === userId.value) || users.value[0])
@@ -455,6 +464,8 @@ export const useAppStore = defineStore('app', () => {
 
   // —— 派生数据：控制点 / Gate / 计划 / 追溯 / 挣值 ——
   const projectWbs = computed(() => data.value.wbs.filter((w) => w.projectId === projectId.value))
+  /** 跨专业交接点（界面计划管理 / Oracle Interface Plan 对标） */
+  const projectHandoffs = computed(() => (data.value.handoffs ?? []).filter((h) => h.projectId === projectId.value))
   const projectReqs = computed(() => data.value.reqs.filter((r) => r.projectId === projectId.value))
   const projectLinks = computed(() => data.value.links.filter((l) => projectReqs.value.some((r) => r.id === l.srcId) || projectReqs.value.some((r) => r.id === l.dstId)))
   const projectRisks = computed(() => data.value.risks.filter((r) => r.projectId === projectId.value))
@@ -842,6 +853,124 @@ export const useAppStore = defineStore('app', () => {
     return computeEvm({ pv: pvInfo.value.pv, ev, ac: currentProject.value.spent, bac: currentProject.value.budget })
   })
 
+  // —— 界面计划管理（对标 Oracle Interface Plan：跨专业交接点三态闭环 + 硬约束逾期）——
+  /** 交接点评估（单一权威：evaluateHandoffs 纯函数，禁止自造状态/逾期） */
+  const handoffEval = computed(() => evaluateHandoffs(projectHandoffs.value, todayStr()))
+
+  // —— 资源剖析表（对标 Oracle Resource Profile：角色 × 周 负荷矩阵，从 CPM 最早时间派生）——
+  /** 资源剖析表（单一权威：buildResourceProfile 纯函数，输入来自 CPM es/ef，禁止自造工时） */
+  const resourceProfile = computed(() => {
+    const spans: TaskResourceSpan[] = cpm.value.nodes
+      .filter((n) => n.level === 2) // 仅叶子/工作包节点占用资源
+      .map((n) => ({
+        id: n.id,
+        code: n.code,
+        name: n.name,
+        role: n.ownerRole || '未分配',
+        startDay: n.es,
+        finishDay: n.ef
+      }))
+    return buildResourceProfile(spans, currentProject.value.start)
+  })
+
+  // —— 成本归集表（对标 Oracle 8 列归集表 + 四类成本单据）——
+  /** 8 列成本归集表（单一权威：buildCostSheet 纯函数，输入 costSubjects/costDocs，禁止自造金额） */
+  const costSheet = computed(() =>
+    buildCostSheet(
+      data.value.costSubjects.filter((s) => s.wbsCode && projectWbs.value.some((w) => w.code === s.wbsCode)),
+      data.value.costDocs.filter((d) => d.projectId === projectId.value)
+    )
+  )
+
+  // —— 临界值自动触发（对标 Oracle Thresholds：业务指标越限→自动生成问题→分派）——
+  /** 当前项目可观测业务指标（阈值引擎输入，全部同源自既有派生，禁止自造比例） */
+  const thresholdMetrics = computed<ThresholdMetrics>(() => {
+    const today = todayStr()
+    const redRisks = projectRisks.value.filter((r) => rpn(r) >= 200)
+    const redNoStrategy = redRisks.filter((r) => !r.strategy?.trim())
+    return {
+      spi: evm.value.spi,
+      cpi: evm.value.cpi,
+      cvRate: currentProject.value.budget ? Math.round(((currentProject.value.spent - evm.value.ev) / currentProject.value.budget) * 10000) / 100 : 0,
+      planHealth: quality.value.health,
+      redRiskCount: redRisks.length,
+      redRiskNoStrategy: redNoStrategy.length,
+      overdueSendAuditCount: projectSendAudits.value.filter((s) => s.status !== '已答复' && isCollabOverdue(s.dueAt, today)).length,
+      overdueSuperviseCount: projectSupervises.value.filter((s) => s.status !== '已销项' && isCollabOverdue(s.due, today)).length,
+      openResolutionCount: projectResolutions.value.filter((r) => r.status !== '已闭环').length,
+      pendingApprovalCount: data.value.flowInstances.filter((f) => f.status === '运行中').length
+    }
+  })
+  /** 扫描阈值并生成问题（幂等：同规则同项目 24h 内不重复触发） */
+  function scanThresholdIssues(): number {
+    const result = scanThresholds(thresholdMetrics.value, DEFAULT_THRESHOLD_RULES, projectId.value)
+    const now = new Date().toISOString()
+    const dayAgo = Date.now() - 24 * 3600 * 1000
+    // 24h 去重：同一 ruleId + projectId 已有未关闭问题则不重复生成
+    const existing = (data.value.thresholdIssues ?? []).filter(
+      (i) => i.projectId === projectId.value && i.status !== '已关闭' && Date.parse(i.createdAt) >= dayAgo
+    )
+    const existingKeys = new Set(existing.map((i) => `${i.ruleId}:${i.projectId}`))
+    let added = 0
+    for (const hit of result.hits) {
+      const key = `${hit.rule.id}:${projectId.value}`
+      if (existingKeys.has(key)) continue
+      const seq = (data.value.thresholdIssues?.length ?? 0) + added + 1
+      const issue: ThresholdIssue = {
+        id: `TI-${Date.now()}-${added}`,
+        projectId: projectId.value,
+        code: `AUTO-${String(seq).padStart(3, '0')}`,
+        ruleId: hit.rule.id,
+        metric: hit.metricKey,
+        title: hit.issueTitle,
+        desc: hit.issueDesc,
+        severity: hit.severity,
+        assignTo: hit.assignTo,
+        source: '自动触发',
+        status: '开放',
+        createdAt: now
+      }
+      if (!data.value.thresholdIssues) data.value.thresholdIssues = []
+      data.value.thresholdIssues.push(issue)
+      // 同步推送消息（POR-006 去重）
+      pushMessage({ eventKey: hit.eventKey, title: hit.issueTitle, content: hit.issueDesc, category: '系统', refType: 'thresholdIssue', refId: issue.id })
+      // 审计留痕
+      log('CREATE', '阈值问题', issue.id, { ruleId: hit.rule.id, severity: hit.severity, assignTo: hit.assignTo })
+      added += 1
+    }
+    if (added > 0) notify('warning', `临界值触发 ${added} 项问题，已自动生成并分派（Oracle Thresholds 对标）`)
+    return added
+  }
+  /** 关闭阈值问题（闭环留痕） */
+  function closeThresholdIssue(issueId: string) {
+    const i = (data.value.thresholdIssues ?? []).find((x) => x.id === issueId)
+    if (!i) return
+    i.status = '已关闭'
+    i.closedBy = currentUser.value.name
+    i.closedAt = new Date().toISOString()
+    log('UPDATE', '阈值问题', issueId, { status: '已关闭' })
+    notify('success', `${i.code} 已关闭`)
+  }
+  const projectThresholdIssues = computed(() => thresholdIssues.value.filter((i) => i.projectId === projectId.value))
+
+  /** 交接点「已交接」：发出方提交交付物（三态闭环第二态） */
+  function handoffHand(handoffId: string) {
+    const h = (data.value.handoffs ?? []).find((x) => x.id === handoffId)
+    if (!h) return
+    if (h.handedAt === undefined) h.handedAt = todayStr()
+    log('UPDATE', '交接点', handoffId, { handedAt: h.handedAt })
+    notify('success', `${h.code} 已交接，等待接收方确认`)
+  }
+  /** 交接点「已接收」：接收方确认交付物（三态闭环终态） */
+  function handoffReceive(handoffId: string) {
+    const h = (data.value.handoffs ?? []).find((x) => x.id === handoffId)
+    if (!h) return
+    if (h.receivedAt === undefined) h.receivedAt = todayStr()
+    if (h.handedAt === undefined) h.handedAt = todayStr()
+    log('UPDATE', '交接点', handoffId, { receivedAt: h.receivedAt })
+    notify('success', `${h.code} 已接收，交接闭环`)
+  }
+
   const cpContext = computed<CpContext>(() => ({
     project: currentProject.value,
     wbs: projectWbs.value,
@@ -942,6 +1071,44 @@ export const useAppStore = defineStore('app', () => {
   const traceBreaks = computed(() => detectBreaks(projectReqs.value, projectLinks.value))
   const traceCoverage = computed(() => coverage(projectReqs.value, projectLinks.value))
   const portfolio = computed(() => rankProjects(visibleProjects.value))
+
+  // —— 企业级聚合视图（对标 Oracle 组合驾驶舱：跨项目汇总健康指标，兑现 V4.0 第五种介入方式「聚合」）——
+  /** 组合健康快照：每项目复用既有引擎派生，禁止自造比例（单一权威：computeEvm/weightedCompletion/rpn/evaluateHandoffs） */
+  const portfolioAggregate = computed(() => {
+    const today = todayStr()
+    const snapshots: ProjectHealthSnapshot[] = visibleProjects.value.map((p) => {
+      const wbs = data.value.wbs.filter((w) => w.projectId === p.id)
+      const comp = weightedCompletion(wbs, p.budget)
+      const ev = (comp.weightedPercent / 100) * p.budget
+      const statusDay = statusDayOf(wbs)
+      const pvInfo = plannedValue(wbs, p.budget, statusDay)
+      const evm = computeEvm({ pv: pvInfo.pv, ev, ac: p.spent, bac: p.budget })
+      const q = planQualityChecks(wbs)
+      const risks = data.value.risks.filter((r) => r.projectId === p.id)
+      const redRisks = risks.filter((r) => rpn(r) >= 200)
+      const handoffs = (data.value.handoffs ?? []).filter((h) => h.projectId === p.id)
+      const overdueHandoffs = evaluateHandoffs(handoffs, today).summary.overdue
+      return {
+        projectId: p.id,
+        code: p.code,
+        name: p.name,
+        spi: evm.spi,
+        cpi: evm.cpi,
+        redRiskCount: redRisks.length,
+        redRiskNoStrategy: redRisks.filter((r) => !r.strategy?.trim()).length,
+        overdueHandoffCount: overdueHandoffs,
+        planHealth: q.health,
+        budget: p.budget,
+        spent: p.spent,
+        health: p.health,
+        level: p.level || 'D',
+        status: p.status
+      }
+    })
+    return aggregatePortfolio(snapshots)
+  })
+  /** 需介入项目（红区优先排序） */
+  const portfolioInterventions = computed(() => interventionRows(portfolioAggregate.value))
 
   // —— 动作 ——
   function saveWbs(nodes: WbsNode[]) {
@@ -2446,10 +2613,21 @@ export const useAppStore = defineStore('app', () => {
     guardTenantAccess,
     guardGroupDrillDown,
     projectWbs,
+    projectHandoffs,
+    handoffEval,
+    resourceProfile,
+    costSheet,
+    handoffHand,
+    handoffReceive,
     projectReqs,
     projectLinks,
     projectRisks,
     projectEcrs,
+    thresholdMetrics,
+    thresholdIssues,
+    projectThresholdIssues,
+    scanThresholdIssues,
+    closeThresholdIssue,
     riskLinks,
     threePoints,
     riskLinkage,
@@ -2557,6 +2735,8 @@ export const useAppStore = defineStore('app', () => {
     traceBreaks,
     traceCoverage,
     portfolio,
+    portfolioAggregate,
+    portfolioInterventions,
     auditChain,
     chainOk,
     persist,

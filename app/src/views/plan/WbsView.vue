@@ -17,6 +17,51 @@
 
     <div class="panel" style="margin-bottom: 12px">
       <div class="panel-title">
+        跨专业交接点（界面计划管理 / Oracle Interface Plan 对标）
+        <span class="dim">三态闭环：待交接 → 已交接 → 已接收；必须完成时间（硬约束）逾期即预警</span>
+      </div>
+      <div class="grid grid-4" style="margin-bottom: 10px">
+        <KpiCard label="交接点总数" :value="store.handoffEval.summary.total" unit="个" sub="跨专业界面" />
+        <KpiCard label="已闭环" :value="store.handoffEval.summary.closed" unit="个" :zone="store.handoffEval.summary.closed === store.handoffEval.summary.total ? 'ok' : 'warn'" sub="已接收" />
+        <KpiCard label="逾期" :value="store.handoffEval.summary.overdue" unit="个" :zone="store.handoffEval.summary.overdue > 0 ? 'danger' : 'ok'" sub="超必须完成时间未闭环" />
+        <KpiCard label="交接健康度" :value="store.handoffEval.summary.health" unit="分" :target="100" :zone="store.handoffEval.summary.health >= 80 ? 'ok' : 'danger'" />
+      </div>
+      <el-table :data="store.handoffEval.items" size="small" height="240">
+        <el-table-column prop="point.code" label="编号" width="80" />
+        <el-table-column prop="point.name" label="交接点" min-width="160" show-overflow-tooltip />
+        <el-table-column label="交接方向" min-width="170">
+          <template #default="{ row }">
+            <span class="mono">{{ row.point.fromRole }}</span>
+            <span class="arrow">→</span>
+            <span class="mono">{{ row.point.toRole }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="point.deliverable" label="交付物" min-width="130" show-overflow-tooltip />
+        <el-table-column label="必须完成" width="100">
+          <template #default="{ row }"><span class="num" :style="{ color: row.overdue ? '#f87171' : 'var(--text-2)' }">{{ row.point.mustFinishBy }}</span></template>
+        </el-table-column>
+        <el-table-column label="状态" width="90">
+          <template #default="{ row }">
+            <span class="tag" :class="row.status === 'received' ? 'ok' : row.overdue ? 'fail' : row.status === 'handed' ? 'l3' : 'l1'">{{ statusText(row.status) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="剩余/逾期" width="90">
+          <template #default="{ row }">
+            <span class="num" :style="{ color: row.overdue ? '#f87171' : 'var(--text-2)' }">{{ row.closed ? '—' : (row.remainingDays < 0 ? `逾期 ${-row.remainingDays} 天` : `${row.remainingDays} 天`) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="160">
+          <template #default="{ row }">
+            <el-button v-if="row.status === 'pending'" size="small" type="primary" plain @click="store.handoffHand(row.point.id)">交接</el-button>
+            <el-button v-else-if="row.status === 'handed'" size="small" type="success" plain @click="store.handoffReceive(row.point.id)">接收</el-button>
+            <span v-else class="dim">已闭环</span>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
+
+    <div class="panel" style="margin-bottom: 12px">
+      <div class="panel-title">
         甘特视图（按 CPM 最早开始 ES 排布）
         <span class="dim">关键路径：{{ store.cpm.criticalPath.join(' → ') }}</span>
       </div>
@@ -93,6 +138,10 @@ const deps = computed(() =>
     })
   )
 )
+
+function statusText(s: string): string {
+  return s === 'received' ? '已接收' : s === 'handed' ? '已交接' : '待交接'
+}
 
 function demoCycle() {
   const nodes = store.projectWbs.map((n) => ({ ...n, deps: [...n.deps] }))

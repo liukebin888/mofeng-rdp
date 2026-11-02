@@ -110,7 +110,7 @@ export const MENUS: MenuGroup[] = [
   {
     key: 'cost', title: '成本管理', icon: 'Money', stage: 'P1–P7', role: '项目经理 / 财务', cp: 'C-10~C-12',
     items: [
-      { path: '/cost/budget', title: '成本基线', desc: '预算挂 WBS 科目', comp: v('resource/EvmView') },
+      { path: '/cost/budget', title: '成本归集表', desc: '8 列归集表 + 四类单据', comp: v('cost/CostSheetView') },
       { path: '/cost/deviation', title: '成本偏差', desc: 'CPI 0.95/0.90 判读', comp: v('resource/EvmView') },
       { path: '/cost/hours', title: '工时归集', desc: '工时→成本归集', comp: v('resource/EvmView') }
     ]
@@ -162,7 +162,7 @@ export const MENUS: MenuGroup[] = [
     key: 'report', title: '报表与看板', icon: 'DataAnalysis', stage: '全阶段', role: '管理层', cp: 'C-47',
     items: [
       { path: '/report/dashboard', title: '项目级驾驶舱', desc: 'Gate/待办/逾期同源', comp: v('report/DashboardView') },
-      { path: '/report/portfolio', title: '组合级驾驶舱', desc: '多项目对比与气泡', comp: v('report/DashboardView') },
+      { path: '/report/portfolio', title: '组合级驾驶舱', desc: '企业级聚合视图（跨项目 SPI/CPI/风险/交接）', comp: v('report/PortfolioDashboardView') },
       { path: '/report/audit', title: '审计与合规报表', desc: '哈希链校验报告', comp: v('report/AuditReportView') },
       { path: '/report/rules', title: '规则体检', desc: '48 控制点分布与口径核对', comp: v('report/RulesView') }
     ]

@@ -60,6 +60,30 @@
     </div>
 
     <div class="panel" style="margin-top: 12px">
+      <div class="panel-title">临界值自动触发问题（Oracle Thresholds 对标）</div>
+      <div class="crow" style="border-bottom: none; padding-top: 2px">
+        <el-button size="small" type="primary" @click="scan()">扫描阈值</el-button>
+        <span class="dim">业务指标（SPI/CPI/健康度/红区风险/逾期件）越限自动生成问题并分派；同规则 24h 去重</span>
+      </div>
+      <el-table v-if="issues.length" :data="issues" size="small" style="margin-top: 6px">
+        <el-table-column prop="code" label="编号" width="100" />
+        <el-table-column prop="title" label="问题" min-width="240" show-overflow-tooltip />
+        <el-table-column label="级别" width="70">
+          <template #default="{ row }"><span class="tag" :class="row.severity === 'P1' ? 'fail' : row.severity === 'P2' ? 'cond' : 'ok'">{{ row.severity }}</span></template>
+        </el-table-column>
+        <el-table-column prop="assignTo" label="分派" width="110" />
+        <el-table-column prop="status" label="状态" width="80" />
+        <el-table-column label="操作" width="90">
+          <template #default="{ row }">
+            <el-button v-if="row.status !== '已关闭'" link size="small" @click="store.closeThresholdIssue(row.id)">关闭</el-button>
+            <span v-else class="dim">已闭环</span>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-empty v-else description="暂无自动触发问题，点击「扫描阈值」执行一次评估" :image-size="48" />
+    </div>
+
+    <div class="panel" style="margin-top: 12px">
       <div class="panel-title">风险量化与储备（RQA-001/002/005/006/007/008/012）</div>
       <div class="grid grid-4" style="margin-bottom: 10px">
         <KpiCard label="高RPN关联率" :value="store.riskLinkage.rate" unit="%" :zone="store.riskLinkage.rate === 100 ? 'ok' : 'danger'" sub="未关联风险在模拟中排除（RQA-005）" />
@@ -131,6 +155,10 @@ const noStrategy = computed(() => red.value.filter((r) => !r.strategy))
 const incomplete = computed(() => store.projectRisks.filter((r) => !completeness(r).ok))
 const closed = computed(() => store.projectRisks.filter((r) => r.status === '已关闭'))
 const vulns = computed(() => store.data.defects.vulns.map((v) => ({ ...v, level: v.cvss >= 7 ? '高' : v.cvss >= 4 ? '中' : '低' })))
+const issues = computed(() => store.projectThresholdIssues)
+function scan() {
+  store.scanThresholdIssues()
+}
 const zoneLabel = (v: number) => (zone(v) === 'red' ? '红区' : zone(v) === 'orange' ? '橙区' : zone(v) === 'yellow' ? '黄区' : '绿区')
 const zoneColor = (v: number) => (zone(v) === 'red' ? '#f87171' : zone(v) === 'orange' ? '#fbbf24' : zone(v) === 'yellow' ? '#93c5fd' : '#4ade80')
 
