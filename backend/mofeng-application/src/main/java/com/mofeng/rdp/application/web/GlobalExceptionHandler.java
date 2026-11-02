@@ -60,6 +60,13 @@ public class GlobalExceptionHandler {
             .body(ApiResponse.badRequest("参数类型不匹配：" + ex.getName()));
     }
 
+    /** 未认证（无有效身份）→ 401 UNAUTHORIZED（与权限不足 403、规则阻断 422 区分）。 */
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<ApiResponse<Object>> handleUnauthorized(UnauthorizedException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+            .body(ApiResponse.unauthorized(ex.getMessage() == null ? "未认证" : ex.getMessage()));
+    }
+
     /** 权限不足 → 403 FORBIDDEN（与领域规则阻断 422 区分）。 */
     @ExceptionHandler(PermissionDeniedException.class)
     public ResponseEntity<ApiResponse<Object>> handlePermissionDenied(PermissionDeniedException ex) {

@@ -22,6 +22,7 @@ public final class ApiResponse<T> {
 
     public static final String OK = "OK";
     public static final String BAD_REQUEST = "BAD_REQUEST";
+    public static final String UNAUTHORIZED = "UNAUTHORIZED";
     public static final String BLOCKED = "BLOCKED";
     public static final String INTERNAL_ERROR = "INTERNAL_ERROR";
 
@@ -45,6 +46,10 @@ public final class ApiResponse<T> {
 
     public static <T> ApiResponse<T> badRequest(String message) {
         return new ApiResponse<>(BAD_REQUEST, message, null);
+    }
+
+    public static <T> ApiResponse<T> unauthorized(String message) {
+        return new ApiResponse<>(UNAUTHORIZED, message, null);
     }
 
     public static <T> ApiResponse<T> blocked(String message, T data) {

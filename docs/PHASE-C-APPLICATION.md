@@ -68,6 +68,7 @@ POST /api/v1/projects/initiate
 | C-6 第三个闭环：变更→ECR ✅ | 四维影响评估 → 审批角色 → 闭包 → ECN 验证关闭 | fail-closed（缺评估/未确认/未验证）拒关闭可验证（提交 `待推送`）|
 | C-8 第四个闭环：样件→齐套→检验 ✅ | 字段齐全率 → 下达资格 → EBOM 齐套 → 状态机 → 检验放行 | fail-closed（缺项/未冻结/不齐套/不合格未闭环）可验证（提交 `待推送`）|
 | C-3 六门禁全链路 | vue-tsc / vitest / build / smoke / e2e / 隔离面 | 全绿（待前端联调）|
+| C-13 认证层 ✅ | JWT 签发/校验 + 过滤器填充 CurrentUserContext + TenantContextHolder + 401 映射 | 有效 token 填充上下文、无效 token 401、匿名放行、finally 清理（提交 `待推送`）|
 
 ---
 
@@ -223,3 +224,24 @@ POST /api/v1/projects/initiate
 1. **前后端门禁各自闭环、互不破坏**：阶段 C 全部改动在后端（应用层编排 + 横切 + 权限入口），前端六门禁 744/744 零回退，证明「领域层权威在 TS、Java 同构迁移」的分层纪律成立——后端改动不触碰前端权威。
 2. **隔离面从「约定」升级为「可执行守护」**：后端 `DomainLayerArchitectureTest` 用 ArchUnit 把「领域层禁 Spring/MyBatis/HTTP/JPA」白名单收口固化进 `mvn test`，出现反向依赖即构建失败，不再依赖人工评审。
 3. **六门禁是交付级判据，非阶段性一过式检查**：阶段 A（前端）与阶段 B/C（后端）各自维护一套门禁基线，每次提交前全量跑，零回退是硬约束。
+
+---
+
+## 12. C-13 落地结论（2026-11-02）——应用层认证层（JWT）
+
+**结论**：应用层认证层落地，`@RequiresPermission` 权限切面的输入源（`CurrentUserContext`）由 JWT 认证过滤器填充，权限校验入口真正生效。认证（验身份）与授权（判角色矩阵）分离，401/403/422 三者语义收敛。
+
+| 项 | 内容 |
+|---|---|
+| JWT 服务 | `security/JwtService`：JDK 内置 HMAC-SHA256（HS256）签发/校验，零第三方依赖；载荷 {sub, role, tenant, exp}；恒等时间比较防时序侧信道；密钥长度≥32 字节构造即校验 |
+| 认证过滤器 | `security/JwtAuthenticationFilter`（OncePerRequestFilter）：解析 `Authorization: Bearer <token>` → 校验 → 填充 `CurrentUserContext` + `TenantContextHolder` → finally 清理 |
+| 自动装配 | `security/SecurityAutoConfiguration`：`JwtService` bean（密钥自 `mofeng.security.jwt.secret` 配置注入，默认本地密钥）+ `FilterRegistrationBean` 最高优先级注册过滤器 |
+| 异常映射 | `web/UnauthorizedException` → `GlobalExceptionHandler` 401 UNAUTHORIZED（补 `ApiResponse.UNAUTHORIZED`/`unauthorized()`），与 403（权限不足）/422（规则阻断）三者分离 |
+| 测试结果 | 应用层 31→43 例全过（+JwtServiceTest 9 + JwtAuthenticationFilterTest 3），领域层 264 例全过，backend 5 模块 BUILD SUCCESS |
+
+**关键设计决策**：
+1. **纯 Servlet Filter + FilterRegistrationBean，不引入 Spring Security 全栈**：与 C-12「轻量切面替代重量级安全框架」决策同源——认证用过滤器（验身份），授权用切面（判角色矩阵），二者都复用领域层权威判定（RbacEngine），不引入整套过滤器链/认证 provider 的超前投入。
+2. **认证与授权分离**：`JwtService` 只做令牌编解码与完整性校验，不判角色矩阵；角色判定仍由领域层 `RbacEngine.can()` 权威承载（ARC-001）。
+3. **三态语义分离**：未认证（无有效身份）→ 401，已认证但无权限 → 403，规则不通过 → 422。过滤器对「携带 token 但校验失败」显式写 401 响应（不抛异常，避免被容器包装成 500），对「无 token」静默放行（匿名），由 `PermissionAspect` 对受保护方法判「未认证 → 403」。
+4. **密钥与数据物理分离**：签名密钥自配置注入（NFR-010 密钥管理），生产环境必须注入 ≥32 字节密钥，默认值仅供本地/测试。
+5. **线程上下文 finally 清理**：`CurrentUserContext` + `TenantContextHolder` 均在 finally 清理，防线程复用串租户/串身份（TEN-004，与阶段 B4 异步兜底断言互补）。
