@@ -47,6 +47,7 @@ import {
   veto,
   type ControlledDoc
 } from '@/domain/docEngine'
+import { summarizeAnnotations, type DocAnnotation } from '@/domain/docAnnotation'
 import { appendRemoteAudit, checkBackend, loadRemoteState, saveRemoteState, seedRemoteAudit, repoBase } from '@/infra/repo'
 import { knowledgeStats, markReused, nextLessonCode, pushToLibrary, searchLessons as searchLessonsEngine, validateLesson } from '@/domain/lessonEngine'
 import {
@@ -499,6 +500,10 @@ export const useAppStore = defineStore('app', () => {
   const projectBaselines = computed(() => data.value.baselines.filter((b) => b.projectId === projectId.value))
   const projectDeliverables = computed(() => data.value.deliverables.filter((d) => d.projectId === projectId.value))
   const projectDocs = computed(() => data.value.docs.filter((d) => d.projectId === projectId.value))
+  /** 图文档在线批注（空间锚定，对标 Oracle P2） */
+  const projectAnnotations = computed<DocAnnotation[]>(() => (data.value.docAnnotations ?? []).filter((a) => a.projectId === projectId.value))
+  /** 批注统计摘要（总数/开放/已解决/解决率） */
+  const annotationSummary = computed(() => summarizeAnnotations(projectAnnotations.value))
   const projectHours = computed(() => data.value.hours.filter((h) => h.projectId === projectId.value))
   /** PRJ-016 资源冲突：按人按周聚合工时，负荷率 >110% 判冲突（时段 = 周） */
   const resourceConflicts = computed(() => detectConflicts(projectHours.value).conflicts)
@@ -2699,6 +2704,8 @@ export const useAppStore = defineStore('app', () => {
     projectBaselines,
     projectDeliverables,
     projectDocs,
+    projectAnnotations,
+    annotationSummary,
     projectHours,
     resourceConflicts,
     overallocations,

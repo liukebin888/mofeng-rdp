@@ -90,6 +90,28 @@
 
       <div class="grid" style="gap: 12px; align-content: start">
         <div class="panel">
+          <div class="panel-title">图文档在线批注（Oracle 对标 P2）</div>
+          <div class="grid grid-4" style="margin-bottom: 8px">
+            <KpiCard label="批注总数" :value="store.annotationSummary.total" unit="条" />
+            <KpiCard label="未解决" :value="store.annotationSummary.open" unit="条" :zone="store.annotationSummary.open ? 'danger' : 'ok'" />
+            <KpiCard label="已解决" :value="store.annotationSummary.resolved" unit="条" />
+            <KpiCard label="解决率" :value="store.annotationSummary.resolveRate" unit="%" :zone="store.annotationSummary.resolveRate === 100 ? 'ok' : 'warn'" />
+          </div>
+          <div v-for="a in store.projectAnnotations" :key="a.id" class="cmt">
+            <span class="tag" :style="{ background: ANNOTATION_COLORS[a.type] + '22', color: ANNOTATION_COLORS[a.type] }">{{ a.type }}</span>
+            <span class="tag" :class="a.status === '已解决' ? 'ok' : 'fail'">{{ a.status }}</span>
+            <span class="dim" style="font-family: var(--mono)">{{ docCodeOf(a.docId) }}</span>
+            <span class="dim">P{{ a.anchor.page }} · {{ a.anchor.region }}</span>
+            <span>{{ a.author }}：{{ a.content }}</span>
+            <span v-if="a.resolution" class="dim">→ {{ a.resolution }}（{{ a.resolvedBy }}）</span>
+          </div>
+          <el-empty v-if="!store.projectAnnotations.length" description="无在线批注" :image-size="40" />
+          <div class="src-note" style="margin-top: 8px">
+            批注锚定到（页码 + 坐标 + 区域），支持高亮/圈注/下划线/文字四类；解决须留痕（解决人 + 结论）。
+          </div>
+        </div>
+
+        <div class="panel">
           <div class="panel-title">全文检索（DOC-008）</div>
           <div v-if="searchState.hits.length" class="hit-list">
             <div v-for="h in searchState.hits" :key="h.doc.id" class="hit">
@@ -127,6 +149,7 @@ import KpiCard from '@/components/KpiCard.vue'
 import { useAppStore } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
 import { isSignoffComplete } from '@/domain/docEngine'
+import { ANNOTATION_COLORS } from '@/domain/docAnnotation'
 
 const store = useAppStore()
 const { te } = useI18n()
@@ -146,6 +169,9 @@ const sets = computed(() => {
   })
 })
 const openComments = computed(() => docs.value.flatMap((d) => d.comments.filter((c) => !c.resolved).map((c) => ({ ...c, docId: d.id, docCode: d.code }))))
+function docCodeOf(docId: string): string {
+  return docs.value.find((d) => d.id === docId)?.code ?? docId
+}
 
 function signedCount(row: any) {
   return row.signoffs.filter((s: any) => s.signed).length

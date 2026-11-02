@@ -63,11 +63,12 @@ import { ROLES } from '@/domain/rbac'
 import type { FlowDefinition, FlowInstance } from '@/domain/flowEngine'
 import type { ComplianceItem } from '@/domain/compliance'
 import type { PolarityRisk } from '@/domain/riskOpportunity'
+import type { DocAnnotation } from '@/domain/docAnnotation'
 import type { AiCorpusItem, AiSwitchConfig, AiCallLog } from '@/domain/aiAssist'
 import type { VulnerabilityItem, Issue8D } from '@/domain/defect'
 import type { Sci, CompatibilityRecord, ReleaseSignoff } from '@/domain/softwareVersion'
 
-export const SEED_VERSION = 'mofeng.rdp.v1.0.19'
+export const SEED_VERSION = 'mofeng.rdp.v1.0.20'
 const TENANT = 'T-1001'
 
 export interface SeedUser {
@@ -822,6 +823,14 @@ export function buildSeed() {
     { id: 'DC8', projectId: 'P-001', code: 'DOC-SUP-002', name: '供应商 PPAP 提交包', discipline: '供应链', version: 'V1.0', status: '已发布', required: true, signoffs: [{ role: 'SQE', signed: true }], mdrSet: 'MDR-SUP' }
   ] as Omit<DocItem, 'comments' | 'versionChain' | 'effectiveFlag' | 'hash'>[]).map((d) => normalizeDoc(d))
 
+  /** 图文档在线批注（空间锚定，对标 Oracle 图文档批注 P2） */
+  const docAnnotations: DocAnnotation[] = [
+    { id: 'AN1', docId: 'DC1', projectId: 'P-001', author: '郑昊', content: '此处安全目标 ASIL 等级需与 HARA 一致', type: '圈注', anchor: { page: 4, x: 0.32, y: 0.48, region: '表 3-2 安全目标' }, createdAt: '2026-11-01T09:00:00Z', status: '开放' },
+    { id: 'AN2', docId: 'DC1', projectId: 'P-001', author: '赵启明', content: '需求编号 FSR-002 引用已过时，建议升版', type: '高亮', anchor: { page: 2, x: 0.55, y: 0.3, region: '第 2.3 节' }, createdAt: '2026-11-02T10:00:00Z', status: '开放' },
+    { id: 'AN3', docId: 'DC2', projectId: 'P-001', author: '顾晨', content: '旋变解码芯片封装改为 B 型后钢网开孔需复核', type: '文字', anchor: { page: 1, x: 0.7, y: 0.65, region: '原理图右下' }, createdAt: '2026-10-30T14:00:00Z', status: '已解决', resolvedBy: '赵启明', resolvedAt: '2026-10-31T09:00:00Z', resolution: '已更新封装并复核钢网' },
+    { id: 'AN4', docId: 'DC3', projectId: 'P-001', author: '吴敏', content: '诊断服务会话超时未覆盖 CAN FD 场景', type: '下划线', anchor: { page: 6, x: 0.4, y: 0.72, region: '第 6.4 节' }, createdAt: '2026-11-03T08:00:00Z', status: '开放' }
+  ]
+
   const samples: SampleReq[] = [
     { id: 'SM1', projectId: 'P-001', code: 'SMP-A-01', type: 'A', qty: 12, needDate: '2026-08-14', gate: 'G3', status: '已交付', ebomVersion: 'V1.2' },
     { id: 'SM2', projectId: 'P-001', code: 'SMP-B-01', type: 'B', qty: 24, needDate: '2026-11-27', gate: 'G4', status: '试制中', ebomVersion: 'V1.2' },
@@ -1259,6 +1268,7 @@ export function buildSeed() {
     costSubjects,
     costDocs,
     docs,
+    docAnnotations,
     samples,
     defects,
     softwareVersions,
