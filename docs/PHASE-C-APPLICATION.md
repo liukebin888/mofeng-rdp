@@ -305,3 +305,21 @@ POST /api/v1/projects/initiate
 3. 无 CORS 配置 → 浏览器跨域拦截（responded=0 全「后端不可用」），补 WebConfig
 
 **关键教训**：真实浏览器联调才暴露 CORS（curl/单测不涉及浏览器同源策略）；vite dev 下 `networkidle` 永不触发（HMR websocket），e2e 需用 `domcontentloaded`。
+
+## 15. 流程引擎 + 协同沟通引擎迁移（2026-11-02）——补迁 TS 权威两个引擎，不引 Flowable
+
+**结论**：此前「Flowable 流程引擎」一直标记为「继续后置」，本轮重新审视后确定正确落地形态——**不引 Flowable 外部引擎**（SOLUTION 10.5「判定位置不可配置」，引可配置流程节点会破坏「卡点判定时机固定、结论可比」的铁律），但把 SOLUTION 第 10 章「流程引擎=管控执行器」的 TS 权威实现 `flowEngine.ts` 与 SRS 第 12 章协同 `collabEngine.ts` **按既定「TS 权威 → Java 同构迁移」模式补迁到领域层**。这两个引擎是阶段 B「迁移 20 引擎」时遗漏的两个，补齐后流程/协同规则与后端一致。
+
+| 引擎 | 位置 | 覆盖 | 测试 |
+|---|---|---|---|
+| FlowEngine | `domain/flow/` | 节点流转（start/approve/branch/sign/end）+ 会签 all/或签 any + 加签/转办 + 超时升级 + 条件分支（无命中且无默认→终止异常出口防静默挂起）+ availableActions | 14 例 |
+| CollabEngine | `domain/collab/` | 决议条目化（缺责任人/期限拒）+ 决议转任务（幂等）+ 无证据关闭拒 + 决议逾期升级 + 会议四要素 + 送审件必带版本/答复留痕/超期升级 + 督办四态闭环（非法动作拒） | 23 例 |
+
+**关键设计决策**：
+1. **「流程引擎」≠「Flowable」**：SOLUTION 第 10 章说「流程引擎是管控执行器，判定位置不可配置」。TS 的 `flowEngine.ts` 正是这个语义的忠实实现——节点流转是静态代码、判定位置固定、业务规则（SOD/安全不可豁免）写死不可配置绕过（GAT-013）。它比 Flowable 更符合本系统「判定位置固定、结论可比」的硬约束。
+2. **不引外部流程引擎**：Flowable 的价值在「动态配置节点」，但 SOLUTION 10.5 明确「位置可变则同一卡点判定时机不同，结论不可比」。本系统四类流程对象（审批/评审/变更/异常处置）的判定位置已由阶段 C 应用层编排固定，Flowable 引入的是「可绕过」风险而非能力增益。
+3. **补齐迁移缺口**：阶段 B 迁移 20 引擎时，`flowEngine.ts`/`collabEngine.ts` 因「依赖复杂类型」暂缓，本轮确认其类型边界清晰（FlowNode/FlowInstance 等自包含值对象），按既定五步模式（值对象先行→真值表权威→裁定独立→留痕可复算→领域纯净）补齐。
+
+**验收**：领域层 264 → **299 例**全过（+35），应用层 43 例全过，backend 5 模块 BUILD SUCCESS 零回退。
+
+**修正**：或签 any 测试最初复用 all 模式的 n4 节点定义，导致 nodePassed=false；不可变值对象需构造「signMode=any 的定义副本」（与 TS 测试 `{ ...n, signMode: 'any' }` 同构）。
