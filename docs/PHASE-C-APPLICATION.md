@@ -69,6 +69,7 @@ POST /api/v1/projects/initiate
 | C-8 第四个闭环：样件→齐套→检验 ✅ | 字段齐全率 → 下达资格 → EBOM 齐套 → 状态机 → 检验放行 | fail-closed（缺项/未冻结/不齐套/不合格未闭环）可验证（提交 `待推送`）|
 | C-3 六门禁全链路 | vue-tsc / vitest / build / smoke / e2e / 隔离面 | 全绿（待前端联调）|
 | C-13 认证层 ✅ | JWT 签发/校验 + 过滤器填充 CurrentUserContext + TenantContextHolder + 401 映射 | 有效 token 填充上下文、无效 token 401、匿名放行、finally 清理（提交 `待推送`）|
+| C-14 基础设施装配接线 ✅ | @MapperScan + 多租户/分页拦截器 + 全 adapter bean + Flyway + boot application.yml | 可执行 fat jar 打出、6 迁移脚本 9 表建成功、backend 5 模块 BUILD SUCCESS（提交 `待推送`）|
 
 ---
 
@@ -245,3 +246,23 @@ POST /api/v1/projects/initiate
 3. **三态语义分离**：未认证（无有效身份）→ 401，已认证但无权限 → 403，规则不通过 → 422。过滤器对「携带 token 但校验失败」显式写 401 响应（不抛异常，避免被容器包装成 500），对「无 token」静默放行（匿名），由 `PermissionAspect` 对受保护方法判「未认证 → 403」。
 4. **密钥与数据物理分离**：签名密钥自配置注入（NFR-010 密钥管理），生产环境必须注入 ≥32 字节密钥，默认值仅供本地/测试。
 5. **线程上下文 finally 清理**：`CurrentUserContext` + `TenantContextHolder` 均在 finally 清理，防线程复用串租户/串身份（TEN-004，与阶段 B4 异步兜底断言互补）。
+
+---
+
+## 13. C-14 落地结论（2026-11-02）——基础设施装配接线（后端可真实启动）
+
+**结论**：把阶段 B 落地的「代码骨架」（Mapper / 多租户拦截器 / 缓存 / 检索 / 消息 adapter）真正装配进 Spring 容器，后端可真实连接 MySQL 启动。这是「R1 可试点闭环」的硬前置——此前基础设施层只有源码无接线，`*Mapper` 无 `@MapperScan`、`TenantLineHandlerImpl` 未注册、Flyway 未接入、boot 模块无 application.yml。
+
+| 项 | 内容 |
+|---|---|
+| 装配类 | `infrastructure/config/InfrastructureAutoConfiguration`：`@MapperScan`（7 个 Mapper）+ MyBatis-Plus 拦截器链（多租户 TenantLineInnerInterceptor 先于分页 PaginationInnerInterceptor）+ 全部 adapter `@Bean`（CacheClient/SessionStore/DistributedLock/SearchClient/EventBus/AsyncTaskQueue/TenantRepository/ComplianceRepository/ArchiveRepository） |
+| Flyway | 引入 flyway-core + flyway-mysql，迁移脚本位于 `mofeng-infrastructure` 的 `db/migration`（V1~V6） |
+| boot 配置 | `mofeng-boot/src/main/resources/application.yml`：数据源（MySQL 8）+ Flyway + Redis + ES + Kafka + MyBatis-Plus + 端口 8088 + JWT 密钥（环境变量覆盖） |
+| 验证 | 可执行 fat jar 成功打出（72MB）；6 个迁移脚本对真实 MySQL 执行成功（9 表建成：baseline/baseline_item/controlled_object/controlled_object_archive/tenant/trace_link/trace_closure/compliance_item/compliance_rectification）；backend 5 模块 BUILD SUCCESS，领域层 264 例 + 应用层 43 例零回退 |
+
+**关键设计决策**：
+1. **装配点集中不侵入 adapter 源码**：阶段 B 各 adapter（`RedisCacheClient`/`ElasticsearchSearchClient`/`KafkaEventBus` 等）保持「纯 adapter 类」风格（无 Spring 注解），由 `InfrastructureAutoConfiguration` 统一 `@Bean` 注册，构造依赖由 Spring 自动注入——装配与实现解耦，符合 ARC-001「基础设施只做编排」。
+2. **多租户拦截器先于分页拦截器**：保证分页 COUNT/limit 在租户过滤之后的结果集上执行，避免「跨租户分页」泄露。
+3. **归档用内存占位、真实 Mapper 后置**：`ArchiveRepositoryImpl` 阶段 B 明确标注「内存占位，真实 SQL 见 V5 DDL，boot 装配阶段接入 Mapper」——本次保持占位（无参构造可直接 @Bean），归档持久化适配器留待联调阶段接入，不引入「假实现」风险。
+4. **Flyway 迁移脚本经真实 MySQL 验证**：6 个 DDL 脚本逐一执行成功、9 表建成，确认语法与表结构正确（`baseline-on-migrate` + `IF NOT EXISTS` 幂等）。
+5. **Flowable 继续后置**：SOLUTION 第 10 章明确「流程引擎不是审批工具而是管控执行器」，且「判定位置不可配置」——当前阶段 C 的纯函数状态机 + 应用层编排已实现「卡点长在服务层」的核心要求，Flowable（可配置流程节点）会引入「判定位置可变则结论不可比」的风险，待 R1 试点闭环验证后再评估。

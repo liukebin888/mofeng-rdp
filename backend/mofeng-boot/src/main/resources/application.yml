@@ -1,0 +1,79 @@
+# MOFENG-RDP 后端配置（阶段 C-14 装配接线）
+# 数据源/中间件连接默认指向 docker-compose.infra.yml 的本地开发实例。
+
+server:
+  port: 8088
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: mofeng-rdp
+  # —— 数据源（MySQL 8，对齐 docker-compose.infra.yml）——
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/mofeng_rdp?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: mofeng
+    password: mofeng-dev
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+  # —— Flyway 数据库迁移（DDL 位于 mofeng-infrastructure 的 db/migration）——
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 1
+  # —— Redis（缓存/会话/限流/分布式锁）——
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      password: mofeng-redis-dev
+      timeout: 3s
+    # —— Elasticsearch（全文检索/大列表）——
+    elasticsearch:
+      uris: http://127.0.0.1:9200
+  # —— Kafka（领域事件/异步任务，KRaft 单节点）——
+  kafka:
+    bootstrap-servers: 127.0.0.1:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      group-id: mofeng-rdp
+      auto-offset-reset: earliest
+
+# —— MyBatis-Plus ——
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# —— 应用自定义配置 ——
+mofeng:
+  security:
+    jwt:
+      # 生产环境必须通过环境变量覆盖（≥32 字节），此处为本地开发默认值
+      secret: ${MOFENG_JWT_SECRET:mofeng-rdp-local-dev-secret-0123456789abcdef}
+  kafka:
+    event-topic: mofeng-events
+    task-topic: mofeng-tasks
+
+# —— 日志 ——
+logging:
+  level:
+    root: info
+    com.mofeng.rdp: info
+    com.baomidou.mybatisplus: warn
