@@ -266,3 +266,16 @@ POST /api/v1/projects/initiate
 3. **归档用内存占位、真实 Mapper 后置**：`ArchiveRepositoryImpl` 阶段 B 明确标注「内存占位，真实 SQL 见 V5 DDL，boot 装配阶段接入 Mapper」——本次保持占位（无参构造可直接 @Bean），归档持久化适配器留待联调阶段接入，不引入「假实现」风险。
 4. **Flyway 迁移脚本经真实 MySQL 验证**：6 个 DDL 脚本逐一执行成功、9 表建成，确认语法与表结构正确（`baseline-on-migrate` + `IF NOT EXISTS` 幂等）。
 5. **Flowable 继续后置**：SOLUTION 第 10 章明确「流程引擎不是审批工具而是管控执行器」，且「判定位置不可配置」——当前阶段 C 的纯函数状态机 + 应用层编排已实现「卡点长在服务层」的核心要求，Flowable（可配置流程节点）会引入「判定位置可变则结论不可比」的风险，待 R1 试点闭环验证后再评估。
+
+**真实启动验证 + @MapperScan 修复（2026-11-02 补充）**：
+
+真实启动（`docker run --network infra-net` + `spring-boot:run`）暴露并修复了一个装配 bug：
+
+| 项 | 内容 |
+|---|---|
+| 暴露问题 | `ConflictingBeanDefinitionException: archiveRepository`——`@MapperScan(basePackages="...persistence")` 过宽，把领域仓库接口（ArchiveRepository 等 6 个，继承领域层接口非 BaseMapper）误扫为 Mapper，与显式 @Bean 冲突 |
+| 修复 | ① `ComplianceItemMapper`/`TenantMapper` 补 `@Mapper` 注解（统一 7 个真 Mapper 都有）；② `@MapperScan` 加 `annotationClass = Mapper.class` 精确过滤 |
+| 启动结果 | Tomcat started on 8088、Started in 12.9s、HikariPool 连 MySQL 成功、Flyway `Successfully applied 5 migrations to v6` |
+| 环境约束 | ES/Kafka 镜像拉取失败未启动，但 Spring Data ES/Kafka 懒初始化（Found 0 repository interfaces）不影响启动 |
+
+**关键教训**：装配正确性不能只靠编译 + 单测验证——`@MapperScan` 误扫导致的 bean 冲突只在真实 Spring 容器启动时才暴露（单测用 Mockito 桩 / 手写桩不加载容器）。「可真实启动」是 R1 试点闭环的硬验收，必须实测。

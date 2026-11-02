@@ -25,6 +25,7 @@ import com.mofeng.rdp.infrastructure.persistence.tenant.TenantRepository;
 import com.mofeng.rdp.infrastructure.persistence.tenant.TenantRepositoryImpl;
 import com.mofeng.rdp.infrastructure.search.ElasticsearchSearchClient;
 import com.mofeng.rdp.infrastructure.search.SearchClient;
+import org.apache.ibatis.annotations.Mapper;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -45,7 +46,7 @@ import org.springframework.kafka.core.KafkaTemplate;
  * 各实现类无 Spring 注解，由本类统一 @Bean 注册，构造依赖由 Spring 自动注入。</p>
  */
 @Configuration
-@MapperScan(basePackages = "com.mofeng.rdp.infrastructure.persistence")
+@MapperScan(basePackages = "com.mofeng.rdp.infrastructure.persistence", annotationClass = Mapper.class)
 public class InfrastructureAutoConfiguration {
 
     // ------------------------------------------------------------------
