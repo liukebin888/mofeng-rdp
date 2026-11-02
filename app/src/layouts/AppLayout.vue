@@ -23,7 +23,7 @@
         </div>
 
         <el-scrollbar class="menus">
-          <div v-for="g in MENUS" :key="g.key" class="group">
+          <div v-for="g in sideMenus" :key="g.key" class="group">
             <div class="ghead" :class="{ active: isGroupActive(g.key) }" @click="toggle(g.key)">
               <span class="gtitle">{{ t('menu.group.' + g.key) }}</span>
               <span class="gcp mono">{{ g.cp }}</span>
@@ -63,6 +63,21 @@
       </aside>
 
       <main class="main">
+        <div class="worktop">
+          <span class="wt-label">{{ t('menu.group.workbench') }}</span>
+          <div class="wt-items">
+            <button
+              v-for="it in workbenchItems"
+              :key="it.path"
+              class="wt-item"
+              :class="{ on: route.path === it.path }"
+              @click="go(it.path)"
+            >
+              <span class="wt-t">{{ t('menu.item.' + it.path) }}</span>
+            </button>
+          </div>
+        </div>
+
         <div class="top">
           <div class="row" style="gap: 10px">
             <el-select v-model="pid" size="small" style="width: 250px" @change="onProject">
@@ -126,6 +141,10 @@ const { t } = useI18n()
 const open = ref<string[]>(['workbench'])
 const uid = ref(store.userId)
 const pid = ref(store.projectId)
+
+/** 顶部横向导航：工作中心分组；侧栏渲染其余分组 */
+const workbenchItems = computed(() => MENUS.find((m) => m.key === 'workbench')?.items ?? [])
+const sideMenus = computed(() => MENUS.filter((m) => m.key !== 'workbench'))
 
 /** Element Plus 组件内部文案随语言切换 */
 const epLocale = computed(() => (store.locale === 'en-US' ? en : zhCn))
@@ -201,6 +220,13 @@ function onLocale(l: 'zh-CN' | 'en-US') {
 .badge { font-size: 9px; color: #ffd79a; border: 1px solid #5b3c14; border-radius: 4px; padding: 0 3px; }
 .foot { padding: 8px 14px; border-top: 1px solid var(--line-soft); font-size: 10px; }
 .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg-0); }
+.worktop { display: flex; align-items: center; gap: 16px; padding: 8px 18px; background: #0a1120; border-bottom: 1px solid var(--line-soft); }
+.wt-label { flex: none; font-size: 12px; font-weight: 700; color: var(--brand-2); letter-spacing: 0.5px; }
+.wt-items { display: flex; flex-wrap: wrap; gap: 4px; }
+.wt-item { border: none; background: transparent; color: var(--text-2); font-size: 12px; padding: 5px 12px; border-radius: 7px; cursor: pointer; white-space: nowrap; }
+.wt-item:hover { background: #0e1a2b; color: var(--text-1); }
+.wt-item.on { background: linear-gradient(90deg, #16305a, #10223c); color: #fff; box-shadow: inset 0 -2px 0 var(--brand); }
+.wt-t { display: inline-block; }
 .top { display: flex; align-items: center; justify-content: space-between; padding: 10px 18px; border-bottom: 1px solid var(--line); background: #0a1120; }
 .dim { color: var(--text-3); font-size: 11px; }
 .content { flex: 1; overflow: auto; padding: 16px 18px 40px; }
@@ -249,6 +275,7 @@ function onLocale(l: 'zh-CN' | 'en-US') {
 .bp-mobile .side.side-open { transform: translateX(0); }
 .bp-mobile .top { padding-left: 56px; flex-wrap: wrap; row-gap: 8px; }
 .bp-mobile .top .row { flex-wrap: wrap; }
+.bp-mobile .worktop { padding-left: 56px; }
 .bp-tablet .shell { grid-template-columns: 64px 1fr; }
 .bp-tablet .side .brand > div:last-child,
 .bp-tablet .side .tenant,
