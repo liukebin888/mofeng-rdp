@@ -66,6 +66,7 @@ POST /api/v1/projects/initiate
 | C-2 首个闭环：立项 ✅ | 分级 → 门禁 G1 → 受控对象入库 → 审计链 | 端到端可复算，缺项阻断可验证（提交 `待推送`）|
 | C-4 第二个闭环：需求追溯 ✅ | 字段齐全率 → 追溯断链 → 覆盖率 → 基线哈希链组装 | fail-closed 三态（缺项/BLOCK/覆盖率）零基线可验证（提交 `待推送`）|
 | C-6 第三个闭环：变更→ECR ✅ | 四维影响评估 → 审批角色 → 闭包 → ECN 验证关闭 | fail-closed（缺评估/未确认/未验证）拒关闭可验证（提交 `待推送`）|
+| C-8 第四个闭环：样件→齐套→检验 ✅ | 字段齐全率 → 下达资格 → EBOM 齐套 → 状态机 → 检验放行 | fail-closed（缺项/未冻结/不齐套/不合格未闭环）可验证（提交 `待推送`）|
 | C-3 六门禁全链路 | vue-tsc / vitest / build / smoke / e2e / 隔离面 | 全绿（待前端联调）|
 
 ---
@@ -141,3 +142,21 @@ POST /api/v1/projects/initiate
 1. **fail-closed 四态**：影响评估缺一维（C-16）、闭包存在未确认项（C-17）、ECN 未验证（C-18）、阶段未到 ECN 验证，任一即拒关闭。
 2. **高风险审批自动增补**：CHG-003 高风险变更在基础角色（研发项目经理 + 系统工程师）上增补功能安全经理 / 信息安全经理 / 架构师。
 3. **「缺评估」用 assessed=false 表达**：领域引擎 `impactComplete` 只校验「已提供维度的 assessed 标志」，不校验「四维是否齐全对象」——应用层 DTO 装配忠实传递，未评估维度须以 assessed=false 提供而非省略维度对象，避免「缺对象」被误判为「已齐全」。
+
+---
+
+## 8. C-8 落地结论（2026-11-02）
+
+**结论**：第四个端到端闭环「样件 → 齐套 → 检验」落地，验证 fail-closed（字段缺项 / EBOM 未冻结 / 齐套不足 / 不合格未闭环）阻断 + 通过流转。
+
+| 项 | 内容 |
+|---|---|
+| 应用层 | `sample/`：SampleRequest（DTO）+ SampleResult（结果）+ SampleApplicationService（编排）+ SampleController（REST /api/v1/samples/trial） |
+| 编排链路 | 字段齐全率（validateSampleOrder，HW-001）→ 下达资格（canReleaseTrial，P-03/K9/HW-012）→ EBOM 齐套（checkKitting，HW-010）→ 状态机（transitionSample，HW-002）→ 检验（problemTicketIdFor + canReleaseInspection，HW-013/014） |
+| 测试结果 | 应用层 14→21 例全过（+SampleApplicationServiceTest 7），领域层 264 例全过，backend 5 模块 BUILD SUCCESS |
+| 验收判据 | 字段齐全 + EBOM 冻结 + 齐套满足 + 合法事件 → 试制中；缺项 / 未冻结 / 不齐套 / 非法事件 / 不合格未闭环 → 阻断 |
+
+**关键设计决策**：
+1. **fail-closed 五态**：字段缺项（HW-001）、EBOM 未冻结（P-03 先 BOM 后样件）、齐套不足（HW-010/K9）、非法状态机事件（HW-002）、不合格未闭环（HW-014），任一即阻断相应阶段。
+2. **先 BOM 后样件刚性**：P-03 要求样件需求挂已发布 EBOM，`canReleaseTrial` 三元判定（EBOM 冻结 + 齐套 + 工装）是下达试制的硬门。
+3. **齐套根节点也计入**：领域引擎 `explodeBom` 从根节点递归展开，根节点（成品）自身也作为一行计入齐套（requiredQty = qty×mult×sampleQty），测试数据须给根节点足够库存，否则误判「不齐套」——这是领域引擎既有语义（HW-004 自下而上汇总）。
