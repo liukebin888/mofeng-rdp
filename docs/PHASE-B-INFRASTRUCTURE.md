@@ -103,9 +103,9 @@ SOLUTION 12.2 已裁定：**R1 单一部署单元，模块化单体**。核心�
 
 | 任务 | 内容 | 验收判据 |
 |---|---|---|
-| B6-1 等保三级自查 | 按 GB/T 22239 做完整 → 提交测评 | NFR-009：测评报告通过或整改计划确认 |
-| B6-2 密评 | 按 GB/T 39786 做完整 → 提交测评 | NFR-010：密评结论通过 |
-| B6-3 数据分类分级 | 四级策略各验证 | NFR-011：行为符合定义 |
+| B6-1 等保三级自查 ✅ | 按 GB/T 22239 做完整 → 提交测评 | NFR-009：测评报告通过或整改计划确认（提交 `待推送`）|
+| B6-2 密评 ✅ | 按 GB/T 39786 做完整 → 提交测评 | NFR-010：密评结论通过（验证后置）|
+| B6-3 数据分类分级 ✅ | 四级策略各验证 | NFR-011：行为符合定义（R2/P1，仅告警不阻断）|
 
 ---
 
@@ -230,3 +230,40 @@ SOLUTION 12.2 已裁定：**R1 单一部署单元，模块化单体**。核心�
 2. **判定落领域层、卸载落网关**：套件合规/弱套件/证书链/密钥管理判定落领域层纯函数 `GmTlsEngine`（可测、可复核协议扫描产物）；实际 TLS 终止与算法运算在网关。
 3. **字段加密与传输加密两条线**：`cipher/CipherEngine`（字段级 XOR 流加密，SEC-013 基础）与 `gmtls/GmTlsEngine`（传输层国密套件判定，SEC-012）职责分离，不混淆。
 4. **密钥分级轮换 + 物理分离**（NFR-010）：密钥不入库、分级≥2 级、轮换周期 1~365 天，由 `checkKeyManagement` 纯函数守护。
+
+### 6.8 B6 等保三级 + 密评 + 数据分类分级落地结论（2026-11-02）——阶段 B 收口
+
+**结论**：合规证据链台账权威补齐至与 TS 同构，等保/密评/数据分类分级台账持久化落地，C-30 事前准入判据可测；真实测评（NFR-009/010）验证后置，不前置为开工卡点。
+
+| 项 | 内容 |
+|---|---|
+| 领域层补齐 | `compliance/ComplianceEngine` 补齐与 TS 权威差距：`evaluateCompliance`（逐项评估 + 中文拼音排序，Collator zh 对齐 localeCompare('zh')）/ `summarizeCompliance`（汇总台账）/ `RectifyItem` 补全 id/issue/severity/deadline / `CipherSubItem` 密评四项 / `cipherFourAllPass` |
+| 基础设施 | `persistence/compliance/`：ComplianceItemEntity/Mapper/Repository + V6__compliance.sql（compliance_item + compliance_rectification 两表，租户隔离） |
+| 测试结果 | 领域层 256→261 例全过（ComplianceEngineTest 7→12 例），backend 5 模块 BUILD SUCCESS |
+| 验收判据 | NFR-009/010：测评报告通过或整改计划确认（验证后置）；NFR-011：数据分类分级 R2/P1 仅告警不阻断（complianceGate 硬闸门排除） |
+
+**关键设计决策**：
+1. **证据链驱动杜绝虚假闭环**：C-30 由 flag 静态登记升级为结构化证据链（机构/报告编号/结论/符合率/高风险/整改/有效期），「到期未重评」自动 FAIL——一次通过永不失效的虚假闭环被机制性堵死。
+2. **判定优先级固化**：到期未重评 > 结论未通过 > 高风险 > 整改未闭环 > 符合率<90%，与 TS 权威一致。
+3. **硬闸门三选一**：等保三级/密评/国密传输任一 FAIL 阻断上线；数据分类分级（NFR-011，R2/P1）仅告警不阻断——精准映射「R1 就要求 vs R2 再要求」。
+4. **中文排序对齐**：Java `Collator.getInstance(Locale.CHINA)` 对齐 TS `localeCompare('zh')` 拼音排序（而非 Unicode 码点），避免「两套规则各说各话」。
+5. **验证后置**：真实测评报告是外部机构结论，系统内只能登记/判定/到期失效/整改闭环追踪；实现方把系统做完整后提交测评给结论，机构选定是采购执行细节不阻塞开发。
+
+### 6.9 阶段 B 基础设施层整体收口（2026-11-02）
+
+**结论**：阶段 B 六大任务（B1~B6）全部落地，SRS ARC-001 四层架构的「应用层 + 基础设施层」补齐完成，领域层以「同一套测试用例」为迁移判据累计迁至 20 个引擎，261 例全过。
+
+| 里程碑 | 内容 | 状态 |
+|---|---|---|
+| B-A 数据层 | B1 MySQL（受控对象基表/闭包表/基线哈希链/多租户三模式/分区归档） | ✅ |
+| B-B 缓存/检索/消息 | B2 Redis + B3 ES + B4 Kafka | ✅ |
+| B-C 国密与合规 | B5 国密网关 + B6 等保密评 | ✅（真实测评验证后置） |
+| B-D 规模验证 | 压测 5000 并发、年 3000 项目（NFR-001/002/019） | ⏸ 待压测环境 |
+
+**领域层引擎迁移累计 20 个**：grading + 批次1 六（gate/baseline/audit/change/risk/riskQuant）+ 批次2 三（schedule/pmc/resource 两）+ 批次3 六（supplier/sample/defect/software/requirement/evm）+ 批次4 六（rbac/tenant/projectControl/password/compliance/cipher）+ trace + ArchiveEngine + RateLimitEngine + SearchEngine + EventBusEngine + AsyncTaskEngine + GmTlsEngine。领域层 261 例全过。
+
+**剩余待办**：
+- 规模验证（B-D）需压测环境，NFR-001/002/019 实测偏差 ≤20% 待压测。
+- 真实等保三级/密评测评（外部机构，验证后置）。
+- 国密网关实际部署（Nginx+tongsuo/商用密码机/云国密三选一，随 D-01 部署形态落地）。
+- 阶段 C：R1 可试点闭环（应用层编排 + Flowable 流程 + 前端 56 视图挂接）。
