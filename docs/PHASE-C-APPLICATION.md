@@ -279,3 +279,29 @@ POST /api/v1/projects/initiate
 | 环境约束 | ES/Kafka 镜像拉取失败未启动，但 Spring Data ES/Kafka 懒初始化（Found 0 repository interfaces）不影响启动 |
 
 **关键教训**：装配正确性不能只靠编译 + 单测验证——`@MapperScan` 误扫导致的 bean 冲突只在真实 Spring 容器启动时才暴露（单测用 Mockito 桩 / 手写桩不加载容器）。「可真实启动」是 R1 试点闭环的硬验收，必须实测。
+
+## 14. 前端联调收口（2026-11-02）——服务端一致性探针 + CORS 修复
+
+**结论**：前端 56 视图是「纯展示 + 前端 domain 引擎驱动」（无表单→后端提交闭环），逐个改 56 视图侵入大且易破坏既有测试。正确落点是新增统一「服务端一致性探针」视图，把「前端 domain 引擎结论 vs 后端 REST 复核结论」做一致性比对，作为联调验证入口。真实浏览器 e2e 全绿（4 端点零差异），并暴露修复了 CORS 前置。
+
+| 项 | 内容 |
+|---|---|
+| 映射模块 | `app/src/infra/probeMapping.ts`：前端 store 数据 → 后端 4 端点 DTO 纯形状映射（不判业务规则，只 import 类型不 import 引擎函数，ARC-001） |
+| 执行模块 | `app/src/infra/probeRunner.ts`：四组探针编排 + 中间指标披露（requested/responded/changed，responded=0 不得判「一致」防零缺陷假阳性） |
+| 探针视图 | `app/src/views/system/ConsistencyProbeView.vue`：KPI 卡披露 + 四组卡片 verdict + 明细行一致性标签，路由 `/system/probe` |
+| e2e 脚本 | `app/scripts/probe-e2e.cjs`：playwright-core 真实浏览器（前端 5178 → 后端 8088） |
+| CORS 修复 | `backend/.../web/WebConfig.java`（WebMvcConfigurer 放行 dev 来源，生产由国密网关同源收敛） |
+
+**真实 e2e 结果**：请求 4 / 有效响应 4 / 差异 0，四组探针 verdict 全「一致」，明细「一致」4 行——前后端结论零差异，联调完全打通。
+
+**关键设计决策**：
+1. **探针而非逐个改视图**：56 视图是展示层，前端 domain 引擎（TS 权威）已在 744 例锁定规则，后端是同构迁移。联调的本质是「验证前后端同构一致」，不是「重写前端逻辑」。统一探针视图最小侵入、可验证、不破坏既有测试。
+2. **中间指标披露防假阳性**：探针必须披露 requested/responded/changed 三指标，`responded === 0` 时（后端不可用）不得判「一致」——否则「全绿」可能是「全没测到」。
+3. **CORS 属联调必要前置**：前端 dev 跨域调后端必须放行，但只放行 dev 来源（127.0.0.1:/localhost:），生产由国密网关同源收敛；CORS 只放开「来源」不放行「鉴权」（仍需合法 Bearer token）。
+
+**端到端暴露的 bug（累计三个，均只在真实联调才暴露）**：
+1. 领域阻断错误继承 RuntimeException → 映射 500（应 422），改继承 IllegalArgumentException
+2. 未认证抛 PermissionDeniedException → 403（应 401），改抛 UnauthorizedException
+3. 无 CORS 配置 → 浏览器跨域拦截（responded=0 全「后端不可用」），补 WebConfig
+
+**关键教训**：真实浏览器联调才暴露 CORS（curl/单测不涉及浏览器同源策略）；vite dev 下 `networkidle` 永不触发（HMR websocket），e2e 需用 `domcontentloaded`。
