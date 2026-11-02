@@ -174,7 +174,8 @@ SOLUTION 12.2 已裁定：**R1 单一部署单元，模块化单体**。核心�
 其余 69 个引擎按「先值对象、再真值表/规则、后一致性测试」三段落批量推进，每批以「对应 spec.ts 用例全过」为完成判据：
 
 - **批次 1（安全/变更）✅ 已完成**：gate（权威模板+runGate+SOD）、baseline（哈希链+冻结）、audit（审计链）、change（ECR 闭环）、risk/riskQuant（RPN/PERT/关联/复算）——6 引擎迁移，44 用例，领域层合计 62 例全过（提交 `7f9a717`）
-- **批次 2（进度/资源）**：schedule（CPM/成环）、pmc、resourcePool/resourcePlan/resourceConflict、overallocation、bottleneck
+- **批次 2（进度/资源）✅ 已完成**：schedule（CPM/成环/13项质量检查）、pmc（十二类对象/PDCA/质量指标/偏差分级/纠偏升级）、resource（周冲突/超分配三级/资源池层级/跨项目冲突）——3 引擎迁移，25 用例，领域层合计 87 例全过（提交 `747ceea`）
+- **批次 3（供应链/质量）**：supplier、sample、defect、softwareVersion、requirement、trace、evm
 - **批次 3（供应链/质量）**：supplier、sample、defect、softwareVersion、requirement、trace、evm
 - **批次 4（横切/治理）**：rbac、tenant、projectControl、naming、cipher、password、compliance、governanceConfig 等
 
