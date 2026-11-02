@@ -160,3 +160,23 @@ POST /api/v1/projects/initiate
 1. **fail-closed 五态**：字段缺项（HW-001）、EBOM 未冻结（P-03 先 BOM 后样件）、齐套不足（HW-010/K9）、非法状态机事件（HW-002）、不合格未闭环（HW-014），任一即阻断相应阶段。
 2. **先 BOM 后样件刚性**：P-03 要求样件需求挂已发布 EBOM，`canReleaseTrial` 三元判定（EBOM 冻结 + 齐套 + 工装）是下达试制的硬门。
 3. **齐套根节点也计入**：领域引擎 `explodeBom` 从根节点递归展开，根节点（成品）自身也作为一行计入齐套（requiredQty = qty×mult×sampleQty），测试数据须给根节点足够库存，否则误判「不齐套」——这是领域引擎既有语义（HW-004 自下而上汇总）。
+
+---
+
+## 9. C-10 落地结论（2026-11-02）——应用层横切能力收口
+
+**结论**：应用层横切能力（统一响应包装 + 全局异常处理 + 参数校验）落地，四个 REST 入口风格统一且 fail-closed 语义收敛到全局处理器。
+
+| 项 | 内容 |
+|---|---|
+| 统一响应 | `web/ApiResponse<T>`：code/message/data 三字段，code 枚举 OK / BAD_REQUEST / BLOCKED / INTERNAL_ERROR |
+| 全局异常 | `web/GlobalExceptionHandler`（@RestControllerAdvice）：参数校验失败→400；请求体不可读/类型不匹配→400；领域规则阻断（IllegalArgumentException/IllegalStateException）→422 BLOCKED；未预期→500（不泄漏堆栈） |
+| 参数校验 | 四个 DTO 加 Jakarta Validation（@NotBlank 租户/项目/业务主键），Controller 加 @Valid；引入 spring-boot-starter-validation |
+| Controller 统一 | 四个 Controller 全部改用 ApiResponse 包装，去掉 ProjectController 手写 Map.of 校验（收敛到 @Valid + 全局处理器） |
+| 测试结果 | 应用层 21→26 例全过（+GlobalExceptionHandlerTest 5），领域层 264 例全过，backend 5 模块 BUILD SUCCESS |
+| 验收判据 | 参数缺项→400 BAD_REQUEST；领域规则阻断→422 BLOCKED；未预期→500 不泄漏堆栈；响应结构统一 code/message/data |
+
+**关键设计决策**：
+1. **fail-closed 语义收敛到全局处理器**：领域层/基础设施层抛出的 `IllegalArgumentException`/`IllegalStateException`（含 AuditImmutableError/BaselineImmutableError/CyclicDependencyError/IncompleteControlledObjectError 等 RuntimeException 子类）统一映射 422 BLOCKED，而非 500——体现「规则不通过即阻断」而非「服务器错误」。
+2. **表现边界不泄漏堆栈**：未预期异常统一记日志、前端仅得 `内部错误`，避免堆栈细节外泄（安全基线）。
+3. **校验前置到表现边界**：TEN-004 租户隔离 + 业务主键（projectId/ecrId/orderId）在 @Valid 阶段即拦截，不进领域层。

@@ -1,5 +1,7 @@
 package com.mofeng.rdp.application.sample;
 
+import jakarta.validation.constraints.NotBlank;
+
 import java.util.List;
 
 /**
@@ -11,10 +13,12 @@ import java.util.List;
 public class SampleRequest {
 
     /** 租户标识（TEN-004 权限入口）。 */
+    @NotBlank(message = "tenantId 必填（TEN-004 租户隔离）")
     private String tenantId;
     /** 组织标识。 */
     private String orgId;
     /** 项目标识。 */
+    @NotBlank(message = "projectId 必填")
     private String projectId;
     /** 操作人。 */
     private String userName;
@@ -22,6 +26,7 @@ public class SampleRequest {
     private String roleName;
 
     /** 样件需求编号。 */
+    @NotBlank(message = "orderId 必填")
     private String orderId;
     /** 样件编码。 */
     private String code;

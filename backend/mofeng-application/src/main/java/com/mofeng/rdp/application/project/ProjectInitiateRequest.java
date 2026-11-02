@@ -1,5 +1,7 @@
 package com.mofeng.rdp.application.project;
 
+import jakarta.validation.constraints.NotBlank;
+
 /**
  * 项目立项请求 DTO（应用层，表现层 → 应用层边界对象）。
  *
@@ -9,8 +11,10 @@ package com.mofeng.rdp.application.project;
 public final class ProjectInitiateRequest {
 
     // 项目标识与权限范围
+    @NotBlank(message = "projectId 必填")
     private String projectId;
     private String projectName;
+    @NotBlank(message = "tenantId 必填（TEN-004 租户隔离）")
     private String tenantId;
     private String orgId;
 

@@ -1,5 +1,7 @@
 package com.mofeng.rdp.application.change;
 
+import jakarta.validation.constraints.NotBlank;
+
 import java.util.List;
 
 /**
@@ -11,10 +13,12 @@ import java.util.List;
 public class ChangeRequest {
 
     /** 租户标识（TEN-004 权限入口）。 */
+    @NotBlank(message = "tenantId 必填（TEN-004 租户隔离）")
     private String tenantId;
     /** 组织标识。 */
     private String orgId;
     /** 项目标识。 */
+    @NotBlank(message = "projectId 必填")
     private String projectId;
     /** 操作人。 */
     private String userName;
@@ -22,6 +26,7 @@ public class ChangeRequest {
     private String roleName;
 
     /** ECR 编号。 */
+    @NotBlank(message = "ecrId 必填")
     private String ecrId;
     /** ECR 编码。 */
     private String code;
