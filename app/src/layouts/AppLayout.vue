@@ -80,8 +80,20 @@
 
         <div class="top">
           <div class="row" style="gap: 10px">
+            <el-select v-model="sid" size="small" style="width: 150px" @change="onSpace">
+              <el-option
+                v-for="s in store.mySpaces"
+                :key="s.id"
+                :value="s.id"
+                :label="s.name"
+                :disabled="!spaceAccessible(s)"
+              >
+                <span>{{ s.name }}</span>
+                <span class="dim" style="margin-left: 6px; font-size: 11px">{{ s.type }}</span>
+              </el-option>
+            </el-select>
             <el-select v-model="pid" size="small" style="width: 250px" @change="onProject">
-              <el-option v-for="p in store.data.projects" :key="p.id" :value="p.id" :label="`${p.code} · ${p.name}`">
+              <el-option v-for="p in store.spaceProjects" :key="p.id" :value="p.id" :label="`${p.code} · ${p.name}`">
                 <span>{{ p.code }} · {{ p.name }}</span>
                 <span class="tag" :class="'l' + (p.level || '4').slice(1)" style="margin-left: 8px">{{ t(p.level || '未定级') }}</span>
               </el-option>
@@ -141,6 +153,7 @@ const { t } = useI18n()
 const open = ref<string[]>(['workbench'])
 const uid = ref(store.userId)
 const pid = ref(store.projectId)
+const sid = ref(store.spaceId)
 
 /** 顶部横向导航：工作中心分组；侧栏渲染其余分组 */
 const workbenchItems = computed(() => MENUS.find((m) => m.key === 'workbench')?.items ?? [])
@@ -188,6 +201,18 @@ function onUser(v: string) {
 function onProject(v: string) {
   store.setProject(v)
   store.notify('info', `${t('app.switchProject')}：${store.currentProject.code}`)
+}
+function onSpace(v: string) {
+  if (store.switchSpace(v)) {
+    sid.value = store.spaceId
+    pid.value = store.projectId
+  } else {
+    sid.value = store.spaceId
+  }
+}
+function spaceAccessible(s: { id: string }) {
+  // mySpaces 已做租户+角色双重过滤，此处对无权限项置灰（防御性兜底）
+  return store.mySpaces.some((x) => x.id === s.id)
 }
 function onLocale(l: 'zh-CN' | 'en-US') {
   store.setLocale(l)

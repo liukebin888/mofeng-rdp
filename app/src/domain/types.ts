@@ -395,6 +395,8 @@ export interface Project {
   planFrozen: boolean
   /** 租户归属（TEN-004 数据强隔离：缺省视为集团租户 T-1001） */
   tenantId?: string
+  /** 空间归属（SPA-003 空间级数据隔离：缺省视为无空间，仅参与租户级过滤） */
+  spaceId?: string
 }
 
 export interface HourRecord {

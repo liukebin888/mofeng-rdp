@@ -30,6 +30,7 @@ import { coverage, detectBreaks } from '@/domain/trace'
 import type { ActorContext, Baseline, GateDef, GateRun, Level, WbsNode, ThresholdIssue } from '@/domain/types'
 import { can, type ActionKey } from '@/domain/rbac'
 import { guardTenant, visibleInTenant, groupDrillDown, type TenantContext } from '@/domain/tenant'
+import { canAccessSpace, visibleInSpace, accessibleSpaces, describeSwitch, type Space, type SpaceContext } from '@/domain/spaceEngine'
 import { advanceThroughBranch, approveNode, availableActions, escalate, getNode, isOverdue, rejectNode, startFlow, addSigner, transferNode, signNode, type FlowDefinition } from '@/domain/flowEngine'
 import {
   addComment,
@@ -122,6 +123,8 @@ interface PersistShape {
   data: SeedData
   userId: string
   projectId: string
+  /** 当前空间 id（SPA-003 顶部切换器） */
+  spaceId: string
   /** 服务端乐观锁版本号（REST 通道下维护，冲突返回 409） */
   rev?: number
 }
@@ -143,6 +146,7 @@ export const useAppStore = defineStore('app', () => {
   const data = ref<SeedData>(saved?.data ?? buildSeed())
   const userId = ref<string>(saved?.userId ?? 'U003')
   const projectId = ref<string>(saved?.projectId ?? 'P-001')
+  const spaceId = ref<string>(saved?.spaceId ?? 'SP-001')
   const toast = ref<{ type: 'success' | 'warning' | 'error' | 'info'; text: string } | null>(null)
   /** 界面语言（TEN-013）：仅影响展示层，数据权限（tenantContext/rbac）不随语言变化 */
   const locale = ref<Locale>(normalizeLocale(localStorage.getItem(LOCALE_KEY)))
@@ -190,7 +194,23 @@ export const useAppStore = defineStore('app', () => {
   }))
   /** 可见项目 = 归属当前租户的项目（跨租户项目不可见，不泄露存在性 TEN-004） */
   const visibleProjects = computed(() => visibleInTenant(tenantContext.value, data.value.projects))
-  const currentProject = computed(() => visibleProjects.value.find((p) => p.id === projectId.value) || visibleProjects.value[0])
+
+  // —— 空间隔离（SPA-001/002/003）：租户之下的项目组合维度，叠加在租户过滤之上 ——
+  const spaces = computed(() => (data.value.spaces ?? []) as Space[])
+  /** 当前空间上下文：spaceId 由顶部切换器强制注入，业务代码禁止从入参取 */
+  const spaceContext = computed<SpaceContext>(() => ({
+    tenantId: data.value.tenantId,
+    spaceId: spaceId.value,
+    roleCode: currentUser.value.roleCode
+  }))
+  /** 当前用户可访问的空间（租户归属 + 角色边界双重过滤，SPA-002） */
+  const mySpaces = computed(() => accessibleSpaces(spaces.value, spaceContext.value))
+  /** 当前空间（若当前 spaceId 越权/不存在则回退到首个可访问空间） */
+  const currentSpace = computed(() => mySpaces.value.find((s) => s.id === spaceId.value) || mySpaces.value[0])
+  /** 空间内可见项目 = 租户可见项目 再按空间过滤（叠加层，不改变租户过滤结果） */
+  const spaceProjects = computed(() => visibleInSpace(spaceContext.value, visibleProjects.value))
+  /** 当前项目 = 空间内可见项目 中取 projectId，否则空间内首个 */
+  const currentProject = computed(() => spaceProjects.value.find((p) => p.id === projectId.value) || spaceProjects.value[0])
 
   /** 跨租户访问守卫：伪造/越界 tenantId 一律拒绝并留审计（应用层面，TEN-004） */
   function guardTenantAccess(targetTenantId?: string): boolean {
@@ -216,6 +236,41 @@ export const useAppStore = defineStore('app', () => {
     return true
   }
 
+  /** 空间访问守卫：伪造/越界 spaceId 或越界角色一律拒绝并留审计（SPA-002/003） */
+  function guardSpaceAccess(targetSpaceId: string): boolean {
+    const target = spaces.value.find((s) => s.id === targetSpaceId)
+    if (!target) {
+      notify('error', `空间 ${targetSpaceId} 不存在（SPA-003 越权拦截）`)
+      log('ACCESS', '空间', targetSpaceId, { verdict: 'SPACE_FORGED' }, undefined, 'DENY')
+      return false
+    }
+    const v = canAccessSpace(spaceContext.value, target)
+    if (!v.ok) {
+      notify('error', `${v.note}（SPA-002 越权拦截）`)
+      log('ACCESS', '空间', targetSpaceId, { verdict: v.code }, undefined, 'DENY')
+      return false
+    }
+    return true
+  }
+
+  /** 空间切换：守卫通过后更新 spaceId，同步重置 projectId 到新空间首个项目，并留审计 */
+  function switchSpace(targetSpaceId: string): boolean {
+    if (targetSpaceId === spaceId.value) return true
+    if (!guardSpaceAccess(targetSpaceId)) return false
+    const from = spaceId.value
+    const target = spaces.value.find((s) => s.id === targetSpaceId)!
+    // 切换后当前项目须归属新空间，否则回退到新空间首个项目
+    const nextProjects = visibleInSpace({ ...spaceContext.value, spaceId: targetSpaceId }, visibleProjects.value)
+    spaceId.value = targetSpaceId
+    if (!nextProjects.some((p) => p.id === projectId.value)) {
+      projectId.value = nextProjects[0]?.id ?? projectId.value
+    }
+    notify('success', `已切换至空间「${target.name}」`)
+    log('SWITCH_SPACE', '空间', targetSpaceId, describeSwitch(from, targetSpaceId), { spaceId: from }, 'OK')
+    persist()
+    return true
+  }
+
   const actor = computed<ActorContext>(() => ({
     userId: currentUser.value.id,
     userName: currentUser.value.name,
@@ -227,7 +282,7 @@ export const useAppStore = defineStore('app', () => {
   }))
 
   function persist() {
-    const payload: PersistShape = { version: SEED_VERSION, data: data.value, userId: userId.value, projectId: projectId.value, rev: rev.value }
+    const payload: PersistShape = { version: SEED_VERSION, data: data.value, userId: userId.value, projectId: projectId.value, spaceId: spaceId.value, rev: rev.value }
     localStorage.setItem(KEY, JSON.stringify(payload))
     // 后端可用时异步同步（fire-and-forget，不阻塞交互；失败入队待重试）
     // 降级提示不得覆盖业务反馈：仅当当前无 toast 时提示一次，避免「基线篡改被拒」等关键错误被淹没。
@@ -276,6 +331,7 @@ export const useAppStore = defineStore('app', () => {
         data.value = rs.data
         userId.value = rs.userId
         projectId.value = rs.projectId
+        spaceId.value = rs.spaceId ?? 'SP-001'
         rev.value = rs.rev ?? 0
         localStorage.setItem(KEY, JSON.stringify(rs))
         notify('info', '已从服务端加载最新数据（跨端共享）')
@@ -283,7 +339,7 @@ export const useAppStore = defineStore('app', () => {
         // 后端无数据或版本不符：将当前（本地种子）播种/迁移到后端。
         // 版本不符（如 v1.0.4 → v1.0.5）属合法 seed 升级：携带后端当前 rev 覆盖写入，避免乐观锁 409。
         const backendRev = (remote && typeof remote === 'object' ? (remote as unknown as PersistShape).rev : undefined) ?? 0
-        const payload: PersistShape = { version: SEED_VERSION, data: data.value, userId: userId.value, projectId: projectId.value, rev: backendRev }
+        const payload: PersistShape = { version: SEED_VERSION, data: data.value, userId: userId.value, projectId: projectId.value, spaceId: spaceId.value, rev: backendRev }
         const ok = await saveRemoteState({ ...payload, expectedRev: backendRev })
         if (ok) {
           rev.value = backendRev + 1
@@ -302,6 +358,7 @@ export const useAppStore = defineStore('app', () => {
     data.value = buildSeed()
     userId.value = 'U003'
     projectId.value = 'P-001'
+    spaceId.value = 'SP-001'
     persist()
     notify('success', '演示数据已重置为初始种子（3 个项目 / 48 控制点 / 40 条审计）')
   }
@@ -2643,6 +2700,14 @@ export const useAppStore = defineStore('app', () => {
     visibleProjects,
     guardTenantAccess,
     guardGroupDrillDown,
+    spaces,
+    spaceContext,
+    mySpaces,
+    currentSpace,
+    spaceProjects,
+    spaceId,
+    switchSpace,
+    guardSpaceAccess,
     projectWbs,
     projectHandoffs,
     handoffEval,

@@ -67,8 +67,9 @@ import type { DocAnnotation } from '@/domain/docAnnotation'
 import type { AiCorpusItem, AiSwitchConfig, AiCallLog } from '@/domain/aiAssist'
 import type { VulnerabilityItem, Issue8D } from '@/domain/defect'
 import type { Sci, CompatibilityRecord, ReleaseSignoff } from '@/domain/softwareVersion'
+import type { Space } from '@/domain/spaceEngine'
 
-export const SEED_VERSION = 'mofeng.rdp.v1.0.20'
+export const SEED_VERSION = 'mofeng.rdp.v1.0.21'
 const TENANT = 'T-1001'
 
 export interface SeedUser {
@@ -414,7 +415,8 @@ function buildProjects(users: SeedUser[]): Project[] {
       technology: 5,
       health: '黄',
       resourceRatio: 1.14,
-      planFrozen: true
+      planFrozen: true,
+      spaceId: 'SP-001'
     },
     {
       ...base,
@@ -434,7 +436,8 @@ function buildProjects(users: SeedUser[]): Project[] {
       technology: 4,
       health: '绿',
       resourceRatio: 0.94,
-      planFrozen: true
+      planFrozen: true,
+      spaceId: 'SP-001'
     },
     {
       ...base,
@@ -455,7 +458,8 @@ function buildProjects(users: SeedUser[]): Project[] {
       technology: 2,
       health: '红',
       resourceRatio: 1.02,
-      planFrozen: false
+      planFrozen: false,
+      spaceId: 'SP-002'
     },
     // —— 子租户项目（TEN-002/TEN-004 隔离验证样本，不参与主租户派生统计）——
     {
@@ -479,7 +483,8 @@ function buildProjects(users: SeedUser[]): Project[] {
       health: '黄',
       resourceRatio: 1.08,
       planFrozen: true,
-      tenantId: 'T-1002'
+      tenantId: 'T-1002',
+      spaceId: 'SP-003'
     },
     {
       ...base,
@@ -502,7 +507,8 @@ function buildProjects(users: SeedUser[]): Project[] {
       health: '绿',
       resourceRatio: 0.9,
       planFrozen: true,
-      tenantId: 'T-1003'
+      tenantId: 'T-1003',
+      spaceId: 'SP-004'
     }
   ]
 }
@@ -1244,6 +1250,13 @@ export function buildSeed() {
       { code: 'T-1002', name: '魔程智驾（子公司）', type: '子租户', isolation: 'SHARED', parentCode: 'T-1001', sharedMetrics: ['项目数', '在研项目', 'Gate 通过率'] },
       { code: 'T-1003', name: '魔程新能源（子公司）', type: '子租户', isolation: 'SCHEMA', parentCode: 'T-1001', sharedMetrics: ['项目数', '风险敞口'] }
     ],
+    /** 空间（项目组合，SPA-001）：租户之下的聚合维度，顶部切换器切换 */
+    spaces: [
+      { id: 'SP-001', code: 'SP-JJ', name: '九甲科技', tenantId: 'T-1001', type: '项目组合', roleBoundary: ['PM', 'SYS_ADMIN', 'OPS'], resourcePoolIds: ['NODE-1', 'NODE-2'], costSubjectIds: ['C-100'] },
+      { id: 'SP-002', code: 'SP-ZKD', name: '中科电安', tenantId: 'T-1001', type: '项目组合', roleBoundary: [], resourcePoolIds: ['NODE-3'], costSubjectIds: ['C-200'] },
+      { id: 'SP-003', code: 'SP-ZJ', name: '智驾项目集', tenantId: 'T-1002', type: '项目组合', roleBoundary: [], resourcePoolIds: ['NODE-1'], costSubjectIds: ['C-300'] },
+      { id: 'SP-004', code: 'SP-XNY', name: '新能源项目集', tenantId: 'T-1003', type: '项目组合', roleBoundary: [], resourcePoolIds: ['NODE-2'], costSubjectIds: ['C-400'] }
+    ] as Space[],
     users,
     orgNodes,
     orgMemberships,

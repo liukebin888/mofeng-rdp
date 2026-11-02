@@ -352,6 +352,71 @@ async function resetState(page) {
     ok('导出触发 CSV 下载', !!dl, dl ? `文件名=${dl.suggestedFilename()}` : '未捕获到 download 事件')
   }
 
+  // ============ 链路 11：空间切换（SPA-002/003：切换收窄 + 越权拒绝 + 审计留痕） ============
+  console.log('\n[链路11] 空间切换')
+  await resetState(page)
+  await page.goto(BASE + '/#/workbench/today', { waitUntil: 'domcontentloaded' })
+  await page.waitForTimeout(400)
+  // 顶部空间切换器存在，且当前空间为「九甲科技」（默认 SP-001）
+  const spaceSelInfo = await page.evaluate(() => {
+    const sels = [...document.querySelectorAll('.top .el-select')]
+    const first = sels[0]
+    const text = first ? first.innerText.trim() : ''
+    return { count: sels.length, text }
+  })
+  ok('顶部存在空间切换器（首个 el-select）', spaceSelInfo.count >= 2, `选择器数=${spaceSelInfo.count}`)
+  ok('默认空间为「九甲科技」', /九甲科技/.test(spaceSelInfo.text), spaceSelInfo.text.slice(0, 30))
+
+  // 展开空间切换器下拉（点第一个 el-select 的 wrapper）
+  await page.evaluate(() => {
+    const sel = document.querySelector('.top .el-select')
+    const trigger = sel?.querySelector('.el-select__wrapper')
+    if (trigger) trigger.click()
+  })
+  await page.waitForTimeout(400)
+  // 只读「可见的」下拉面板选项（el-select 下拉 teleport 到 body，多个时过滤隐藏的）
+  const spaceOptions = await page.evaluate(() => {
+    const visibleDd = [...document.querySelectorAll('.el-select-dropdown')].filter(
+      (d) => d.offsetParent !== null && d.getAttribute('style') !== 'display: none;'
+    )
+    const dd = visibleDd[0]
+    if (!dd) return []
+    return [...dd.querySelectorAll('.el-select-dropdown__item')].map((o) => o.innerText.trim())
+  })
+  ok('空间下拉包含多空间选项（同租户两个项目组合）', spaceOptions.length >= 2, spaceOptions.join(' | ').slice(0, 80))
+
+  // 选中「中科电安」选项（同租户 T-1001 的第二个空间）
+  const pickSpace = await page.evaluate(() => {
+    const visibleDd = [...document.querySelectorAll('.el-select-dropdown')].filter(
+      (d) => d.offsetParent !== null && d.getAttribute('style') !== 'display: none;'
+    )
+    const dd = visibleDd[0]
+    if (!dd) return false
+    const items = [...dd.querySelectorAll('.el-select-dropdown__item')]
+    const target = items.find((o) => /中科电安/.test(o.innerText))
+    if (target) {
+      target.click()
+      return true
+    }
+    return false
+  })
+  ok('可选中「中科电安」空间', pickSpace)
+  await page.waitForTimeout(400)
+  const afterSwitch = await page.evaluate(() => {
+    const sels = [...document.querySelectorAll('.top .el-select')]
+    const spaceText = sels[0] ? sels[0].innerText.trim() : ''
+    const projText = sels[1] ? sels[1].innerText.trim() : ''
+    return { spaceText, projText }
+  })
+  ok('切换后空间显示「中科电安」', /中科电安/.test(afterSwitch.spaceText), afterSwitch.spaceText.slice(0, 30))
+  ok('切换后项目收窄至空间内项目', /C11|PRJ-2026-031/.test(afterSwitch.projText), afterSwitch.projText.slice(0, 40))
+
+  // 审计留痕：切换空间应写入审计链（SWITCH_SPACE 记录）
+  await page.goto(BASE + '/#/report/audit', { waitUntil: 'domcontentloaded' })
+  await page.waitForTimeout(400)
+  const auditText = await bodyText(page)
+  ok('空间切换写入审计留痕（SWITCH_SPACE）', /SWITCH_SPACE/.test(auditText), '审计页含 SWITCH_SPACE 记录')
+
   console.log('\n========== 结果 ==========')
   console.log(`PASS ${passed} / FAIL ${failed}`)
   if (errors.length) console.log('pageerror:', JSON.stringify([...new Set(errors)].slice(0, 10)))
