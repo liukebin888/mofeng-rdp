@@ -64,6 +64,7 @@ POST /api/v1/projects/initiate
 |---|---|---|
 | C-1 应用层编排骨架 ✅ | ApplicationService + Controller + DTO + 事务 + 权限 + 幂等 | 一个用例方法跑通，领域层判定 + 基础设施持久化串联（提交 `待推送`）|
 | C-2 首个闭环：立项 ✅ | 分级 → 门禁 G1 → 受控对象入库 → 审计链 | 端到端可复算，缺项阻断可验证（提交 `待推送`）|
+| C-4 第二个闭环：需求追溯 ✅ | 字段齐全率 → 追溯断链 → 覆盖率 → 基线哈希链组装 | fail-closed 三态（缺项/BLOCK/覆盖率）零基线可验证（提交 `待推送`）|
 | C-3 六门禁全链路 | vue-tsc / vitest / build / smoke / e2e / 隔离面 | 全绿（待前端联调）|
 
 ---
@@ -103,3 +104,21 @@ POST /api/v1/projects/initiate
 2. **事务边界原子性**：分级 → 门禁 → 入库 → 审计同事务，守住 K5「写项目 + 写追溯」本地原子性。
 3. **缺项阻断可复算**：分级缺项 → 未定级 → C-01 FAIL → 门禁阻断 → 零写入，回退测试验证「fail-closed 不 fail-open」。
 4. **受控对象子类落领域层**：Project 作为 ControlledObject 具体子类落领域层（非基础设施层），五要素装配由领域对象自身承载。
+
+---
+
+## 6. C-4 落地结论（2026-11-02）
+
+**结论**：第二个端到端闭环「需求 → 追溯 → 基线」落地，验证 fail-closed 三态（字段缺项 / BLOCK 断链 / 覆盖率不达标）零基线 + 通过组装基线哈希链。
+
+| 项 | 内容 |
+|---|---|
+| 应用层 | `requirement/`：RequirementTraceRequest（DTO）+ RequirementTraceResult（结果）+ RequirementTraceApplicationService（编排）+ RequirementController（REST /api/v1/requirements/trace） |
+| 编排链路 | 字段齐全率（RequirementEngine.batchCompleteness）→ 追溯断链（TraceEngine.detectBreaks）→ 覆盖率（TraceEngine.coverage）→ 基线哈希链组装（BaselineRepository.build，复用 BaselineEngine） |
+| 测试结果 | 应用层 3→8 例全过（+RequirementTraceApplicationServiceTest 5），领域层 264 例全过，backend 5 模块 BUILD SUCCESS |
+| 验收判据 | 字段缺项 → 零基线；BLOCK 断链 → 零基线；覆盖率不达标 → 零基线；空需求集通过 → 组装基线 |
+
+**关键设计决策**：
+1. **fail-closed 三态**：字段缺项 / BLOCK 断链 / 覆盖率不达标（<95%）任一触发即零写入零基线，与「缺项阻断」纪律一致。
+2. **覆盖率语义忠实传递**：领域引擎 `TraceEngine.coverage` 的权威语义是「分母含必须有下游的对象、covered 需 dst 也在分母池」，完整 V 模型链路（含末端 VER）覆盖率上限 75%——应用层如实传递不「修正」，避免两套规则各说各话（TS 权威同构，coverage 无 pass 用例）。
+3. **编排聚焦调用顺序与分支**：应用层测试聚焦「编排正确性」（调用顺序 / DTO 映射 / fail-closed 分支 / 基线组装触发），不重复验证领域引擎数值（已由 264 例领域层测试锁定）。
