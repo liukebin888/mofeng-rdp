@@ -23,6 +23,7 @@ import {
 import { runGate, GATE_TEMPLATES } from '@/domain/gate'
 import { enforceStageGate, canCreateWorkItem, type WorkItemKind, type GateEnforceVerdict } from '@/domain/gateEnforce'
 import { AUTOMOTIVE_STAGE_TEMPLATE, findStageTemplate, orderedStages, type StageTemplate } from '@/domain/stageTemplate'
+import { gateReleaseEvidence, stageFullyReleased, type ApprovalBinding } from '@/domain/approvalBinding'
 import { freeze as freezeBaseline, verifyBaseline } from '@/domain/baseline'
 import { appendAudit, verifyChain } from '@/domain/audit'
 import { computeCpm, planQualityChecks, plannedValue, statusDayOf, weightedCompletion } from '@/domain/schedule'
@@ -1183,6 +1184,20 @@ export const useAppStore = defineStore('app', () => {
       log('DENY', kind, stageCode, { verdict: v.code, blockedBy: v.blockedBy }, undefined, 'DENY')
     }
     return v
+  }
+
+  // —— 审批链—阶段绑定（APR-001/002/003，产品核心 P1：发起→审核→会签→批准 = 闸门放行证据）——
+  /** 阶段↔审批链绑定关系（seed 播入，可配置） */
+  const approvalBindings = computed<ApprovalBinding[]>(() => (data.value.approvalBindings ?? []) as ApprovalBinding[])
+  /** 某阶段审批链完成的放行证据（复用引擎，禁止自造判定） */
+  function stageReleaseEvidence(stageCode: string) {
+    return gateReleaseEvidence(stageTemplate.value, stageCode, approvalBindings.value, flowInstances.value)
+  }
+  /** 某阶段是否「审批完成 + 闸门通过」联合放行（P2 权威判定） */
+  function stageRelease(stageCode: string) {
+    const stage = stages.value.find((s) => s.code === stageCode)
+    const gatePassed = stage?.gateCode ? !!stageGateRuns.value.find((g) => g.gate === stage.gateCode && g.passed && !g.conditional) : false
+    return stageFullyReleased(stageTemplate.value, stageCode, approvalBindings.value, flowInstances.value, gatePassed)
   }
 
   // —— 企业级聚合视图（对标 Oracle 组合驾驶舱：跨项目汇总健康指标，兑现 V4.0 第五种介入方式「聚合」）——
@@ -2850,6 +2865,9 @@ export const useAppStore = defineStore('app', () => {
     stages,
     stageGateRuns,
     canCreateInStage,
+    approvalBindings,
+    stageReleaseEvidence,
+    stageRelease,
     aiSwitchState,
     aiScope,
     aiVisibleCorpus,

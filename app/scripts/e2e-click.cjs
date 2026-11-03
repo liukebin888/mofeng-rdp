@@ -436,6 +436,18 @@ async function resetState(page) {
   ok('阶段状态含批准标记', stageFlow.nodes.some((n) => /已批准|未批准/.test(n.status)), stageFlow.nodes.map((n) => `${n.code}:${n.status}`).join(' | '))
   ok('首个阶段为「立项与策划」', stageFlow.nodes[0]?.name === '立项与策划', stageFlow.nodes[0]?.name)
 
+  // ============ 链路 13：审批链—阶段绑定（APR-001/002/003：发起→审核→会签→批准 = 闸门放行证据） ============
+  console.log('\n[链路13] 审批链—阶段绑定与放行证据')
+  const approvalFlow = await page.evaluate(() => {
+    const nodes = [...document.querySelectorAll('.stage-node')].map((n) => ({
+      code: n.querySelector('.sn-code')?.innerText.trim() || '',
+      approval: n.querySelector('.sn-approval')?.innerText.trim() || ''
+    }))
+    return { nodes }
+  })
+  ok('每阶段渲染审批链状态标签', approvalFlow.nodes.every((n) => /审批|未发起|未绑定/.test(n.approval)), approvalFlow.nodes.map((n) => `${n.code}:${n.approval}`).join(' | '))
+  ok('六阶段均绑定标准审批链（非「未绑定」）', approvalFlow.nodes.every((n) => !/未绑定/.test(n.approval)), approvalFlow.nodes.map((n) => `${n.code}:${n.approval}`).join(' | '))
+
   console.log('\n========== 结果 ==========')
   console.log(`PASS ${passed} / FAIL ${failed}`)
   if (errors.length) console.log('pageerror:', JSON.stringify([...new Set(errors)].slice(0, 10)))

@@ -68,8 +68,9 @@ import type { AiCorpusItem, AiSwitchConfig, AiCallLog } from '@/domain/aiAssist'
 import type { VulnerabilityItem, Issue8D } from '@/domain/defect'
 import type { Sci, CompatibilityRecord, ReleaseSignoff } from '@/domain/softwareVersion'
 import type { Space } from '@/domain/spaceEngine'
+import { buildApprovalChain, DEFAULT_APPROVAL_ROLES, type ApprovalBinding } from '@/domain/approvalBinding'
 
-export const SEED_VERSION = 'mofeng.rdp.v1.0.21'
+export const SEED_VERSION = 'mofeng.rdp.v1.0.22'
 const TENANT = 'T-1001'
 
 export interface SeedUser {
@@ -1452,8 +1453,24 @@ export function buildSeed() {
         ],
         enabled: true,
         version: 1
-      }
+      },
+      // ⑧ 研发阶段标准审批链（APR-001：发起→审核→并行会签→批准，绑定 S1~S6 阶段闸门）
+      buildApprovalChain('DEF-STAGE-S1', 'FLOW-STAGE-S1', 'S1 立项与策划审批', { ...DEFAULT_APPROVAL_ROLES, signRoles: ['电子研发中心', '结构研发中心', '工艺技术中心', '项目管理中心', '质量中心'] }, [{ key: 'name', label: '项目名称' }]),
+      buildApprovalChain('DEF-STAGE-S2', 'FLOW-STAGE-S2', 'S2 产品设计与开发审批', { ...DEFAULT_APPROVAL_ROLES, signRoles: ['电子研发中心', '结构研发中心', '工艺技术中心', '质量中心'] }, [{ key: 'design', label: '设计方案' }]),
+      buildApprovalChain('DEF-STAGE-S3', 'FLOW-STAGE-S3', 'S3 过程设计与开发审批', { ...DEFAULT_APPROVAL_ROLES, signRoles: ['工艺技术中心', '制造中心', '质量中心'] }, [{ key: 'process', label: '过程方案' }]),
+      buildApprovalChain('DEF-STAGE-S4', 'FLOW-STAGE-S4', 'S4 试制与 OTS 验证审批', { ...DEFAULT_APPROVAL_ROLES, signRoles: ['制造中心', '质量中心', '试验中心'] }, [{ key: 'ots', label: 'OTS 结果' }]),
+      buildApprovalChain('DEF-STAGE-S5', 'FLOW-STAGE-S5', 'S5 量产与交付审批', { ...DEFAULT_APPROVAL_ROLES, signRoles: ['制造中心', '计划物流中心', '质量中心'] }, [{ key: 'sop', label: 'SOP 准备' }]),
+      buildApprovalChain('DEF-STAGE-S6', 'FLOW-STAGE-S6', 'S6 反馈与改进审批', { ...DEFAULT_APPROVAL_ROLES, signRoles: ['质量中心', '项目管理中心'] }, [{ key: 'feedback', label: '反馈结论' }])
     ] as FlowDefinition[],
+    /** 审批链—阶段绑定（APR-002：每个阶段走一条标准四步审批链，作为闸门放行的审批证据） */
+    approvalBindings: [
+      { stageCode: 'S1', defId: 'DEF-STAGE-S1', label: '立项与策划审批' },
+      { stageCode: 'S2', defId: 'DEF-STAGE-S2', label: '产品设计与开发审批' },
+      { stageCode: 'S3', defId: 'DEF-STAGE-S3', label: '过程设计与开发审批' },
+      { stageCode: 'S4', defId: 'DEF-STAGE-S4', label: '试制与 OTS 验证审批' },
+      { stageCode: 'S5', defId: 'DEF-STAGE-S5', label: '量产与交付审批' },
+      { stageCode: 'S6', defId: 'DEF-STAGE-S6', label: '反馈与改进审批' }
+    ] as ApprovalBinding[],
     flowInstances: [
       {
         id: 'F1', defId: 'DEF-GATE', defCode: 'FLOW-GATE', title: 'PRJ-2026-018 Gate3 设计闸门放行', submitter: '周立群',

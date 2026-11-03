@@ -20,6 +20,9 @@
               <span class="tag" :class="stageState(s).approved ? 'ok' : 'l3'">{{ stageState(s).approved ? '已批准' : '未批准' }}</span>
             </div>
             <div v-if="s.gateCode" class="sn-gate dim">{{ s.gateCode }} {{ s.gateCode === 'G1' ? '立项闸门' : s.gateCode === 'G2' ? '方案闸门' : s.gateCode === 'G3' ? '设计闸门' : s.gateCode === 'G4' ? '样件闸门' : '交付闸门' }}</div>
+            <div class="sn-approval dim">
+              <span class="tag" :class="stageState(s).release.released ? 'ok' : 'l1'">{{ stageState(s).release.released ? '审批已完成' : stageState(s).approvalEvidence.code === 'PENDING' ? '审批中' : stageState(s).approvalEvidence.code === 'UNBOUND' ? '未绑定' : '未发起审批' }}</span>
+            </div>
           </div>
           <div v-if="i < store.stages.length - 1" class="stage-arrow">→</div>
         </template>
@@ -99,7 +102,10 @@ function open(code: string) {
 function stageState(s: { code: string; gateCode?: string }) {
   const run = s.gateCode ? store.gateResults[s.gateCode] : undefined
   const approved = run ? run.passed && !run.conditional : false
-  return { approved }
+  // 审批链放行证据（APR-003：审批完成 = 闸门放行证据，复用引擎不自行判定）
+  const ev = store.stageReleaseEvidence(s.code)
+  const rel = store.stageRelease(s.code)
+  return { approved, approvalEvidence: ev, release: rel }
 }
 function submit() {
   if (!current.value) return
@@ -129,6 +135,7 @@ function demoSod() {
 .sn-name { margin-top: 2px; color: var(--text-2); font-size: 11px; }
 .sn-status { margin-top: 5px; }
 .sn-gate { margin-top: 4px; font-size: 10px; }
+.sn-approval { margin-top: 4px; font-size: 10px; }
 .stage-arrow { color: var(--text-3); font-size: 14px; flex: 0 0 auto; }
 .gcard { background: var(--bg-1); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; font-size: 11.5px; }
 .gcard.ok { border-color: #1d4a2e; }
