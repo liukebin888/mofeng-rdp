@@ -73,7 +73,7 @@ import type { DeliverableApprovalBinding } from '@/domain/deliverableApproval'
 import { appendRecord, manifestHashOf, type ArchiveLayer, type ArchiveVolume } from '@/domain/archiveLayer'
 import { DEFAULT_REJECTION_POLICIES, type RejectionPolicyItem } from '@/domain/rejectionPolicy'
 
-export const SEED_VERSION = 'mofeng.rdp.v1.0.24'
+export const SEED_VERSION = 'mofeng.rdp.v1.0.25'
 const TENANT = 'T-1001'
 
 export interface SeedUser {
@@ -1482,8 +1482,13 @@ export function buildSeed() {
         name: '立项申请',
         formFields: [
           { key: 'name', label: '项目名称' },
+          { key: 'code', label: '项目编码' },
           { key: 'customer', label: '客户' },
-          { key: 'productLine', label: '产品线' }
+          { key: 'productLine', label: '产品线' },
+          { key: 'otsDate', label: 'OTS 期' },
+          { key: 'sopDate', label: 'SOP 日期' },
+          { key: 'annualVolume', label: '车型年产量' },
+          { key: 'lifecycleYears', label: '生命周期（年）' }
         ],
         startNodeId: 'b1',
         nodes: [
@@ -1494,7 +1499,7 @@ export function buildSeed() {
           { id: 'b5', name: '结束', type: 'end' }
         ],
         enabled: true,
-        version: 1
+        version: 2
       },
       // ⑧ 研发阶段标准审批链（APR-001：发起→审核→并行会签→批准，绑定 S1~S6 阶段闸门）
       buildApprovalChain('DEF-STAGE-S1', 'FLOW-STAGE-S1', 'S1 立项与策划审批', { ...DEFAULT_APPROVAL_ROLES, signRoles: ['电子研发中心', '结构研发中心', '工艺技术中心', '项目管理中心', '质量中心'] }, [{ key: 'name', label: '项目名称' }]),

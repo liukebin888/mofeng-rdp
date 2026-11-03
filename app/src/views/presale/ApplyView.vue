@@ -47,9 +47,21 @@
           </el-form-item>
           <el-form-item label="起止日期">
             <div class="row" style="width: 100%">
-              <el-input v-model="form.start" @input="markDirty" />
-              <el-input v-model="form.end" @input="markDirty" />
+              <el-date-picker v-model="form.start" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" style="flex: 1" @change="markDirty" />
+              <el-date-picker v-model="form.end" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" style="flex: 1" @change="markDirty" />
             </div>
+          </el-form-item>
+          <el-form-item label="OTS 期">
+            <el-date-picker v-model="form.otsDate" type="date" value-format="YYYY-MM-DD" placeholder="选择 OTS 日期" style="width: 100%" @change="markDirty" />
+          </el-form-item>
+          <el-form-item label="SOP 日期">
+            <el-date-picker v-model="form.sopDate" type="date" value-format="YYYY-MM-DD" placeholder="选择 SOP 日期" style="width: 100%" @change="markDirty" />
+          </el-form-item>
+          <el-form-item label="车型年产量">
+            <el-input-number v-model="form.annualVolume" :min="0" :step="1000" placeholder="年产量" style="width: 100%" @change="markDirty" />
+          </el-form-item>
+          <el-form-item label="生命周期（年）">
+            <el-input-number v-model="form.lifecycleYears" :min="0" :max="30" :step="1" placeholder="年" style="width: 100%" @change="markDirty" />
           </el-form-item>
         </el-form>
 
@@ -152,7 +164,7 @@ const store = useAppStore()
 const { te } = useI18n()
 
 // 空白表单默认值：新增打开的是空白模板，所有字段由用户新填写，不带入任何已有项目数据。
-const EMPTY_FORM = { code: '', name: '', customer: '', productLine: '', platform: '', owner: '', start: '', end: '' }
+const EMPTY_FORM = { code: '', name: '', customer: '', productLine: '', platform: '', owner: '', start: '', end: '', otsDate: '', sopDate: '', annualVolume: 0, lifecycleYears: 0 }
 const EMPTY_INPUT: GradingInput = { asil: '', cal: -1, selfDev: '', newArch: null, customerSafety: null }
 const form = reactive({ ...EMPTY_FORM })
 const input = reactive<GradingInput>({ ...EMPTY_INPUT })
@@ -275,7 +287,11 @@ function wfSubmit() {
     code: form.code,
     customer: form.customer,
     productLine: form.productLine,
-    level: result.value.level ?? ''
+    level: result.value.level ?? '',
+    otsDate: form.otsDate,
+    sopDate: form.sopDate,
+    annualVolume: form.annualVolume,
+    lifecycleYears: form.lifecycleYears
   }
   const ok = store.submitWorkflowForm(wfForm.value, `${wfForm.value.title}：${form.name}`, formData)
   if (ok) {
