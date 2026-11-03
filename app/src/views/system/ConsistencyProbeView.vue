@@ -102,7 +102,9 @@ async function runAll() {
       store.approvalBindings,
       store.flowInstances,
       gatePassed,
-      actor
+      actor,
+      store.projectDeliverables,
+      store.deliverableApprovalBindings
     )
     const feRelease = store.stageRelease(targetStage)
     reports.value.push(await runStageProbe(stagePayload, feRelease.released, feRelease.note, `阶段 ${targetStage}`))

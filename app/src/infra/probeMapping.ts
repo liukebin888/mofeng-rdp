@@ -12,10 +12,11 @@
  * 与 src/infra/apiV1.ts 的分工：apiV1 负责「网络 + 三态解包」，本模块负责「形状映射」。
  */
 
-import type { Project, Requirement, TraceLink, EcrItem, SampleReq, BomNode, ActorContext } from '@/domain/types'
+import type { Project, Requirement, TraceLink, EcrItem, SampleReq, BomNode, ActorContext, Deliverable } from '@/domain/types'
 import type { StageTemplate } from '@/domain/stageTemplate'
 import type { ApprovalBinding } from '@/domain/approvalBinding'
 import type { FlowInstance } from '@/domain/flowEngine'
+import type { DeliverableApprovalBinding } from '@/domain/deliverableApproval'
 import type {
   ProjectInitiatePayload,
   RequirementTracePayload,
@@ -188,6 +189,7 @@ export function mapSample(
 /**
  * 把前端阶段模板 + 审批绑定 + 审批实例 + 闸门通过状态映射为后端 StagePayload。
  * 阶段推进探针：用「目标阶段 S2」发起推进，比对前端 stageRelease 结论 vs 后端 advance 判定。
+ * deliverables / deliverableBindings 可选传入，用于覆盖 C 组交付物维度（C1/C2/C3）的一致性验证。
  */
 export function mapStageAdvance(
   tpl: StageTemplate,
@@ -195,7 +197,9 @@ export function mapStageAdvance(
   bindings: ApprovalBinding[],
   instances: FlowInstance[],
   gatePassed: Array<{ gate: string; passed: boolean }>,
-  actor: ActorContext
+  actor: ActorContext,
+  deliverables?: Deliverable[],
+  deliverableBindings?: DeliverableApprovalBinding[]
 ): StagePayload | null {
   if (!tpl) return null
   return {
@@ -225,6 +229,21 @@ export function mapStageAdvance(
       createdAt: i.createdAt,
       finishedAt: i.finishedAt
     })),
-    gatePassed: gatePassed.map((g) => ({ gate: g.gate, passed: g.passed }))
+    gatePassed: gatePassed.map((g) => ({ gate: g.gate, passed: g.passed })),
+    deliverables: (deliverables ?? []).map((d) => ({
+      id: d.id,
+      projectId: d.projectId,
+      code: d.code,
+      name: d.name,
+      category: d.category,
+      required: d.required,
+      provided: d.provided,
+      gate: d.gate
+    })),
+    deliverableBindings: (deliverableBindings ?? []).map((b) => ({
+      deliverableId: b.deliverableId,
+      defId: b.defId,
+      label: b.label
+    }))
   }
 }
