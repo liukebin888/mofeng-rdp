@@ -328,4 +328,80 @@ class StageApplicationServiceTest {
         StageResult result = service.advanceStage(r);
         assertTrue(result.isAllowed());
     }
+
+    // —— 🟡 可配置：B4 会签（signMode）——
+
+    /** 构造 release 请求：阶段 S1 绑定审批链 DEF-STAGE-S1，闸门 G1 通过，审批实例进行中。 */
+    private StageRequest releaseRequest(String instanceStatus) {
+        StageRequest r = baseRequest("release");
+        r.setStageCode("S1");
+        // 绑定 S1 审批链
+        List<StageRequest.BindingDto> bindings = new ArrayList<>();
+        StageRequest.BindingDto b = new StageRequest.BindingDto();
+        b.setStageCode("S1");
+        b.setDefId("DEF-STAGE-S1");
+        b.setLabel("S1 审批链");
+        bindings.add(b);
+        r.setBindings(bindings);
+        // 审批实例（状态由调用方指定：已完成 / 运行中 / 已驳回）
+        List<StageRequest.InstanceDto> instances = new ArrayList<>();
+        StageRequest.InstanceDto inst = new StageRequest.InstanceDto();
+        inst.setId("F-S1");
+        inst.setDefId("DEF-STAGE-S1");
+        inst.setStatus(instanceStatus);
+        instances.add(inst);
+        r.setInstances(instances);
+        // G1 闸门通过
+        List<StageRequest.GatePassedDto> gates = new ArrayList<>();
+        StageRequest.GatePassedDto g = new StageRequest.GatePassedDto();
+        g.setGate("G1");
+        g.setPassed(true);
+        gates.add(g);
+        r.setGatePassed(gates);
+        return r;
+    }
+
+    @Test
+    void B4会签进行中signModeAll缺签拒绝() {
+        // 审批实例「运行中」= PENDING，signMode=all（默认）→ 缺签不放行
+        StageRequest r = releaseRequest("运行中");
+        r.setSignMode("all");
+
+        StageResult result = service.releaseStage(r);
+        assertFalse(result.isAllowed());
+        assertEquals("release", result.getOp());
+        assertTrue(result.getNote().contains("审批链进行中") || result.getNote().contains("尚未批准"));
+    }
+
+    @Test
+    void B4会签进行中signModeAny任一签放行() {
+        // 审批实例「运行中」= PENDING，signMode=any → 任一签放行
+        StageRequest r = releaseRequest("运行中");
+        r.setSignMode("any");
+
+        StageResult result = service.releaseStage(r);
+        assertTrue(result.isAllowed());
+        assertTrue(result.getNote().contains("B4"));
+    }
+
+    @Test
+    void B4会签审批完成闸门通过正常放行() {
+        // 审批实例「已完成」→ 不再走 B4 PENDING 分支，直接 FULLY_RELEASED 放行
+        StageRequest r = releaseRequest("已完成");
+
+        StageResult result = service.releaseStage(r);
+        assertTrue(result.isAllowed());
+        assertFalse(result.getNote().contains("B4"));
+    }
+
+    @Test
+    void B4会签已驳回仍请求放行硬拒绝() {
+        // B3：审批已驳回 → 无论 signMode 何值均硬拒绝（fail-closed，不可配置关闭）
+        StageRequest r = releaseRequest("已驳回");
+        r.setSignMode("any"); // 即使 any 也不可绕过驳回
+
+        IllegalArgumentException ex = assertThrows(
+            IllegalArgumentException.class, () -> service.releaseStage(r));
+        assertTrue(ex.getMessage().contains("驳回"));
+    }
 }
