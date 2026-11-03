@@ -448,6 +448,24 @@ async function resetState(page) {
   ok('每阶段渲染审批链状态标签', approvalFlow.nodes.every((n) => /审批|未发起|未绑定/.test(n.approval)), approvalFlow.nodes.map((n) => `${n.code}:${n.approval}`).join(' | '))
   ok('六阶段均绑定标准审批链（非「未绑定」）', approvalFlow.nodes.every((n) => !/未绑定/.test(n.approval)), approvalFlow.nodes.map((n) => `${n.code}:${n.approval}`).join(' | '))
 
+  // ============ 链路 14：15 年合规归档层（ARC-001/002/003：哈希防篡改 + 保留期 + 只读） ============
+  console.log('\n[链路14] 15 年合规归档层')
+  await page.goto(BASE + '/#/report/audit', { waitUntil: 'domcontentloaded' })
+  await page.waitForTimeout(400)
+  const archiveInfo = await page.evaluate(() => {
+    const panel = [...document.querySelectorAll('.panel-title')].find((p) => /15 年合规归档层/.test(p.innerText))
+    const vols = [...document.querySelectorAll('.avol')].map((v) => ({
+      name: v.querySelector('b')?.innerText.trim() || '',
+      body: v.innerText || ''
+    }))
+    const tags = [...document.querySelectorAll('.avol .tag')].map((t) => t.innerText.trim())
+    return { hasPanel: !!panel, volCount: vols.length, vols, tags }
+  })
+  ok('存在「15 年合规归档层」面板', archiveInfo.hasPanel)
+  ok('存在示例归档卷', archiveInfo.volCount >= 1, `卷数=${archiveInfo.volCount}`)
+  ok('归档卷含保留期标识（15 年）', archiveInfo.vols.some((v) => /15 年/.test(v.body)), archiveInfo.vols.map((v) => v.name).join(' | '))
+  ok('归档卷含保留状态标签', archiveInfo.tags.some((t) => /保留中|临近到期|已到期/.test(t)), archiveInfo.tags.join(' | '))
+
   console.log('\n========== 结果 ==========')
   console.log(`PASS ${passed} / FAIL ${failed}`)
   if (errors.length) console.log('pageerror:', JSON.stringify([...new Set(errors)].slice(0, 10)))

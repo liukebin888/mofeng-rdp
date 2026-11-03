@@ -26,6 +26,7 @@ import { AUTOMOTIVE_STAGE_TEMPLATE, findStageTemplate, orderedStages, type Stage
 import { gateReleaseEvidence, stageFullyReleased, type ApprovalBinding } from '@/domain/approvalBinding'
 import { freeze as freezeBaseline, verifyBaseline } from '@/domain/baseline'
 import { appendAudit, verifyChain } from '@/domain/audit'
+import { appendRecord, archiveFromAudit, DEFAULT_RETENTION_YEARS, destroyVolume, retentionVerdict, verifyLayer, type ArchiveLayer, type ArchiveVolume } from '@/domain/archiveLayer'
 import { computeCpm, planQualityChecks, plannedValue, statusDayOf, weightedCompletion } from '@/domain/schedule'
 import { computeEvm } from '@/domain/evm'
 import { rankProjects } from '@/domain/portfolio'
@@ -930,6 +931,60 @@ export const useAppStore = defineStore('app', () => {
 
   const auditChain = computed(() => verifyChain(data.value.audit))
   const chainOk = computed(() => auditChain.value.ok)
+
+  // —— 15 年合规归档层（ARC-001/002/003，产品核心 P2：审批存档 + 关键输出物，留存 15 年）——
+  /** 归档层数据（多卷） */
+  const archiveLayer = computed<ArchiveLayer>(() => (data.value.archiveLayer ?? { volumes: [] }) as ArchiveLayer)
+  /** 归档卷列表 */
+  const archiveVolumes = computed<ArchiveVolume[]>(() => archiveLayer.value.volumes)
+  /** 归档层整体完整性（复用引擎 verifyLayer，禁止自造校验） */
+  const archiveIntegrity = computed(() => verifyLayer(archiveLayer.value))
+  /** 某卷的保留期判定 */
+  function archiveRetention(volumeId: string) {
+    const vol = archiveVolumes.value.find((v) => v.id === volumeId)
+    if (!vol) return null
+    return retentionVerdict(vol)
+  }
+  /** 把当前项目的审批记录 + 关键输出物归档为一个新卷（ARC-001） */
+  function archiveProject(projectId: string, name?: string) {
+    const now = new Date().toISOString()
+    const volumeId = `AV-${projectId}-${now.slice(0, 7)}`
+    let volume: ArchiveVolume = {
+      id: volumeId,
+      name: name ?? `${projectId} 合规归档卷`,
+      projectId,
+      createdAt: now,
+      createdBy: currentUser.value.name,
+      retentionYears: DEFAULT_RETENTION_YEARS,
+      records: [],
+      manifestHash: ''
+    }
+    // 归档该项目的审批类审计记录（复用 archiveFromAudit，禁止自造）
+    const approvals = data.value.audit.filter((r) => r.tenantId === projectId && ['APPROVE', 'RELEASE', 'FREEZE', 'REJECT'].includes(r.action))
+    for (const row of approvals) {
+      volume = appendRecord(volume, archiveFromAudit(volumeId, row, '审批', undefined, currentUser.value.name, now))
+    }
+    const next = [...archiveVolumes.value, volume]
+    data.value.archiveLayer = { volumes: next }
+    log('ARCHIVE', '归档', volumeId, { projectId, records: volume.records.length })
+    persist()
+    notify('success', `${projectId} 已归档 ${volume.records.length} 条审批记录，保留期 15 年`)
+  }
+  /** 销毁卷（仅已到期可销毁，ARC-002 只读保护） */
+  function destroyArchive(volumeId: string) {
+    const vol = archiveVolumes.value.find((v) => v.id === volumeId)
+    if (!vol) return
+    const r = destroyVolume(vol)
+    if (!r.ok) {
+      notify('error', r.note)
+      log('ARCHIVE', '归档', volumeId, { verdict: 'DENY' }, undefined, 'DENY')
+      return
+    }
+    data.value.archiveLayer = { volumes: archiveVolumes.value.filter((v) => v.id !== volumeId) }
+    log('ARCHIVE', '归档', volumeId, { verdict: 'DESTROYED' })
+    persist()
+    notify('success', r.note)
+  }
 
   // —— 派生：计划 / 挣值（必须先于控制点，控制点 C-05/C-11 要引用同一份 EVM）——
   const cpm = computed(() => computeCpm(projectWbs.value))
@@ -2888,6 +2943,12 @@ export const useAppStore = defineStore('app', () => {
     portfolioInterventions,
     auditChain,
     chainOk,
+    archiveLayer,
+    archiveVolumes,
+    archiveIntegrity,
+    archiveRetention,
+    archiveProject,
+    destroyArchive,
     persist,
     reset,
     notify,

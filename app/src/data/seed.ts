@@ -69,6 +69,7 @@ import type { VulnerabilityItem, Issue8D } from '@/domain/defect'
 import type { Sci, CompatibilityRecord, ReleaseSignoff } from '@/domain/softwareVersion'
 import type { Space } from '@/domain/spaceEngine'
 import { buildApprovalChain, DEFAULT_APPROVAL_ROLES, type ApprovalBinding } from '@/domain/approvalBinding'
+import { appendRecord, manifestHashOf, type ArchiveLayer, type ArchiveVolume } from '@/domain/archiveLayer'
 
 export const SEED_VERSION = 'mofeng.rdp.v1.0.22'
 const TENANT = 'T-1001'
@@ -694,6 +695,39 @@ function buildBom(): BomNode[] {
   ]
 }
 
+/** 构造示例合规归档卷（ARC-001：审批 + 输出物条目，保留期 15 年，复用归档引擎） */
+function buildSampleArchive(): ArchiveLayer {
+  let vol: ArchiveVolume = {
+    id: 'AV-P-001-2026Q4',
+    name: 'P-001 九甲电驱控制器合规归档卷',
+    projectId: 'P-001',
+    windowStart: '2026-10-01T00:00:00+08:00',
+    windowEnd: '2026-12-31T23:59:59+08:00',
+    createdAt: '2026-11-03T10:00:00+08:00',
+    createdBy: '系统',
+    retentionYears: 15,
+    records: [],
+    manifestHash: ''
+  }
+  vol = appendRecord(vol, {
+    id: 'AR-1001', volumeId: vol.id, kind: '审批', objType: 'Gate', objId: 'G1', title: 'G1 立项闸门放行审批',
+    stageCode: 'S1', projectId: 'P-001', snapshot: { gate: 'G1', passed: true, releasedBy: '总经理' },
+    archivedAt: '2026-11-03T10:00:00+08:00', archivedBy: '系统'
+  })
+  vol = appendRecord(vol, {
+    id: 'AR-1002', volumeId: vol.id, kind: '输出物', objType: 'Doc', objId: 'DOC-001', title: '立项申请书（已批准）',
+    stageCode: 'S1', projectId: 'P-001', snapshot: { code: 'DOC-001', name: '立项申请书', version: 3, approved: true },
+    archivedAt: '2026-11-03T10:01:00+08:00', archivedBy: '系统'
+  })
+  vol = appendRecord(vol, {
+    id: 'AR-1003', volumeId: vol.id, kind: '审批', objType: 'Flow', objId: 'PRE-3-001', title: '立项申请审批链（八部门会签+总经理批准）',
+    stageCode: 'S1', projectId: 'P-001', snapshot: { flow: 'FLOW-PRE-3', status: '已完成', approvedBy: '总经理' },
+    archivedAt: '2026-11-03T10:02:00+08:00', archivedBy: '系统'
+  })
+  vol = { ...vol, manifestHash: manifestHashOf(vol) }
+  return { volumes: [vol] }
+}
+
 export function buildSeed() {
   const users = buildUsers()
   const projects = buildProjects(users)
@@ -1313,6 +1347,8 @@ export function buildSeed() {
     portalSections,
     drafts,
     audit,
+    /** 15 年合规归档层（ARC-001：示例归档卷，含审批+输出物条目，保留期 15 年） */
+    archiveLayer: buildSampleArchive(),
     flags,
     complianceItems,
     aiCorpus,
