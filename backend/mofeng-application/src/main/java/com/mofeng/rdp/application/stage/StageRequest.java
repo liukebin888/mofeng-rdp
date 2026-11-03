@@ -61,8 +61,8 @@ public class StageRequest {
 
     // —— 🟡 档配置字段（可配置拒绝力度，缺省走行业惯例默认值）——
 
-    /** A1 前序未批准：true=严格（拒绝）/ false=宽松（警告放行）。默认 false。 */
-    private boolean strictMode;
+    /** A1 前序未批准：true=严格（拒绝）/ false=宽松（警告放行）。默认 true（与前端 rejectionPolicy 对齐，fail-closed）。 */
+    private boolean strictMode = true;
     /** A2 闸门 conditional：true=允许 conditional 放行 / false=严格。默认 true。 */
     private boolean allowConditional = true;
     /** B1 未绑定审批链：true=必审批（拒绝）/ false=免审批放行。默认 true。 */

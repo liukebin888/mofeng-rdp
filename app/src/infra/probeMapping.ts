@@ -230,6 +230,15 @@ export function mapStageAdvance(
       finishedAt: i.finishedAt
     })),
     gatePassed: gatePassed.map((g) => ({ gate: g.gate, passed: g.passed })),
+    // 🟡 档配置字段显式对齐前端 rejectionPolicy 默认值（严格口径），
+    // 确保探针比对「同构」不依赖后端默认值漂移。
+    strictMode: true,
+    allowConditional: true,
+    approvalRequired: true,
+    allowPartialApprove: false,
+    signMode: 'all',
+    required: true,
+    allowDeferredDeliverable: false,
     deliverables: (deliverables ?? []).map((d) => ({
       id: d.id,
       projectId: d.projectId,

@@ -106,7 +106,7 @@ async function runAll() {
       store.projectDeliverables,
       store.deliverableApprovalBindings
     )
-    const feRelease = store.stageRelease(targetStage)
+    const feRelease = store.advanceStageVerdict(targetStage)
     reports.value.push(await runStageProbe(stagePayload, feRelease.released, feRelease.note, `阶段 ${targetStage}`))
   } finally {
     running.value = false
