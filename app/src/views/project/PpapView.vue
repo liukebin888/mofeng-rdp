@@ -30,6 +30,16 @@
               <el-option v-for="p in store.spaceProjects" :key="p.id" :value="p.name" :label="`${p.code} · ${p.name}`" />
             </el-select>
           </el-form-item>
+          <el-form-item label="产品大类" required>
+            <el-select v-model="form.category" filterable placeholder="选择产品大类（智能交互/智能控制等）" style="width: 100%" @change="onCategoryChange">
+              <el-option v-for="cat in productCategories" :key="cat.id" :value="cat.name" :label="cat.name" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="产品线" required>
+            <el-select v-model="form.productLine" filterable placeholder="从产品线主数据选择" style="width: 100%" @change="markDirty">
+              <el-option v-for="l in currentLines" :key="l.id" :value="l.name" :label="`${l.name}${l.code ? '（' + l.code + '）' : ''}`" />
+            </el-select>
+          </el-form-item>
           <el-form-item label="PPAP 等级" required>
             <el-select v-model="form.level" placeholder="选择 PPAP 等级" style="width: 100%" @change="markDirty">
               <el-option value="等级1" label="等级 1（仅提交 PSW）" />
@@ -71,7 +81,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import PageHeader from '@/components/PageHeader.vue'
 import WorkflowFormShell from '@/components/WorkflowFormShell.vue'
 import { useAppStore } from '@/store/app'
@@ -80,7 +90,7 @@ import type { WorkflowForm } from '@/domain/workflowForm'
 
 const store = useAppStore()
 
-const EMPTY_FORM = { name: '', level: '', pkgNo: '', elements: '' }
+const EMPTY_FORM = { name: '', category: '', productLine: '', level: '', pkgNo: '', elements: '' }
 const form = reactive({ ...EMPTY_FORM })
 
 const wfForm = ref<WorkflowForm | null>(null)
@@ -89,12 +99,24 @@ const wfBlockers = ref<string[]>([])
 
 const INITIATION_DEF_ID = 'DEF-PRJ-PPAP'
 
+const productCategories = computed(() => store.productCategories)
+const currentLines = computed(() => {
+  const cat = store.productCategories.find((c) => c.name === form.category)
+  return cat ? store.productLines.filter((l) => l.categoryId === cat.id) : store.productLines
+})
+function onCategoryChange() {
+  form.productLine = ''
+  markDirty()
+}
+
 function markDirty() {
   dirty.value = true
 }
 
 const REQUIRED_FIELDS: Array<{ label: string; empty: () => boolean }> = [
   { label: '项目名称', empty: () => !form.name.trim() },
+  { label: '产品大类', empty: () => !form.category },
+  { label: '产品线', empty: () => !form.productLine },
   { label: 'PPAP 等级', empty: () => !form.level },
   { label: '文件包编号', empty: () => !form.pkgNo.trim() },
   { label: '18 要素齐全性', empty: () => !form.elements }
@@ -162,6 +184,8 @@ function wfSubmit() {
   wfForm.value = saveWorkflowForm(wfForm.value, content)
   const formData: Record<string, string | number | boolean> = {
     name: form.name,
+    category: form.category,
+    productLine: form.productLine,
     level: form.level,
     pkgNo: form.pkgNo,
     elements: form.elements

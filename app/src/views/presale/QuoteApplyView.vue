@@ -25,11 +25,14 @@
       <div class="panel">
         <div class="panel-title">报价信息（<span class="required-note">红色 * 为必填项</span>）</div>
         <el-form label-width="110px" size="small">
+          <el-form-item label="产品大类" required>
+            <el-select v-model="form.category" filterable placeholder="选择产品大类（智能交互/智能控制等）" style="width: 100%" @change="onCategoryChange">
+              <el-option v-for="cat in productCategories" :key="cat.id" :value="cat.name" :label="cat.name" />
+            </el-select>
+          </el-form-item>
           <el-form-item label="产品线" required>
             <el-select v-model="form.productLine" filterable placeholder="从产品线主数据选择" style="width: 100%" @change="markDirty">
-              <el-option-group v-for="cat in productCategories" :key="cat.id" :label="cat.name">
-                <el-option v-for="l in linesOf(cat.id)" :key="l.id" :value="l.name" :label="`${l.name}${l.code ? '（' + l.code + '）' : ''}`" />
-              </el-option-group>
+              <el-option v-for="l in currentLines" :key="l.id" :value="l.name" :label="`${l.name}${l.code ? '（' + l.code + '）' : ''}`" />
             </el-select>
           </el-form-item>
           <el-form-item label="电子BOM金额" required>
@@ -87,7 +90,7 @@ import type { WorkflowForm } from '@/domain/workflowForm'
 const store = useAppStore()
 
 // 空白表单默认值：新增打开的是空白模板，所有字段由用户新填写，不带入任何已有项目数据。
-const EMPTY_FORM = { productLine: '', electronBom: 0, structureBom: 0, processQuote: 0, procurementPrice: 0, financeSummary: 0 }
+const EMPTY_FORM = { category: '', productLine: '', electronBom: 0, structureBom: 0, processQuote: 0, procurementPrice: 0, financeSummary: 0 }
 const form = reactive({ ...EMPTY_FORM })
 
 // —— 统一工作流单据（WF-001 四按钮）——
@@ -100,6 +103,16 @@ const INITIATION_DEF_ID = 'DEF-PRE-2'
 
 const productCategories = computed(() => store.productCategories)
 const linesOf = (categoryId: string) => store.productLines.filter((l) => l.categoryId === categoryId)
+/** 当前选中大类下的产品线（两级联动：未选大类则显示全部产品线） */
+const currentLines = computed(() => {
+  const cat = store.productCategories.find((c) => c.name === form.category)
+  return cat ? linesOf(cat.id) : store.productLines
+})
+/** 切换产品大类：清空已选产品线，避免跨大类残留 */
+function onCategoryChange() {
+  form.productLine = ''
+  markDirty()
+}
 
 /** 直接成本合计（电子BOM + 结构BOM + 过程报价 + 采购价格） */
 const directCost = computed(() => form.electronBom + form.structureBom + form.processQuote + form.procurementPrice)
@@ -110,6 +123,7 @@ function markDirty() {
 
 /** 必填字段清单（label → 取值是否为空）。红色 * 标注，未填不允许提交进入下一步。 */
 const REQUIRED_FIELDS: Array<{ label: string; empty: () => boolean }> = [
+  { label: '产品大类', empty: () => !form.category },
   { label: '产品线', empty: () => !form.productLine },
   { label: '电子BOM金额', empty: () => !form.electronBom || form.electronBom <= 0 },
   { label: '结构BOM金额', empty: () => !form.structureBom || form.structureBom <= 0 },
@@ -196,6 +210,7 @@ function wfSubmit() {
   const content = serializeContent()
   wfForm.value = saveWorkflowForm(wfForm.value, content)
   const formData: Record<string, string | number | boolean> = {
+    category: form.category,
     productLine: form.productLine,
     electronBom: form.electronBom,
     structureBom: form.structureBom,

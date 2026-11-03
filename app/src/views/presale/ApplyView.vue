@@ -32,11 +32,14 @@
               <el-option v-for="c in store.customers" :key="c.id" :value="c.name" :label="`${c.name}（${c.code}）`" />
             </el-select>
           </el-form-item>
+          <el-form-item label="产品大类" required>
+            <el-select v-model="form.category" filterable placeholder="选择产品大类（智能交互/智能控制等）" style="width: 100%" @change="onCategoryChange">
+              <el-option v-for="cat in productCategories" :key="cat.id" :value="cat.name" :label="cat.name" />
+            </el-select>
+          </el-form-item>
           <el-form-item label="产品线" required>
             <el-select v-model="form.productLine" filterable placeholder="从产品线主数据选择" style="width: 100%" @change="markDirty">
-              <el-option-group v-for="cat in productCategories" :key="cat.id" :label="cat.name">
-                <el-option v-for="l in linesOf(cat.id)" :key="l.id" :value="l.name" :label="`${l.name}${l.code ? '（' + l.code + '）' : ''}`" />
-              </el-option-group>
+              <el-option v-for="l in currentLines" :key="l.id" :value="l.name" :label="`${l.name}${l.code ? '（' + l.code + '）' : ''}`" />
             </el-select>
           </el-form-item>
           <el-form-item label="平台">
@@ -164,7 +167,7 @@ const store = useAppStore()
 const { te } = useI18n()
 
 // 空白表单默认值：新增打开的是空白模板，所有字段由用户新填写，不带入任何已有项目数据。
-const EMPTY_FORM = { code: '', name: '', customer: '', productLine: '', platform: '', owner: '', start: '', end: '', otsDate: '', sopDate: '', annualVolume: 0, lifecycleYears: 0 }
+const EMPTY_FORM = { code: '', name: '', customer: '', category: '', productLine: '', platform: '', owner: '', start: '', end: '', otsDate: '', sopDate: '', annualVolume: 0, lifecycleYears: 0 }
 const EMPTY_INPUT: GradingInput = { asil: '', cal: -1, selfDev: '', newArch: null, customerSafety: null }
 const form = reactive({ ...EMPTY_FORM })
 const input = reactive<GradingInput>({ ...EMPTY_INPUT })
@@ -181,6 +184,16 @@ const INITIATION_DEF_ID = 'DEF-PRE-3'
 
 const productCategories = computed(() => store.productCategories)
 const linesOf = (categoryId: string) => store.productLines.filter((l) => l.categoryId === categoryId)
+/** 当前选中大类下的产品线（两级联动：未选大类则显示全部产品线） */
+const currentLines = computed(() => {
+  const cat = store.productCategories.find((c) => c.name === form.category)
+  return cat ? linesOf(cat.id) : store.productLines
+})
+/** 切换产品大类：清空已选产品线，避免跨大类残留 */
+function onCategoryChange() {
+  form.productLine = ''
+  markDirty()
+}
 
 const result = computed(() => grade(input, store.actor))
 const gate = computed(() => store.gateResults.G1)
@@ -193,6 +206,7 @@ function markDirty() {
 const REQUIRED_FIELDS: Array<{ label: string; empty: () => boolean }> = [
   { label: '项目名称', empty: () => !form.name.trim() },
   { label: '客户', empty: () => !form.customer },
+  { label: '产品大类', empty: () => !form.category },
   { label: '产品线', empty: () => !form.productLine },
   { label: '负责人', empty: () => !form.owner },
   { label: '开始日期', empty: () => !form.start },
@@ -307,6 +321,7 @@ function wfSubmit() {
     name: form.name,
     code: form.code,
     customer: form.customer,
+    category: form.category,
     productLine: form.productLine,
     level: result.value.level ?? '',
     otsDate: form.otsDate,
