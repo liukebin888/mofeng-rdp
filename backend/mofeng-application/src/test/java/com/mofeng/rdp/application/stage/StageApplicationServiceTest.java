@@ -252,6 +252,34 @@ class StageApplicationServiceTest {
         assertTrue(result.isAllowed());
     }
 
+    @Test
+    void A2审批完成但闸门未过严格拒绝() {
+        // P2 语义：前置「已批准」= 审批完成 + 闸门通过，二者缺一不可。
+        // 修复前此处只用 gateReleaseEvidence（只看审批）→ 审批完成即放行，漏闸门（fail-open）。
+        StageRequest r = advanceToS2Request();
+        // S1 审批已完成（advanceToS2Request 已带完成实例），但把 G1 闸门改为未通过
+        for (StageRequest.GatePassedDto g : r.getGatePassed()) {
+            if ("G1".equals(g.getGate())) g.setPassed(false);
+        }
+        r.setAllowConditional(false); // 严格：闸门未过即拦
+
+        StageResult result = service.advanceStage(r);
+        assertFalse(result.isAllowed());
+        assertTrue(result.getBlockers().stream().anyMatch(s -> s.contains("闸门")));
+    }
+
+    @Test
+    void A2审批完成但闸门未过allowConditional放行() {
+        StageRequest r = advanceToS2Request();
+        for (StageRequest.GatePassedDto g : r.getGatePassed()) {
+            if ("G1".equals(g.getGate())) g.setPassed(false);
+        }
+        r.setAllowConditional(true); // 宽松：conditional 放行
+
+        StageResult result = service.advanceStage(r);
+        assertTrue(result.isAllowed());
+    }
+
     // —— 🟡 可配置：C2 交付物齐套（allowDeferredDeliverable）——
 
     /** 目标阶段 S2 绑定闸门 G2，G2 有必交交付物未齐套。 */

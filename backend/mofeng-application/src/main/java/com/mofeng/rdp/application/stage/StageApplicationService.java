@@ -48,11 +48,12 @@ public class StageApplicationService {
      * <p>三档映射：</p>
      * <ul>
      *   <li>A3 阶段不存在 → 🔴 硬拒绝（fail-closed，抛 IllegalArgumentException）；</li>
-     *   <li>A1 前序未批准 → 🟡 依 strictMode（true 拒绝 / false 警告放行）；</li>
+     *   <li>A1 前序未批准（审批未完成但闸门已过）→ 🟡 依 strictMode（true 拒绝 / false 警告放行）；</li>
+     *   <li>A2 闸门未过（审批可能已完成）→ 🟡 依 allowConditional（true conditional 放行 / false 拒绝）；</li>
      *   <li>B1 未绑定审批链 → 🟡 依 approvalRequired（true 拒绝 / false 放行）；</li>
      *   <li>B2 审批进行中 → 🟡 依 allowPartialApprove（true 放行 / false 拒绝）；</li>
      *   <li>B3 审批驳回却放行 → 🔴 硬拒绝；</li>
-     *   <li>通过 → 放行。</li>
+     *   <li>通过（审批完成 + 闸门通过，P2）→ 放行。</li>
      * </ul>
      */
     public StageResult advanceStage(StageRequest request) {
@@ -108,33 +109,38 @@ public class StageApplicationService {
                 continue;
             }
 
-            // 前置阶段审批证据
-            ApprovalBindingEngine.GateReleaseEvidence ev =
-                ApprovalBindingEngine.gateReleaseEvidence(tpl, preCode, bindings, instances);
+            // 前置阶段联合放行判定（P2：审批完成 + 闸门通过 缺一不可）。
+            // 与 releaseStage 及前端 prerequisitesFullyReleased 同构，杜绝「审批完成但闸门未过仍放行」的 fail-open。
+            ApprovalBindingEngine.StageReleaseVerdict v =
+                ApprovalBindingEngine.stageFullyReleased(tpl, preCode, bindings, instances, gatePassed);
 
-            if (!ev.released()) {
-                // B2：审批进行中 → 依 allowPartialApprove
-                boolean allowPartial = request.isAllowPartialApprove(); // 🟡 默认 false
-                if ("PENDING".equals(ev.code()) && allowPartial) {
-                    note.append("（前置 ").append(preStage.name()).append(" 审批进行中，允许先行，B2）");
-                    continue;
-                }
-                if (!gatePassed) {
-                    // A2：闸门未过 → 依 allowConditional（conditional 放行）
-                    if (request.isAllowConditional()) {
-                        note.append("（前置 ").append(preStage.name()).append(" 闸门 conditional 放行，A2）");
-                    } else {
-                        blockers.add(preStage.name() + "（" + ev.note() + "）");
-                    }
-                    continue;
-                }
-                // A1：前序未批准（审批未完成但闸门已过）→ 依 strictMode
-                if (request.isStrictMode()) {
-                    blockers.add(preStage.name() + "（" + ev.note() + "）");
+            if (v.released()) {
+                continue; // 审批 + 闸门均满足 → 前置已批准
+            }
+
+            if ("GATE_NOT_PASSED".equals(v.code())) {
+                // A2：闸门未过（审批可能已完成）→ 依 allowConditional
+                if (request.isAllowConditional()) {
+                    note.append("（前置 ").append(preStage.name()).append(" 闸门 conditional 放行，A2）");
                 } else {
-                    note.append("（前置 ").append(preStage.name()).append(" 未批准，宽松放行，A1）");
+                    blockers.add(preStage.name() + "（" + v.note() + "）");
                 }
                 continue;
+            }
+
+            // APPROVAL_NOT_DONE：审批未完成（此时闸门已过）→ 细分 PENDING / NO_INSTANCE
+            ApprovalBindingEngine.GateReleaseEvidence ev =
+                ApprovalBindingEngine.gateReleaseEvidence(tpl, preCode, bindings, instances);
+            if ("PENDING".equals(ev.code()) && request.isAllowPartialApprove()) {
+                // B2：审批进行中 → 依 allowPartialApprove（默认 false）
+                note.append("（前置 ").append(preStage.name()).append(" 审批进行中，允许先行，B2）");
+                continue;
+            }
+            // A1：前序未批准（审批未完成但闸门已过）→ 依 strictMode
+            if (request.isStrictMode()) {
+                blockers.add(preStage.name() + "（" + ev.note() + "）");
+            } else {
+                note.append("（前置 ").append(preStage.name()).append(" 未批准，宽松放行，A1）");
             }
         }
 
