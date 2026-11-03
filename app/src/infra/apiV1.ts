@@ -354,6 +354,25 @@ export interface StageGatePassedDto {
   passed?: boolean
 }
 
+/** 交付物 DTO（对齐 DeliverableApprovalEngine.Deliverable）。 */
+export interface StageDeliverableDto {
+  id?: string
+  projectId?: string
+  code?: string
+  name?: string
+  category?: string
+  required?: boolean
+  provided?: boolean
+  gate?: string
+}
+
+/** 交付物—审批链绑定 DTO（对齐 DeliverableApprovalEngine.Binding）。 */
+export interface StageDeliverableBindingDto {
+  deliverableId?: string
+  defId?: string
+  label?: string
+}
+
 /** 阶段管控请求（对齐后端 StageRequest）。 */
 export interface StagePayload {
   tenantId: string
@@ -373,12 +392,15 @@ export interface StagePayload {
   bindings?: StageBindingDto[]
   instances?: StageInstanceDto[]
   gatePassed?: StageGatePassedDto[]
+  deliverables?: StageDeliverableDto[]
+  deliverableBindings?: StageDeliverableBindingDto[]
   // 🟡 档配置字段
   strictMode?: boolean
   allowConditional?: boolean
   approvalRequired?: boolean
   allowPartialApprove?: boolean
   signMode?: string
+  required?: boolean
   allowDeferredDeliverable?: boolean
 }
 

@@ -198,4 +198,106 @@ class StageApplicationServiceTest {
             IllegalArgumentException.class, () -> service.createWorkItem(r));
         assertTrue(ex.getMessage().contains("前置"));
     }
+
+    // —— 🟡 可配置：A2 闸门 conditional（allowConditional）——
+
+    @Test
+    void A2闸门未过allowConditional严格拒绝() {
+        StageRequest r = baseRequest("advance");
+        r.setTargetStageCode("S2");
+        r.setAllowConditional(false); // 严格：闸门未过即拦
+        r.setApprovalRequired(false); // 免审批，让闸门判定生效
+        // S1 绑定审批链但闸门 G1 未通过
+        List<StageRequest.BindingDto> bindings = new ArrayList<>();
+        StageRequest.BindingDto b = new StageRequest.BindingDto();
+        b.setStageCode("S1");
+        b.setDefId("DEF-STAGE-S1");
+        bindings.add(b);
+        r.setBindings(bindings);
+        // 无完成实例 → 审批证据未释放
+        r.setInstances(new ArrayList<>());
+        // G1 未通过
+        List<StageRequest.GatePassedDto> gates = new ArrayList<>();
+        StageRequest.GatePassedDto g = new StageRequest.GatePassedDto();
+        g.setGate("G1");
+        g.setPassed(false);
+        gates.add(g);
+        r.setGatePassed(gates);
+
+        StageResult result = service.advanceStage(r);
+        assertFalse(result.isAllowed());
+    }
+
+    @Test
+    void A2闸门未过allowConditional宽松放行() {
+        StageRequest r = baseRequest("advance");
+        r.setTargetStageCode("S2");
+        r.setAllowConditional(true); // 宽松：conditional 放行
+        r.setApprovalRequired(false);
+        List<StageRequest.BindingDto> bindings = new ArrayList<>();
+        StageRequest.BindingDto b = new StageRequest.BindingDto();
+        b.setStageCode("S1");
+        b.setDefId("DEF-STAGE-S1");
+        bindings.add(b);
+        r.setBindings(bindings);
+        r.setInstances(new ArrayList<>());
+        List<StageRequest.GatePassedDto> gates = new ArrayList<>();
+        StageRequest.GatePassedDto g = new StageRequest.GatePassedDto();
+        g.setGate("G1");
+        g.setPassed(false);
+        gates.add(g);
+        r.setGatePassed(gates);
+
+        StageResult result = service.advanceStage(r);
+        assertTrue(result.isAllowed());
+    }
+
+    // —— 🟡 可配置：C2 交付物齐套（allowDeferredDeliverable）——
+
+    /** 目标阶段 S2 绑定闸门 G2，G2 有必交交付物未齐套。 */
+    private void attachIncompleteDeliverable(StageRequest r) {
+        // S2 的前置 S1 已批准（复用 advanceToS2Request 的绑定/实例/闸门）
+        // 交付物：G2 下 1 个必交交付物，无完成审批实例 → 缺件
+        List<StageRequest.DeliverableDto> dels = new ArrayList<>();
+        StageRequest.DeliverableDto d = new StageRequest.DeliverableDto();
+        d.setId("DEL-001");
+        d.setCode("DEL-001");
+        d.setName("系统需求规格书");
+        d.setRequired(true);
+        d.setProvided(true); // 勾了 provided，但无审批完成实例
+        d.setGate("G2");
+        dels.add(d);
+        r.setDeliverables(dels);
+        // 无交付物审批完成实例 → 缺件
+        r.setDeliverableBindings(new ArrayList<>());
+    }
+
+    @Test
+    void C2交付物未齐套allowDeferred拒绝() {
+        StageRequest r = advanceToS2Request();
+        r.setAllowDeferredDeliverable(false); // 默认 false：缺件拒绝
+        attachIncompleteDeliverable(r);
+
+        StageResult result = service.advanceStage(r);
+        assertFalse(result.isAllowed());
+        assertTrue(result.getBlockers().stream().anyMatch(s -> s.contains("交付物")));
+    }
+
+    @Test
+    void C2交付物未齐套allowDeferred放行() {
+        StageRequest r = advanceToS2Request();
+        r.setAllowDeferredDeliverable(true); // 允许后补：缺件放行
+        attachIncompleteDeliverable(r);
+
+        StageResult result = service.advanceStage(r);
+        assertTrue(result.isAllowed());
+    }
+
+    @Test
+    void C2交付物齐套不阻断() {
+        StageRequest r = advanceToS2Request();
+        // 不传交付物 → stageDeliverablesComplete 返回 complete=true，不阻断
+        StageResult result = service.advanceStage(r);
+        assertTrue(result.isAllowed());
+    }
 }

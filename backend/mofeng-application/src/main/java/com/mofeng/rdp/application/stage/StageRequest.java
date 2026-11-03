@@ -54,6 +54,10 @@ public class StageRequest {
     private List<InstanceDto> instances;
     /** 闸门通过状态（gate → passed）。 */
     private List<GatePassedDto> gatePassed;
+    /** 交付物清单（C1/C2/C3 交付物齐套判定用）。 */
+    private List<DeliverableDto> deliverables;
+    /** 交付物—审批链绑定（C1/C3 有效提供证据用）。 */
+    private List<DeliverableBindingDto> deliverableBindings;
 
     // —— 🟡 档配置字段（可配置拒绝力度，缺省走行业惯例默认值）——
 
@@ -67,7 +71,9 @@ public class StageRequest {
     private boolean allowPartialApprove;
     /** B4 会签：all=全签（缺签拒绝）/ any=任一签放行。默认 all。 */
     private String signMode = "all";
-    /** C2 交付物后补：true=允许后补放行 / false=拒绝。默认 false。 */
+    /** C1/C3 交付物必交：true=必交未批视为缺件（拒绝）/ false=可选不参与齐套。默认 true。 */
+    private boolean required = true;
+    /** C2 交付物后补：true=允许后补放行 / false=缺件拒绝。默认 false。 */
     private boolean allowDeferredDeliverable;
 
     /** 审批链—阶段绑定 DTO。 */
@@ -145,6 +151,49 @@ public class StageRequest {
         public void setPassed(boolean passed) { this.passed = passed; }
     }
 
+    /** 交付物 DTO（对齐 DeliverableApprovalEngine.Deliverable 最小视图）。 */
+    public static class DeliverableDto {
+        private String id;
+        private String projectId;
+        private String code;
+        private String name;
+        private String category;
+        private boolean required;
+        private boolean provided;
+        private String gate;
+
+        public String getId() { return id; }
+        public void setId(String id) { this.id = id; }
+        public String getProjectId() { return projectId; }
+        public void setProjectId(String projectId) { this.projectId = projectId; }
+        public String getCode() { return code; }
+        public void setCode(String code) { this.code = code; }
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+        public String getCategory() { return category; }
+        public void setCategory(String category) { this.category = category; }
+        public boolean isRequired() { return required; }
+        public void setRequired(boolean required) { this.required = required; }
+        public boolean isProvided() { return provided; }
+        public void setProvided(boolean provided) { this.provided = provided; }
+        public String getGate() { return gate; }
+        public void setGate(String gate) { this.gate = gate; }
+    }
+
+    /** 交付物—审批链绑定 DTO（对齐 DeliverableApprovalEngine.Binding）。 */
+    public static class DeliverableBindingDto {
+        private String deliverableId;
+        private String defId;
+        private String label;
+
+        public String getDeliverableId() { return deliverableId; }
+        public void setDeliverableId(String deliverableId) { this.deliverableId = deliverableId; }
+        public String getDefId() { return defId; }
+        public void setDefId(String defId) { this.defId = defId; }
+        public String getLabel() { return label; }
+        public void setLabel(String label) { this.label = label; }
+    }
+
     // —— getters / setters ——
 
     public String getTenantId() { return tenantId; }
@@ -179,6 +228,10 @@ public class StageRequest {
     public void setInstances(List<InstanceDto> instances) { this.instances = instances; }
     public List<GatePassedDto> getGatePassed() { return gatePassed; }
     public void setGatePassed(List<GatePassedDto> gatePassed) { this.gatePassed = gatePassed; }
+    public List<DeliverableDto> getDeliverables() { return deliverables; }
+    public void setDeliverables(List<DeliverableDto> deliverables) { this.deliverables = deliverables; }
+    public List<DeliverableBindingDto> getDeliverableBindings() { return deliverableBindings; }
+    public void setDeliverableBindings(List<DeliverableBindingDto> deliverableBindings) { this.deliverableBindings = deliverableBindings; }
     public boolean isStrictMode() { return strictMode; }
     public void setStrictMode(boolean strictMode) { this.strictMode = strictMode; }
     public boolean isAllowConditional() { return allowConditional; }
@@ -189,6 +242,8 @@ public class StageRequest {
     public void setAllowPartialApprove(boolean allowPartialApprove) { this.allowPartialApprove = allowPartialApprove; }
     public String getSignMode() { return signMode; }
     public void setSignMode(String signMode) { this.signMode = signMode; }
+    public boolean isRequired() { return required; }
+    public void setRequired(boolean required) { this.required = required; }
     public boolean isAllowDeferredDeliverable() { return allowDeferredDeliverable; }
     public void setAllowDeferredDeliverable(boolean allowDeferredDeliverable) { this.allowDeferredDeliverable = allowDeferredDeliverable; }
 }

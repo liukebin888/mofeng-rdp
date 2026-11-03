@@ -100,10 +100,10 @@ public class StageApplicationService {
             // 前置阶段闸门判定
             boolean gatePassed = gatePassedMap.getOrDefault(preStage.gateCode(), false);
 
-            // 免审批（binding==null 且 approvalRequired=false）：仅看闸门
+            // 免审批（binding==null 且 approvalRequired=false）：仅看闸门（A2 依 allowConditional）
             if (binding == null) {
-                if (!gatePassed && request.isStrictMode()) {
-                    blockers.add(preStage.name() + "（闸门未通过）");
+                if (!gatePassed && !request.isAllowConditional()) {
+                    blockers.add(preStage.name() + "（闸门未通过，A2）");
                 }
                 continue;
             }
@@ -120,16 +120,35 @@ public class StageApplicationService {
                     continue;
                 }
                 if (!gatePassed) {
-                    // A1/A2：前序未批准 / 闸门未过 → 依 strictMode / allowConditional
-                    boolean strict = request.isStrictMode(); // 🟡 默认汽车零部件 true
-                    if (strict) {
-                        blockers.add(preStage.name() + "（" + ev.note() + "）");
+                    // A2：闸门未过 → 依 allowConditional（conditional 放行）
+                    if (request.isAllowConditional()) {
+                        note.append("（前置 ").append(preStage.name()).append(" 闸门 conditional 放行，A2）");
                     } else {
-                        note.append("（前置 ").append(preStage.name()).append(" 未批准，宽松放行，A1）");
+                        blockers.add(preStage.name() + "（" + ev.note() + "）");
                     }
                     continue;
                 }
-                blockers.add(preStage.name() + "（" + ev.note() + "）");
+                // A1：前序未批准（审批未完成但闸门已过）→ 依 strictMode
+                if (request.isStrictMode()) {
+                    blockers.add(preStage.name() + "（" + ev.note() + "）");
+                } else {
+                    note.append("（前置 ").append(preStage.name()).append(" 未批准，宽松放行，A1）");
+                }
+                continue;
+            }
+        }
+
+        // C2：目标阶段交付物齐套判定（交付物审批嵌入阶段审批，P3）
+        // 目标阶段绑定的闸门 gate 对应交付物须齐套；缺件依 allowDeferredDeliverable 决定是否阻断。
+        String targetGate = target.gateCode();
+        if (targetGate != null && !targetGate.isBlank()) {
+            DeliverableApprovalEngine.StageDeliverablesVerdict dv =
+                DeliverableApprovalEngine.stageDeliverablesComplete(
+                    targetGate, toDeliverables(request), toDeliverableBindings(request), instances);
+            if (!dv.complete() && !request.isAllowDeferredDeliverable()) {
+                blockers.add(target.name() + " 交付物未齐套：" + dv.note() + "（C2）");
+            } else if (!dv.complete()) {
+                note.append("（").append(target.name()).append(" 交付物后补放行，C2）");
             }
         }
 
@@ -239,13 +258,19 @@ public class StageApplicationService {
         ApprovalBindingEngine.StageReleaseVerdict v =
             ApprovalBindingEngine.stageFullyReleased(tpl, stageCode, bindings, instances, gatePassed);
 
-        if (!v.released() && "APPROVAL_NOT_DONE".equals(v.code()) && "any".equals(request.getSignMode())) {
-            // B4 会签未齐但 signMode=any → 放行
-            return new StageResult("release", stageCode, true, v.note() + "（B4 signMode=any 放行）", List.of());
-        }
-        if (!v.released() && "GATE_NOT_PASSED".equals(v.code()) && request.isAllowConditional()) {
-            // A2 闸门 conditional 放行
-            return new StageResult("release", stageCode, true, v.note() + "（A2 allowConditional 放行）", List.of());
+        if (!v.released()) {
+            // B4 会签：审批进行中（PENDING）时，signMode=any 允许任一签放行（缺签不阻断）
+            if ("APPROVAL_NOT_DONE".equals(v.code())) {
+                ApprovalBindingEngine.GateReleaseEvidence ev =
+                    ApprovalBindingEngine.gateReleaseEvidence(tpl, stageCode, bindings, instances);
+                if ("PENDING".equals(ev.code()) && "any".equals(request.getSignMode())) {
+                    return new StageResult("release", stageCode, true, v.note() + "（B4 signMode=any 放行）", List.of());
+                }
+            }
+            if ("GATE_NOT_PASSED".equals(v.code()) && request.isAllowConditional()) {
+                // A2 闸门 conditional 放行
+                return new StageResult("release", stageCode, true, v.note() + "（A2 allowConditional 放行）", List.of());
+            }
         }
         return new StageResult("release", stageCode, v.released(), v.note(), List.of());
     }
@@ -322,6 +347,28 @@ public class StageApplicationService {
 
     private List<String> toPrereqList(StageRequest request) {
         return request.getPrerequisites() == null ? List.of() : request.getPrerequisites();
+    }
+
+    /** 交付物 DTO → 领域值对象（对齐 DeliverableApprovalEngine.Deliverable）。 */
+    private List<DeliverableApprovalEngine.Deliverable> toDeliverables(StageRequest request) {
+        List<DeliverableApprovalEngine.Deliverable> out = new ArrayList<>();
+        if (request.getDeliverables() == null) return out;
+        for (StageRequest.DeliverableDto d : request.getDeliverables()) {
+            out.add(new DeliverableApprovalEngine.Deliverable(
+                d.getId(), d.getProjectId(), d.getCode(), d.getName(), d.getCategory(),
+                d.isRequired(), d.isProvided(), d.getGate()));
+        }
+        return out;
+    }
+
+    /** 交付物—审批链绑定 DTO → 领域值对象（对齐 DeliverableApprovalEngine.Binding）。 */
+    private List<DeliverableApprovalEngine.Binding> toDeliverableBindings(StageRequest request) {
+        List<DeliverableApprovalEngine.Binding> out = new ArrayList<>();
+        if (request.getDeliverableBindings() == null) return out;
+        for (StageRequest.DeliverableBindingDto d : request.getDeliverableBindings()) {
+            out.add(new DeliverableApprovalEngine.Binding(d.getDeliverableId(), d.getDefId(), d.getLabel()));
+        }
+        return out;
     }
 
     /** 是否该绑定的审批链已被驳回（B3 判定）。 */
