@@ -30,8 +30,7 @@ public class StageRequest {
     /** 操作人角色。 */
     private String roleName;
 
-    /** 动作类型：advance / createWorkItem / configure / release。 */
-    @NotBlank(message = "op 必填")
+    /** 动作类型：advance / createWorkItem / configure / release。由 controller 端点决定，非客户端输入。 */
     private String op;
 
     /** 阶段模板 id（空则默认汽车零部件六阶段模板 TPL-AUTO）。 */
