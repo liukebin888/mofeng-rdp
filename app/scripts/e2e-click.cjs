@@ -417,6 +417,25 @@ async function resetState(page) {
   const auditText = await bodyText(page)
   ok('空间切换写入审计留痕（SWITCH_SPACE）', /SWITCH_SPACE/.test(auditText), '审计页含 SWITCH_SPACE 记录')
 
+  // ============ 链路 12：研发阶段流程 + 未批准阻断（STG/GAT-ENF-001） ============
+  console.log('\n[链路12] 研发阶段流程与门禁阻断')
+  await resetState(page)
+  await page.goto(BASE + '/#/dev/gate', { waitUntil: 'domcontentloaded' })
+  await page.waitForTimeout(400)
+  const stageFlow = await page.evaluate(() => {
+    const panel = [...document.querySelectorAll('.panel-title')].find((p) => /研发阶段流程/.test(p.innerText))
+    const nodes = [...document.querySelectorAll('.stage-node')].map((n) => ({
+      code: n.querySelector('.sn-code')?.innerText.trim() || '',
+      name: n.querySelector('.sn-name')?.innerText.trim() || '',
+      status: n.querySelector('.sn-status')?.innerText.trim() || ''
+    }))
+    return { hasPanel: !!panel, nodes }
+  })
+  ok('存在「研发阶段流程」面板', stageFlow.hasPanel)
+  ok('六阶段流程完整渲染（S1~S6）', stageFlow.nodes.length === 6, stageFlow.nodes.map((n) => n.code).join(','))
+  ok('阶段状态含批准标记', stageFlow.nodes.some((n) => /已批准|未批准/.test(n.status)), stageFlow.nodes.map((n) => `${n.code}:${n.status}`).join(' | '))
+  ok('首个阶段为「立项与策划」', stageFlow.nodes[0]?.name === '立项与策划', stageFlow.nodes[0]?.name)
+
   console.log('\n========== 结果 ==========')
   console.log(`PASS ${passed} / FAIL ${failed}`)
   if (errors.length) console.log('pageerror:', JSON.stringify([...new Set(errors)].slice(0, 10)))

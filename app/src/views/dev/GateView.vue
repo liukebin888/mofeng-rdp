@@ -6,6 +6,26 @@
       </template>
     </PageHeader>
 
+    <div class="panel" style="margin-bottom: 12px">
+      <div class="panel-title">
+        研发阶段流程（{{ store.stageTemplate.name }}）· 未批准不得实施下一阶段
+        <span class="dim">前序阶段批准后，后续阶段工作方可开展（GAT-ENF-001）</span>
+      </div>
+      <div class="stage-flow">
+        <template v-for="(s, i) in store.stages" :key="s.code">
+          <div class="stage-node" :class="stageState(s).approved ? 'ok' : 'pending'">
+            <div class="sn-code">{{ s.code }}</div>
+            <div class="sn-name">{{ s.name }}</div>
+            <div class="sn-status">
+              <span class="tag" :class="stageState(s).approved ? 'ok' : 'l3'">{{ stageState(s).approved ? '已批准' : '未批准' }}</span>
+            </div>
+            <div v-if="s.gateCode" class="sn-gate dim">{{ s.gateCode }} {{ s.gateCode === 'G1' ? '立项闸门' : s.gateCode === 'G2' ? '方案闸门' : s.gateCode === 'G3' ? '设计闸门' : s.gateCode === 'G4' ? '样件闸门' : '交付闸门' }}</div>
+          </div>
+          <div v-if="i < store.stages.length - 1" class="stage-arrow">→</div>
+        </template>
+      </div>
+    </div>
+
     <div class="grid grid-5" style="margin-bottom: 12px">
       <div v-for="t in GATE_TEMPLATES" :key="t.code" class="gcard" :class="{ ok: store.gateResults[t.code].passed, bad: !store.gateResults[t.code].passed }">
         <div class="between">
@@ -75,6 +95,12 @@ function open(code: string) {
   current.value = store.gateResults[code]
   drawer.value = true
 }
+/** 阶段批准状态（复用 store.stageGateRuns 口径，不自行比较闸门） */
+function stageState(s: { code: string; gateCode?: string }) {
+  const run = s.gateCode ? store.gateResults[s.gateCode] : undefined
+  const approved = run ? run.passed && !run.conditional : false
+  return { approved }
+}
 function submit() {
   if (!current.value) return
   store.submitGate(current.value.gate)
@@ -95,6 +121,15 @@ function demoSod() {
 </script>
 
 <style scoped>
+.stage-flow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 4px 0; }
+.stage-node { background: var(--bg-1); border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 10px; min-width: 118px; font-size: 11px; }
+.stage-node.ok { border-color: #1d4a2e; }
+.stage-node.pending { border-color: #4a3b1f; }
+.sn-code { font-weight: 700; color: var(--text-1); }
+.sn-name { margin-top: 2px; color: var(--text-2); font-size: 11px; }
+.sn-status { margin-top: 5px; }
+.sn-gate { margin-top: 4px; font-size: 10px; }
+.stage-arrow { color: var(--text-3); font-size: 14px; flex: 0 0 auto; }
 .gcard { background: var(--bg-1); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; font-size: 11.5px; }
 .gcard.ok { border-color: #1d4a2e; }
 .gcard.bad { border-color: #4a1f24; }

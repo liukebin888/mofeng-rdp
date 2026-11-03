@@ -1243,6 +1243,8 @@ export function buildSeed() {
   return {
     version: SEED_VERSION,
     tenantId: TENANT,
+    /** 当前项目所用研发阶段模板（STG-001：默认汽车零部件六阶段，可配置切换） */
+    stageTemplateId: 'TPL-AUTO',
     tenant: { code: 'T-1001', name: '魔程科技（集团）', type: '集团租户', isolation: 'SHARED' },
     /** 集团—子租户两级结构（TEN-002/TEN-003）：T-1001 集团 + T-1002/T-1003 子租户 */
     tenants: [

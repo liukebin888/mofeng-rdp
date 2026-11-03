@@ -21,6 +21,8 @@ import {
   type ReviewAction
 } from '@/domain/aiAssist'
 import { runGate, GATE_TEMPLATES } from '@/domain/gate'
+import { enforceStageGate, canCreateWorkItem, type WorkItemKind, type GateEnforceVerdict } from '@/domain/gateEnforce'
+import { AUTOMOTIVE_STAGE_TEMPLATE, findStageTemplate, orderedStages, type StageTemplate } from '@/domain/stageTemplate'
 import { freeze as freezeBaseline, verifyBaseline } from '@/domain/baseline'
 import { appendAudit, verifyChain } from '@/domain/audit'
 import { computeCpm, planQualityChecks, plannedValue, statusDayOf, weightedCompletion } from '@/domain/schedule'
@@ -1159,6 +1161,29 @@ export const useAppStore = defineStore('app', () => {
   const traceBreaks = computed(() => detectBreaks(projectReqs.value, projectLinks.value))
   const traceCoverage = computed(() => coverage(projectReqs.value, projectLinks.value))
   const portfolio = computed(() => rankProjects(visibleProjects.value))
+
+  // —— 研发阶段模板 + 门禁强制阻断（STG-001/002/003 + GAT-ENF-001，产品核心 P0）——
+  /** 当前项目所用阶段模板（默认汽车零部件六阶段，可配置切换） */
+  const stageTemplate = computed<StageTemplate>(() => {
+    const tplId = data.value.stageTemplateId ?? 'TPL-AUTO'
+    return findStageTemplate([AUTOMOTIVE_STAGE_TEMPLATE], tplId) ?? AUTOMOTIVE_STAGE_TEMPLATE
+  })
+  /** 阶段模板的有序阶段列表（复用引擎权威排序） */
+  const stages = computed(() => orderedStages(stageTemplate.value))
+  /** 各闸门 GateRun 数组（复用 gateResults 口径，喂给阻断引擎） */
+  const stageGateRuns = computed(() => Object.values(gateResults.value))
+  /**
+   * 引擎级阻断判定：目标阶段的前置未批准 → 拒绝创建/实施。
+   * 这是「只有批准才能实施下一阶段」的权威闸，供 create* 动作入口统一调用。
+   */
+  function canCreateInStage(stageCode: string, kind: WorkItemKind = '任务'): GateEnforceVerdict {
+    const v = enforceStageGate(stageTemplate.value, stageCode, stageGateRuns.value)
+    if (!v.allowed) {
+      notify('error', `${v.note}（GAT-ENF-001 未批准不得实施）`)
+      log('DENY', kind, stageCode, { verdict: v.code, blockedBy: v.blockedBy }, undefined, 'DENY')
+    }
+    return v
+  }
 
   // —— 企业级聚合视图（对标 Oracle 组合驾驶舱：跨项目汇总健康指标，兑现 V4.0 第五种介入方式「聚合」）——
   /** 组合健康快照：每项目复用既有引擎派生，禁止自造比例（单一权威：computeEvm/weightedCompletion/rpn/evaluateHandoffs） */
@@ -2821,6 +2846,10 @@ export const useAppStore = defineStore('app', () => {
     cacheBadgeInfo,
     cpResults,
     gateResults,
+    stageTemplate,
+    stages,
+    stageGateRuns,
+    canCreateInStage,
     aiSwitchState,
     aiScope,
     aiVisibleCorpus,
