@@ -12,6 +12,10 @@ toolchain/capl/
 │   ├── Assert.can          # 收发断言（超时/值/周期抖动）
 │   ├── Result.can          # 结果上报（PASS/FAIL/日志/Trace 打点）
 │   └── FaultInject.can     # 错误注入钩子（预留 VN6501/VH6501）
+├── adapters/               # 硬件 Adapter（统一 Bus API）
+│   └── README.md           # Vn16xx/Vn76xx/UsbCan 三 Adapter 骨架
+├── capability/             # 能力探测与优雅降级
+│   └── README.md           # 型号→能力映射 + probeAndCheck + 链路冒烟前置
 ├── smoke/
 │   ├── Smoke_CAN.can
 │   ├── Smoke_CANFD.can
