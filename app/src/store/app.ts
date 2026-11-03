@@ -23,7 +23,7 @@ import {
 import { runGate, GATE_TEMPLATES } from '@/domain/gate'
 import { enforceStageGate, canCreateWorkItem, type WorkItemKind, type GateEnforceVerdict } from '@/domain/gateEnforce'
 import { AUTOMOTIVE_STAGE_TEMPLATE, findStageTemplate, orderedStages, type StageTemplate } from '@/domain/stageTemplate'
-import { gateReleaseEvidence, stageFullyReleased, prerequisitesFullyReleased, type ApprovalBinding } from '@/domain/approvalBinding'
+import { gateReleaseEvidence, stageFullyReleased, prerequisitesFullyReleased, stageAdvanceVerdict, type ApprovalBinding } from '@/domain/approvalBinding'
 import { deliverableProvidedEvidence, stageDeliverablesComplete, type DeliverableApprovalBinding } from '@/domain/deliverableApproval'
 import { applySeverityChange, findRejectionPolicy, severitySummary, shouldReject, type RejectionPolicyItem, type RejectionSeverity } from '@/domain/rejectionPolicy'
 import { freeze as freezeBaseline, verifyBaseline } from '@/domain/baseline'
@@ -1282,28 +1282,19 @@ export const useAppStore = defineStore('app', () => {
    * 供服务端一致性探针比对前端结论 vs 后端 advance 判定（E1 前后端语义同构的落点）。
    */
   function advanceStageVerdict(targetStageCode: string): { released: boolean; note: string } {
-    const target = stages.value.find((s) => s.code === targetStageCode)
-    if (!target) return { released: false, note: `阶段 ${targetStageCode} 不在模板内` }
-    // 前置全批准（复用 prerequisitesFullyReleased 单一权威）
     const gatePassedMap = new Map<string, boolean>()
     for (const g of stageGateRuns.value) {
       gatePassedMap.set(g.gate, g.passed && !g.conditional)
     }
-    const pre = prerequisitesFullyReleased(
-      stageTemplate.value, targetStageCode, approvalBindings.value, flowInstances.value, gatePassedMap
+    return stageAdvanceVerdict(
+      stageTemplate.value,
+      targetStageCode,
+      approvalBindings.value,
+      flowInstances.value,
+      gatePassedMap,
+      projectDeliverables.value,
+      deliverableApprovalBindings.value
     )
-    // 目标阶段交付物齐套（复用 stageDeliverablesComplete 单一权威）
-    const gateCode = target.gateCode
-    const dv = gateCode
-      ? stageDeliverablesComplete(gateCode, projectDeliverables.value, deliverableApprovalBindings.value, flowInstances.value)
-      : null
-    if (!pre.ok) {
-      return { released: false, note: pre.note }
-    }
-    if (dv && !dv.complete) {
-      return { released: false, note: `${pre.note}；但交付物未齐套：${dv.note}` }
-    }
-    return { released: true, note: `${pre.note}${dv ? `；交付物齐套（${dv.approvedCount}/${dv.requiredCount}）` : ''}` }
   }
 
   // —— 企业级聚合视图（对标 Oracle 组合驾驶舱：跨项目汇总健康指标，兑现 V4.0 第五种介入方式「聚合」）——

@@ -18,6 +18,9 @@
 
 import type { FlowDefinition, FlowInstance } from './flowEngine'
 import type { StageTemplate } from './stageTemplate'
+import type { Deliverable } from './types'
+import { stageDeliverablesComplete } from './deliverableApproval'
+import type { DeliverableApprovalBinding } from './deliverableApproval'
 
 /** 标准审批链四步角色（可配置，默认汽车零部件常用角色） */
 export interface ApprovalChainRoles {
@@ -202,4 +205,47 @@ export function prerequisitesFullyReleased(
     return { ok: false, missing, note: `前置阶段未全部批准：${missing.join('；')}` }
   }
   return { ok: true, missing: [], note: `阶段 ${stage.name} 前置已全部批准，可进入` }
+}
+
+/**
+ * 阶段推进聚合判定（P2 权威落地：前置全批准 + 目标交付物齐套，二者合取）。
+ *
+ * <p>这是「能否推进到目标阶段」的单一权威纯函数，与后端 {@code StageApplicationService.advanceStage}
+ * 语义同构：前置阶段须「审批完成 + 闸门通过」（{@link prerequisitesFullyReleased}），
+ * 目标阶段的交付物须齐套（{@link stageDeliverablesComplete}，C2）。</p>
+ *
+ * <p>顺序语义：前置未全部批准 → 阻断（不进入交付物判定）；前置已批准但交付物缺件 → 阻断；
+ * 二者皆满足 → 放行。用于前端探针与后端 advance 的结论一致性比对。</p>
+ *
+ * @return released=true 表示「可推进」，note 为结构化原因说明。
+ */
+export function stageAdvanceVerdict(
+  tpl: StageTemplate,
+  targetStageCode: string,
+  bindings: ApprovalBinding[],
+  instances: FlowInstance[],
+  gatePassedMap: Map<string, boolean>,
+  deliverables: Deliverable[],
+  deliverableBindings: DeliverableApprovalBinding[]
+): { released: boolean; note: string } {
+  const target = tpl.stages.find((s) => s.code === targetStageCode)
+  if (!target) return { released: false, note: `阶段 ${targetStageCode} 不在模板内` }
+
+  const pre = prerequisitesFullyReleased(tpl, targetStageCode, bindings, instances, gatePassedMap)
+  if (!pre.ok) {
+    return { released: false, note: pre.note }
+  }
+
+  const gateCode = target.gateCode
+  const dv = gateCode
+    ? stageDeliverablesComplete(gateCode, deliverables, deliverableBindings, instances)
+    : null
+
+  if (dv && !dv.complete) {
+    return { released: false, note: `${pre.note}；但交付物未齐套：${dv.note}` }
+  }
+  return {
+    released: true,
+    note: `${pre.note}${dv ? `；交付物齐套（${dv.approvedCount}/${dv.requiredCount}）` : ''}`
+  }
 }

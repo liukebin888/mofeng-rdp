@@ -13,12 +13,15 @@ import {
   DEFAULT_APPROVAL_ROLES,
   gateReleaseEvidence,
   prerequisitesFullyReleased,
+  stageAdvanceVerdict,
   stageFullyReleased,
   stagesBoundTo,
   type ApprovalBinding
 } from '../src/domain/approvalBinding'
 import { AUTOMOTIVE_STAGE_TEMPLATE } from '../src/domain/stageTemplate'
 import type { FlowInstance } from '../src/domain/flowEngine'
+import type { Deliverable } from '../src/domain/types'
+import type { DeliverableApprovalBinding } from '../src/domain/deliverableApproval'
 
 const TPL = AUTOMOTIVE_STAGE_TEMPLATE
 
@@ -162,5 +165,74 @@ describe('prerequisitesFullyReleased 前置全部批准判定', () => {
     const gatePassed = new Map([['G1', false]])
     const r = prerequisitesFullyReleased(TPL, 'S2', bindings, [instance('DEF-S1', '已完成')], gatePassed)
     expect(r.ok).toBe(false)
+  })
+})
+
+describe('stageAdvanceVerdict 阶段推进聚合判定（前置全批准 + 目标交付物齐套，P2 权威）', () => {
+  // 目标 S3：前置 S2（审批 DEF-S2 + 闸门 G2），目标交付物 gate=G3
+  const stageBindings: ApprovalBinding[] = [
+    { stageCode: 'S2', defId: 'DEF-S2', label: '设计审批' }
+  ]
+  const deliverableBindings: DeliverableApprovalBinding[] = [
+    { deliverableId: 'D1', defId: 'DEF-D1', label: '安全分析报告审批' }
+  ]
+  const deliverables: Deliverable[] = [
+    { id: 'D1', projectId: 'P-001', code: 'DEL-001', name: '安全分析报告', category: '文档', required: true, provided: false, gate: 'G3' }
+  ]
+  const gatePassedG2 = new Map<string, boolean>([['G2', true]])
+  const gatePassedG2Fail = new Map<string, boolean>([['G2', false]])
+
+  it('回退验证：前置 S2 审批未完成 → 阻断（不进入交付物判定）', () => {
+    const v = stageAdvanceVerdict(
+      TPL, 'S3', stageBindings, [instance('DEF-S2', '运行中')], gatePassedG2, deliverables, deliverableBindings
+    )
+    expect(v.released).toBe(false)
+    expect(v.note).toContain('前置')
+  })
+
+  it('回退验证：前置 S2 审批完成但闸门 G2 未过 → 阻断', () => {
+    const v = stageAdvanceVerdict(
+      TPL, 'S3', stageBindings, [instance('DEF-S2', '已完成')], gatePassedG2Fail, deliverables, deliverableBindings
+    )
+    expect(v.released).toBe(false)
+    expect(v.note).toContain('闸门')
+  })
+
+  it('前置已批准 + 目标 G3 交付物缺件（D1 无审批完成实例）→ 阻断（C2）', () => {
+    const v = stageAdvanceVerdict(
+      TPL, 'S3', stageBindings, [instance('DEF-S2', '已完成')], gatePassedG2, deliverables, deliverableBindings
+    )
+    expect(v.released).toBe(false)
+    expect(v.note).toContain('交付物')
+  })
+
+  it('前置已批准 + 目标 G3 交付物齐套（D1 审批完成）→ 放行', () => {
+    const v = stageAdvanceVerdict(
+      TPL, 'S3', stageBindings,
+      [instance('DEF-S2', '已完成', 'F-S2'), instance('DEF-D1', '已完成', 'F-D1')],
+      gatePassedG2, deliverables, deliverableBindings
+    )
+    expect(v.released).toBe(true)
+    expect(v.note).toContain('交付物齐套')
+  })
+
+  it('目标阶段不存在 → 阻断', () => {
+    const v = stageAdvanceVerdict(
+      TPL, 'SX', stageBindings, [instance('DEF-S2', '已完成')], gatePassedG2, deliverables, deliverableBindings
+    )
+    expect(v.released).toBe(false)
+    expect(v.note).toContain('不在模板内')
+  })
+
+  it('回退验证：目标交付物缺件阻断不因 provided 字段而放行（审批证据为准）', () => {
+    // D1.provided=true 但审批链无完成实例 → 仍应阻断（「未批准不得视为已交付」）
+    const dProvided: Deliverable[] = [
+      { id: 'D1', projectId: 'P-001', code: 'DEL-001', name: '安全分析报告', category: '文档', required: true, provided: true, gate: 'G3' }
+    ]
+    const v = stageAdvanceVerdict(
+      TPL, 'S3', stageBindings, [instance('DEF-S2', '已完成')], gatePassedG2, dProvided, deliverableBindings
+    )
+    expect(v.released).toBe(false)
+    expect(v.note).toContain('交付物')
   })
 })
