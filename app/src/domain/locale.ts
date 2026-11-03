@@ -156,7 +156,19 @@ export const zhCN: Dict = {
   'menu.item./system/calendar': '三层日历',
   'menu.item./system/ops': '运维监控',
   'menu.item./system/data': '数据与版本',
-  'menu.item./ai/assist': '智能辅助工作台'
+  'menu.item./ai/assist': '智能辅助工作台',
+  // —— 统一工作流单据（WF-001：新增/保存/关闭/提交）——
+  'wf.btn.new': '新增',
+  'wf.btn.save': '保存',
+  'wf.btn.close': '关闭',
+  'wf.btn.submit': '提交',
+  'wf.dirty': '未保存',
+  'wf.blockers': '提交前须解决：',
+  'wf.status.draft': '草稿',
+  'wf.status.submitted': '审批中',
+  'wf.status.completed': '已完成',
+  'wf.status.rejected': '已驳回',
+  'wf.status.terminated': '已终止'
 }
 
 export const enUS: Dict = {
@@ -307,7 +319,18 @@ export const enUS: Dict = {
   'menu.item./system/calendar': 'Three-tier Calendar',
   'menu.item./system/ops': 'Ops & Monitoring',
   'menu.item./system/data': 'Data & Version',
-  'menu.item./ai/assist': 'AI Assistance Workbench'
+  'menu.item./ai/assist': 'AI Assistance Workbench',
+  'wf.btn.new': 'New',
+  'wf.btn.save': 'Save',
+  'wf.btn.close': 'Close',
+  'wf.btn.submit': 'Submit',
+  'wf.dirty': 'Unsaved',
+  'wf.blockers': 'Resolve before submit: ',
+  'wf.status.draft': 'Draft',
+  'wf.status.submitted': 'In Approval',
+  'wf.status.completed': 'Completed',
+  'wf.status.rejected': 'Rejected',
+  'wf.status.terminated': 'Terminated'
 }
 
 export const DICTS: Record<Locale, Dict> = {

@@ -2680,15 +2680,38 @@ export const useAppStore = defineStore('app', () => {
     return flowDefinitions.value.find((d) => d.id === id)
   }
 
-  /** 启动流程（配置驱动，新增实例即按定义生效，无需发版） */
-  function launchFlow(defId: string, title: string, form: Record<string, string | number | boolean> = {}) {
+  /** 启动流程（配置驱动，新增实例即按定义生效，无需发版）；返回实例 id（找不到定义返回 undefined） */
+  function launchFlow(defId: string, title: string, form: Record<string, string | number | boolean> = {}): string | undefined {
     const def = flowDef(defId)
-    if (!def) return
+    if (!def) return undefined
     const inst = startFlow({ def, title, submitter: currentUser.value.name, form })
     data.value.flowInstances = [...(data.value.flowInstances ?? []), inst]
     log('START', '流程', inst.id, { defCode: def.code, title })
     persist()
     notify('success', `流程已发起：${title}`)
+    return inst.id
+  }
+
+  /**
+   * 提交一张工作流单据（WF-001 统一「新增/保存/关闭/提交」闭环的提交动作）：
+   *   校验放行 → 启动流程实例 → 绑定 flowInstanceId → 清除草稿。
+   * 返回 true 表示已提交；false 表示被 gate 阻断（blockers 已写入 form）。
+   */
+  function submitWorkflowForm(form: import('@/domain/workflowForm').WorkflowForm, title: string, formData: Record<string, string | number | boolean> = {}) {
+    const def = flowDef(form.defId)
+    if (!def) {
+      notify('error', `流程模板 ${form.defCode} 不存在，无法提交`)
+      return false
+    }
+    const instId = launchFlow(form.defId, title, formData)
+    if (!instId) return false
+    form.status = 'submitted'
+    form.flowInstanceId = instId
+    // 提交后自动清除草稿（POR-007）
+    data.value.drafts = clearDraft(drafts.value, currentUser.value.id, form.objectType as import('@/domain/types').DraftObjectType, form.id)
+    log('SUBMIT', '工作流单据', form.id, { defCode: form.defCode, flowInstanceId: instId })
+    persist()
+    return true
   }
 
   /** 审批通过：校验 SOD-01（提交人≠审批人）+ 引擎推进（含分支求值） */
@@ -3122,6 +3145,7 @@ export const useAppStore = defineStore('app', () => {
     flowDefinitions,
     flowInstances,
     launchFlow,
+    submitWorkflowForm,
     approveFlow,
     signAsFlow,
     rejectFlow,

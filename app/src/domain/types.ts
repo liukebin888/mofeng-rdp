@@ -731,7 +731,19 @@ export interface PortalSectionConfig {
 
 // —— 我的草稿跨端续写（POR-007：跨端内容一致、超期提示不静默删除、提交后清除）——
 
-export type DraftObjectType = '变更单' | '纠偏' | '送审件' | '经验' | '决议' | '工时单'
+export type DraftObjectType =
+  | '变更单'
+  | '纠偏'
+  | '送审件'
+  | '经验'
+  | '决议'
+  | '工时单'
+  // —— 工作流单据（WF-001 统一「新增/保存/关闭/提交」）：立项申请及后续各工作流单据均复用 ——
+  | '立项申请'
+  | '前期交申请'
+  | '项目产品报价'
+  | '豁免申请'
+  | 'ECR申请'
 
 export interface FormDraft {
   id: string

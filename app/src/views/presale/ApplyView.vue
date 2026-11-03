@@ -1,32 +1,45 @@
 <template>
   <div>
-    <PageHeader title="立项申请" desc="五项分级输入必填，缺项即「未定级」并阻断 Gate1（CLS-001/CLS-007）；技术方案与报价未关联不得审批（C-02）">
+    <PageHeader title="立项申请" desc="统一工作流单据（WF-001）：新增打开立项模板 → 编辑中可保存/关闭 → 提交走审批链。五项分级输入必填，缺项即「未定级」并阻断 Gate1（CLS-001/CLS-007）；技术方案与报价未关联不得审批（C-02）">
       <template #actions>
-        <el-button size="small" @click="fillDemo('L1')">载入 L1 样例</el-button>
-        <el-button size="small" @click="fillDemo('L3')">载入 L3 样例</el-button>
-        <el-button type="primary" size="small" :disabled="!result.level" @click="submit">提交立项申请</el-button>
+        <WorkflowFormShell
+          :form="wfForm"
+          :blockers="wfBlockers"
+          :dirty="dirty"
+          @new="wfNew"
+          @save="wfSave"
+          @close="wfClose"
+          @submit="wfSubmit"
+        />
       </template>
     </PageHeader>
 
-    <div class="grid" style="grid-template-columns: 1fr 1.1fr">
+    <div v-if="!wfForm" class="panel empty-panel">
+      <el-empty description="点击「新增」打开立项申请模板，开始填写" :image-size="80" />
+      <div class="row center">
+        <el-button type="primary" size="small" @click="wfNew">新增立项</el-button>
+      </div>
+    </div>
+
+    <div v-else class="grid" style="grid-template-columns: 1fr 1.1fr">
       <div class="panel">
         <div class="panel-title">项目基本信息（PRJ-002 八项必填）</div>
         <el-form label-width="96px" size="small">
           <el-form-item label="项目编码"><el-input :model-value="p.code" disabled /></el-form-item>
-          <el-form-item label="项目名称"><el-input v-model="form.name" /></el-form-item>
+          <el-form-item label="项目名称"><el-input v-model="form.name" @input="markDirty" /></el-form-item>
           <el-form-item label="客户">
-            <el-select v-model="form.customer" filterable placeholder="从客户主数据选择" style="width: 100%">
+            <el-select v-model="form.customer" filterable placeholder="从客户主数据选择" style="width: 100%" @change="markDirty">
               <el-option v-for="c in store.customers" :key="c.id" :value="c.name" :label="`${c.name}（${c.code}）`" />
             </el-select>
           </el-form-item>
           <el-form-item label="产品线 / 平台">
             <div class="row" style="width: 100%">
-              <el-select v-model="form.productLine" filterable placeholder="从产品线主数据选择" style="flex: 1">
+              <el-select v-model="form.productLine" filterable placeholder="从产品线主数据选择" style="flex: 1" @change="markDirty">
                 <el-option-group v-for="cat in productCategories" :key="cat.id" :label="cat.name">
                   <el-option v-for="l in linesOf(cat.id)" :key="l.id" :value="l.name" :label="`${l.name}${l.code ? '（' + l.code + '）' : ''}`" />
                 </el-option-group>
               </el-select>
-              <el-input v-model="form.platform" placeholder="平台（自由文本）" style="flex: 1" />
+              <el-input v-model="form.platform" placeholder="平台（自由文本）" style="flex: 1" @input="markDirty" />
             </div>
           </el-form-item>
           <el-form-item label="负责人">
@@ -34,8 +47,8 @@
           </el-form-item>
           <el-form-item label="起止日期">
             <div class="row" style="width: 100%">
-              <el-input v-model="form.start" />
-              <el-input v-model="form.end" />
+              <el-input v-model="form.start" @input="markDirty" />
+              <el-input v-model="form.end" @input="markDirty" />
             </div>
           </el-form-item>
         </el-form>
@@ -44,17 +57,17 @@
         <div class="panel-title">分级判定输入（仅五项，决定 L1~L4）</div>
         <el-form label-width="140px" size="small">
           <el-form-item label="ASIL 等级" required>
-            <el-select v-model="input.asil" placeholder="选择" style="width: 160px">
+            <el-select v-model="input.asil" placeholder="选择" style="width: 160px" @change="markDirty">
               <el-option v-for="a in ['D', 'C', 'B', 'A', 'QM']" :key="a" :value="a" :label="a" />
             </el-select>
           </el-form-item>
           <el-form-item label="CAL 信息安全等级" required>
-            <el-select v-model="input.cal" style="width: 160px">
+            <el-select v-model="input.cal" style="width: 160px" @change="markDirty">
               <el-option v-for="c in [0, 1, 2, 3, 4]" :key="c" :value="c" :label="`CAL ${c}`" />
             </el-select>
           </el-form-item>
           <el-form-item label="自研软件属性" required>
-            <el-select v-model="input.selfDev" style="width: 220px">
+            <el-select v-model="input.selfDev" style="width: 220px" @change="markDirty">
               <el-option value="FULL" label="自研软件（含新增功能）" />
               <el-option value="PARAM_ONLY" label="仅参数配置" />
               <el-option value="NONE_HW" label="无自研软件（纯硬件）" />
@@ -62,18 +75,18 @@
             </el-select>
           </el-form-item>
           <el-form-item label="新架构 / 新算法" required>
-            <el-switch v-model="input.newArch" />
+            <el-switch v-model="input.newArch" @change="markDirty" />
           </el-form-item>
           <el-form-item label="客户强制要求（安全相关）" required>
-            <el-switch v-model="input.customerSafety" />
+            <el-switch v-model="input.customerSafety" @change="markDirty" />
           </el-form-item>
         </el-form>
 
         <div class="hr" />
         <div class="panel-title">技术方案与报价关联（C-02）</div>
         <div class="row wrap">
-          <el-checkbox v-model="schemeLinked">技术方案已关联（TS-E15-V2.1）</el-checkbox>
-          <el-checkbox v-model="quoteLinked">报价单已关联（QT-2026-0087）</el-checkbox>
+          <el-checkbox v-model="schemeLinked" @change="markDirty">技术方案已关联（TS-E15-V2.1）</el-checkbox>
+          <el-checkbox v-model="quoteLinked" @change="markDirty">报价单已关联（QT-2026-0087）</el-checkbox>
         </div>
       </div>
 
@@ -126,9 +139,12 @@
 import { computed, reactive, ref } from 'vue'
 import PageHeader from '@/components/PageHeader.vue'
 import PersonSelect from '@/components/PersonSelect.vue'
+import WorkflowFormShell from '@/components/WorkflowFormShell.vue'
 import { useAppStore } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
 import { grade, LEVEL_DESC } from '@/domain/grading'
+import { newWorkflowForm, saveWorkflowForm } from '@/domain/workflowForm'
+import type { WorkflowForm } from '@/domain/workflowForm'
 import type { GradingInput, Level } from '@/domain/types'
 import type { PersonCandidate } from '@/domain/personSearch'
 
@@ -141,12 +157,23 @@ const input = reactive<GradingInput>({ asil: init?.asil ?? '', cal: init?.cal ??
 const schemeLinked = ref(true)
 const quoteLinked = ref(true)
 
-// 主数据下拉（客户 / 产品线，与基础数据菜单同源）
+// —— 统一工作流单据（WF-001 四按钮）——
+const wfForm = ref<WorkflowForm | null>(null)
+const dirty = ref(false)
+const wfBlockers = ref<string[]>([])
+
+/** 立项模板 id（seed 中 DEF-PRE-3 立项申请） */
+const INITIATION_DEF_ID = 'DEF-PRE-3'
+
 const productCategories = computed(() => store.productCategories)
 const linesOf = (categoryId: string) => store.productLines.filter((l) => l.categoryId === categoryId)
 
 const result = computed(() => grade(input, store.actor))
 const gate = computed(() => store.gateResults.G1)
+
+function markDirty() {
+  dirty.value = true
+}
 
 function fillDemo(level: 'L1' | 'L3') {
   if (level === 'L1') {
@@ -154,37 +181,114 @@ function fillDemo(level: 'L1' | 'L3') {
   } else {
     Object.assign(input, { asil: 'QM', cal: 0, selfDev: 'PARAM_ONLY', newArch: false, customerSafety: false })
   }
+  markDirty()
 }
 
-/** 负责人选中后：自动带入部门/岗位信息（回写项目负责人扩展信息） */
 const ownerMeta = ref<PersonCandidate | null>(null)
 function onOwnerSelect(person: PersonCandidate) {
   ownerMeta.value = person.id ? person : null
+  markDirty()
   if (person.id) {
     store.notify('info', `已带入负责人 ${person.name}：${[person.dept, person.post].filter(Boolean).join(' · ') || '（无挂靠）'}`)
   }
 }
 
-function submit() {
-  if (!result.value.level) {
-    store.notify('error', '五项分级输入不齐，按最严禁要求阻断立项（CLS-001）')
+/** 序列化当前编辑内容为草稿 JSON */
+function serializeContent(): string {
+  return JSON.stringify({ form: { ...form }, input: { ...input }, schemeLinked: schemeLinked.value, quoteLinked: quoteLinked.value })
+}
+
+/** 从草稿内容反序列化回表单（续编） */
+function hydrateContent(content: string) {
+  try {
+    const obj = JSON.parse(content)
+    if (obj.form) Object.assign(form, obj.form)
+    if (obj.input) Object.assign(input, obj.input)
+    if (typeof obj.schemeLinked === 'boolean') schemeLinked.value = obj.schemeLinked
+    if (typeof obj.quoteLinked === 'boolean') quoteLinked.value = obj.quoteLinked
+  } catch {
+    /* 草稿损坏则忽略，从空白开始 */
+  }
+}
+
+/** 新增：打开立项模板，若已有草稿则续编 */
+function wfNew() {
+  const def = store.flowDefinitions.find((d) => d.id === INITIATION_DEF_ID)
+  if (!def) {
+    store.notify('error', '立项流程模板不存在，无法新增')
     return
+  }
+  const objectId = p.value.id ?? 'project'
+  const draft = store.data.drafts?.find((d) => d.userId === store.currentUser.id && d.objectType === '立项申请' && d.id === objectId)
+  const f = newWorkflowForm({ def, objectType: '立项申请', objectId, content: draft?.content })
+  if (draft?.content) hydrateContent(draft.content)
+  wfForm.value = f
+  dirty.value = false
+  wfBlockers.value = []
+}
+
+/** 保存：写草稿（可关闭后续编） */
+function wfSave() {
+  if (!wfForm.value) return
+  const content = serializeContent()
+  wfForm.value = saveWorkflowForm(wfForm.value, content)
+  store.saveDraft('立项申请', wfForm.value.id, content)
+  dirty.value = false
+}
+
+/** 关闭：退出编辑（草稿保留） */
+function wfClose() {
+  if (dirty.value) {
+    // 未保存改动：仍允许关闭（草稿不强制保存，但提示）
+    store.notify('info', '已关闭编辑（未保存的改动不会保留）')
+  } else {
+    store.notify('info', '已关闭编辑（草稿已保存，可再次打开续编）')
+  }
+  wfForm.value = null
+  dirty.value = false
+  wfBlockers.value = []
+}
+
+/** 提交：校验 → 走审批链 */
+function wfSubmit() {
+  if (!wfForm.value) return
+  const blockers: string[] = []
+  if (!result.value.level) {
+    blockers.push('CLS-001：五项分级输入不齐，未定级')
   }
   if (!schemeLinked.value || !quoteLinked.value) {
-    store.notify('error', 'C-02：技术方案与报价必须已关联，未关联不得提交审批')
+    blockers.push('C-02：技术方案与报价必须已关联')
+  }
+  if (blockers.length) {
+    wfBlockers.value = blockers
+    store.notify('error', blockers.join('；'))
     return
   }
+  // 回写项目台账（分级判定 + 主数据）
   const proj = store.currentProject
   const before = { level: proj.level }
   proj.level = result.value.level
   proj.grading = { input: { ...input }, result: result.value }
-  // 主数据打通：客户 / 产品线回写项目台账，与基础数据菜单同源
   proj.customer = form.customer
   proj.productLine = form.productLine
   proj.name = form.name
   proj.platform = form.platform
-  store.log('SUBMIT', '项目', proj.id, { level: proj.level, row: result.value.hitRowNo }, before)
-  store.notify('success', `立项申请已提交：判定 ${result.value.level}（命中第 ${result.value.hitRowNo} 行），留痕哈希 ${result.value.trace.snapshotHash.slice(0, 10)}…`)
+
+  // 保存最终内容并提交（走 startFlow 进入「立项申请」审批链）
+  const content = serializeContent()
+  wfForm.value = saveWorkflowForm(wfForm.value, content)
+  const formData: Record<string, string | number | boolean> = {
+    name: form.name,
+    customer: form.customer,
+    productLine: form.productLine
+  }
+  const ok = store.submitWorkflowForm(wfForm.value, `${wfForm.value.title}：${form.name}`, formData)
+  if (ok) {
+    store.log('SUBMIT', '项目', proj.id, { level: proj.level, row: result.value.hitRowNo }, before)
+    store.notify('success', `立项申请已提交审批：判定 ${result.value.level}（命中第 ${result.value.hitRowNo} 行）`)
+    dirty.value = false
+    wfBlockers.value = []
+  }
 }
 </script>
 
@@ -197,4 +301,6 @@ function submit() {
 .check { display: flex; gap: 7px; align-items: flex-start; padding: 5px 0; border-bottom: 1px dashed #16233a; font-size: 11.5px; }
 .check em { margin-left: auto; font-style: normal; color: var(--text-3); text-align: right; max-width: 46%; }
 .warn-box { margin-top: 8px; padding: 7px 9px; border: 1px solid #5b3c14; background: #2a1f10; color: #ffd79a; border-radius: 6px; font-size: 11.5px; }
+.empty-panel { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 40px 0; }
+.row.center { justify-content: center; }
 </style>
