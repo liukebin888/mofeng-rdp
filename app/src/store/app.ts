@@ -25,6 +25,7 @@ import { enforceStageGate, canCreateWorkItem, type WorkItemKind, type GateEnforc
 import { AUTOMOTIVE_STAGE_TEMPLATE, findStageTemplate, orderedStages, type StageTemplate } from '@/domain/stageTemplate'
 import { gateReleaseEvidence, stageFullyReleased, type ApprovalBinding } from '@/domain/approvalBinding'
 import { deliverableProvidedEvidence, stageDeliverablesComplete, type DeliverableApprovalBinding } from '@/domain/deliverableApproval'
+import { applySeverityChange, findRejectionPolicy, severitySummary, shouldReject, type RejectionPolicyItem, type RejectionSeverity } from '@/domain/rejectionPolicy'
 import { freeze as freezeBaseline, verifyBaseline } from '@/domain/baseline'
 import { appendAudit, verifyChain } from '@/domain/audit'
 import { appendRecord, archiveFromAudit, DEFAULT_RETENTION_YEARS, destroyVolume, retentionVerdict, verifyLayer, type ArchiveLayer, type ArchiveVolume } from '@/domain/archiveLayer'
@@ -909,6 +910,10 @@ export const useAppStore = defineStore('app', () => {
   const udfs = computed(() => (data.value.udfs ?? []) as import('@/domain/types').UdfDef[])
   const stepTemplates = computed(() => (data.value.stepTemplates ?? []) as import('@/domain/types').StepTemplate[])
   const stepRuns = computed(() => (data.value.stepRuns ?? []) as import('@/domain/types').StepRun[])
+  /** 服务端拒绝拦截策略（SRP-001/002：16 项问题事项三档可配置，管理员可在系统设置自定义） */
+  const rejectionPolicies = computed<RejectionPolicyItem[]>(() => (data.value.rejectionPolicies ?? []) as RejectionPolicyItem[])
+  /** 三档统计（硬拒绝/可配置/只读披露） */
+  const rejectionSummary = computed(() => severitySummary(rejectionPolicies.value))
   const messages = computed(() => (data.value.messages ?? []) as import('@/domain/types').MessageItem[])
   const inboxItems = computed(() => (data.value.inboxItems ?? []) as import('@/domain/types').InboxItem[])
   const myUnreadCount = computed(() => unreadCount(messages.value, currentUser.value.id))
@@ -2157,6 +2162,41 @@ export const useAppStore = defineStore('app', () => {
     return run && tpl ? stepCompletion(run, tpl) : null
   }
 
+  // —— 服务端拒绝拦截策略（SRP-001/002：三档可配置）——
+  /** 修改某事项的拦截档位（及 CONFIGURABLE 档参数），审计留痕 */
+  function updateRejectionPolicy(id: string, severity: RejectionSeverity, fieldValue?: boolean | string): boolean {
+    const r = applySeverityChange(rejectionPolicies.value, id, severity, fieldValue)
+    if (!r.ok) {
+      notify('warning', r.note)
+      return false
+    }
+    data.value.rejectionPolicies = r.items
+    log('UPDATE', '拦截策略', id, { severity, fieldValue })
+    notify('success', `拦截策略 ${id} 已更新（${r.note}）`)
+    return true
+  }
+
+  /**
+   * 统一拦截闸（写路径入口调用）：按拦截策略三档判定某事项是否拦截。
+   *   engineViolated = true 表示规则引擎已判定违规（如闸门未通过/审批未完成）。
+   *   返回 true 表示「已拦截，调用方应中止写操作」。
+   *   三档语义见 rejectionPolicy.shouldReject：HARD 拦 / CONFIGURABLE 读字段 / DISCLOSE 放行。
+   */
+  function rejectIf(itemId: string, kind: string, objId: string, engineViolated: boolean, detail?: Record<string, unknown>): boolean {
+    const policy = findRejectionPolicy(rejectionPolicies.value, itemId)
+    if (!policy) return false // 未登记事项：不拦截（禁止代码里新起未登记的拦截）
+    const rejected = shouldReject(rejectionPolicies.value, itemId, engineViolated)
+    if (rejected) {
+      const label = policy.severity === 'HARD' ? '硬拒绝' : policy.severity === 'CONFIGURABLE' ? '可配置拒绝' : '只读披露'
+      notify('error', `[${policy.id}] ${policy.name}（${label}，SRP-001）`)
+      log(kind, '拦截策略', itemId, { objId, ...detail }, undefined, 'DENY')
+      return true
+    }
+    // 放行：DISCLOSE 披露留痕，CONFIGURABLE 宽松放行留痕
+    log(kind, '拦截策略', itemId, { objId, ...detail, rejected: false, severity: policy.severity })
+    return false
+  }
+
   // —— 消息中心（POR-006 已读回执 + POR-008 收件箱）——
   function readMessage(messageId: string) {
     const at = new Date().toISOString()
@@ -2321,8 +2361,9 @@ export const useAppStore = defineStore('app', () => {
   function submitGate(gate: string) {
     const run = gateResults.value[gate]
     if (!run.passed) {
+      // 事项 A2「前序闸门未通过」：引擎判定违规，策略决定拦截力度（默认 CONFIGURABLE）
+      if (rejectIf('A2', 'SUBMIT', 'Gate', true, { gate, passed: false, missing: run.missing.slice(0, 3) })) return
       notify('error', `${gate} 未通过：${run.missing.slice(0, 2).join('；')}${run.missing.length > 2 ? ` 等 ${run.missing.length} 项` : ''}`)
-      log('SUBMIT', 'Gate', gate, { passed: false, missing: run.missing }, undefined, 'DENY')
       return
     }
     log('SUBMIT', 'Gate', gate, { passed: true })
@@ -2365,6 +2406,15 @@ export const useAppStore = defineStore('app', () => {
   function advanceSample(id: string, to: string) {
     const s = data.value.samples.find((x) => x.id === id)
     if (!s) return
+    // 事项 A1/A2：样件越过其绑定闸门前，该闸门须已通过（策略驱动，默认 HARD）
+    if (s.gate) {
+      const gr = gateResults.value[s.gate]
+      if (gr && !gr.passed) {
+        if (rejectIf('A2', 'UPDATE', '样件', true, { code: s.code, gate: s.gate, to, missing: gr.missing.slice(0, 3) })) return
+        notify('error', `样件 ${s.code} 推进被拒：${s.gate} 未放行`)
+        return
+      }
+    }
     const before = { status: s.status }
     s.status = to
     log('UPDATE', '样件', s.code, { status: to }, before)
@@ -2379,8 +2429,9 @@ export const useAppStore = defineStore('app', () => {
     if (!s) return
     const g4 = gateResults.value['G4']
     if (!g4.passed) {
+      // 事项 A2「前序闸门未通过」：引擎判定违规，策略决定拦截力度
+      if (rejectIf('A2', 'APPROVE', 'OTS', true, { gate: 'G4', passed: false, missing: g4.missing.slice(0, 3) })) return
       notify('error', `OTS 认可被拒：Gate4 未放行（${g4.missing.slice(0, 2).join('；')}）`)
-      log('APPROVE', 'OTS', s.code, { conclusion }, undefined, 'DENY')
       return
     }
     const before = { status: s.status }
@@ -2915,6 +2966,8 @@ export const useAppStore = defineStore('app', () => {
     udfs,
     stepTemplates,
     stepRuns,
+    rejectionPolicies,
+    rejectionSummary,
     messages,
     inboxItems,
     myUnreadCount,
@@ -3020,6 +3073,8 @@ export const useAppStore = defineStore('app', () => {
     saveUdf,
     bumpStepTemplate,
     stepRunStats,
+    updateRejectionPolicy,
+    rejectIf,
     readMessage,
     readAllMessages,
     pushMessage,

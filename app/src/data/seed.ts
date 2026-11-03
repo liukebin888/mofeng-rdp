@@ -71,8 +71,9 @@ import type { Space } from '@/domain/spaceEngine'
 import { buildApprovalChain, DEFAULT_APPROVAL_ROLES, type ApprovalBinding } from '@/domain/approvalBinding'
 import type { DeliverableApprovalBinding } from '@/domain/deliverableApproval'
 import { appendRecord, manifestHashOf, type ArchiveLayer, type ArchiveVolume } from '@/domain/archiveLayer'
+import { DEFAULT_REJECTION_POLICIES, type RejectionPolicyItem } from '@/domain/rejectionPolicy'
 
-export const SEED_VERSION = 'mofeng.rdp.v1.0.23'
+export const SEED_VERSION = 'mofeng.rdp.v1.0.24'
 const TENANT = 'T-1001'
 
 export interface SeedUser {
@@ -1061,6 +1062,9 @@ export function buildSeed() {
     { id: 'SR1', templateId: 'ST1', activityId: 'WBS-OTS', doneStepIds: ['S1', 'S2'], templateVersion: 2 }
   ]
 
+  // 服务端拒绝拦截策略（SRP-001/002：16 项问题事项，三档可配置，管理员可在系统设置自定义）
+  const rejectionPolicies: RejectionPolicyItem[] = DEFAULT_REJECTION_POLICIES
+
   // 消息与收件箱（POR-006 / POR-008）
   const messages: MessageItem[] = [
     { id: 'MSG1', userId: 'U003', eventKey: 'OTS-GATE4-READY', title: 'OTS 样件已具备 Gate4 评审条件', content: 'P-001 项目 OTS 样件完成，可发起 Gate4 准入评审', category: '决议', read: false, createdAt: '2026-11-01T08:00:00+08:00', refType: 'gate', refId: 'Gate4' },
@@ -1340,6 +1344,7 @@ export function buildSeed() {
     udfs,
     stepTemplates,
     stepRuns,
+    rejectionPolicies,
     messages,
     inboxItems,
     thresholdIssues: [] as ThresholdIssue[],

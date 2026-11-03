@@ -1243,4 +1243,36 @@ export interface CodeIssue {
   at: string
 }
 
+// —— 服务端拒绝拦截策略（SRP-001/002：三档可配置，不搞一刀切）——
+
+/** 拦截档位（三档：硬拒绝 / 可配置拒绝 / 只读披露） */
+export type RejectionSeverity = 'HARD' | 'CONFIGURABLE' | 'DISCLOSE'
+
+/** 问题事项分组（5 组） */
+export type RejectionGroup = '阶段推进' | '审批链' | '交付物' | '模板配置' | '跨层一致'
+
+/** 单个问题事项的拦截策略配置项 */
+export interface RejectionPolicyItem {
+  /** 事项编号（A1~E3） */
+  id: string
+  /** 所属分组 */
+  group: RejectionGroup
+  /** 事项名称 */
+  name: string
+  /** 触发场景描述 */
+  scenario: string
+  /** 引擎依据 */
+  basis: string
+  /** 当前拦截档位 */
+  severity: RejectionSeverity
+  /** CONFIGURABLE 档的配置字段名 */
+  field?: string
+  /** CONFIGURABLE 档的配置值 */
+  fieldValue?: boolean | string
+  /** 配置值可选项 */
+  fieldOptions?: string[]
+  /** 是否锁定（HARD 且数据完整性底线，不允许降档） */
+  locked?: boolean
+}
+
 

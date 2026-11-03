@@ -484,6 +484,23 @@ async function resetState(page) {
   ok('G3 交付物审批齐套判定有数值（已批准/应批）', /^\d+\/\d+$/.test(deliverInfo.rows.find((r) => r.gate === 'G3')?.num || ''), deliverInfo.rows.find((r) => r.gate === 'G3')?.num)
   ok('未批准交付物列为缺件（DEL-004 安全分析报告）', deliverInfo.rows.some((r) => r.miss.some((m) => /DEL-004/.test(m))), JSON.stringify(deliverInfo.rows.map((r) => r.miss)))
 
+  // ============ 链路 16：服务端拒绝拦截策略配置（SRP-001/002：三档可配置） ============
+  console.log('\n[链路16] 拦截策略配置（三档可配置）')
+  await page.goto(BASE + '/#/system/rejection', { waitUntil: 'domcontentloaded' })
+  await page.waitForTimeout(400)
+  const rejInfo = await page.evaluate(() => {
+    const body = document.body.innerText
+    const panels = [...document.querySelectorAll('.panel-title')].map((p) => p.innerText.trim())
+    const tables = [...document.querySelectorAll('.el-table__body tbody tr')].map((tr) => tr.innerText)
+    const kpis = [...document.querySelectorAll('.kpi .value')].map((k) => k.innerText.trim())
+    return { body, panels, tableCount: tables.length, tables, kpis }
+  })
+  ok('存在「拦截策略配置」页面（含三档语义说明）', /硬拒绝|可配置拒绝|只读披露/.test(rejInfo.body))
+  ok('五个分组面板齐全（阶段推进/审批链/交付物/模板配置/跨层一致）', ['阶段推进', '审批链', '交付物', '模板配置', '跨层一致'].every((g) => rejInfo.panels.some((p) => p.includes(g))), rejInfo.panels.join('|'))
+  ok('16 项问题事项全部渲染', rejInfo.tableCount === 16, `行数=${rejInfo.tableCount}`)
+  ok('KPI 卡显示三档统计（6/8/2）', rejInfo.kpis.some((k) => k.includes('6')) && rejInfo.kpis.some((k) => k.includes('8')) && rejInfo.kpis.some((k) => k.includes('2')), rejInfo.kpis.join('|'))
+  ok('锁定事项（数据完整性底线）有锁定标记', /锁定/.test(rejInfo.body))
+
   console.log('\n========== 结果 ==========')
   console.log(`PASS ${passed} / FAIL ${failed}`)
   if (errors.length) console.log('pageerror:', JSON.stringify([...new Set(errors)].slice(0, 10)))

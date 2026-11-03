@@ -188,6 +188,7 @@ export const MENUS: MenuGroup[] = [
       { path: '/system/roles', title: '角色权限', desc: '18×6 矩阵 + SOD-01~07', comp: v('system/RolesView') },
       { path: '/system/audit', title: '审计日志', desc: '七元组 + 哈希链', comp: v('system/AuditLogView') },
       { path: '/system/dict', title: '分类码与 UDF', desc: '自定义字段扩展点', comp: v('system/DictView') },
+      { path: '/system/rejection', title: '拦截策略配置', desc: '服务端拒绝三档可配置（硬拒绝/可配置/只读披露）', comp: v('system/RejectionPolicyView') },
       { path: '/system/calendar', title: '三层日历', desc: '企业/项目/资源 + 例外日（TEN-015）', comp: v('system/CalendarView') },
       { path: '/system/ops', title: '运维监控', desc: 'SLO + 监控告警 + 限流熔断 + 配额预警 + 变更审批', comp: v('system/OpsMonitorView') },
       { path: '/system/probe', title: '服务端一致性探针', desc: '前端引擎结论 vs 后端 REST 复核一致性比对（联调）', comp: v('system/ConsistencyProbeView') },
