@@ -23,45 +23,45 @@
 
     <div v-else class="grid" style="grid-template-columns: 1fr 1.1fr">
       <div class="panel">
-        <div class="panel-title">项目基本信息（PRJ-002 八项必填）</div>
+        <div class="panel-title">项目基本信息（<span class="required-note">红色 * 为必填项</span>）</div>
         <el-form label-width="96px" size="small">
           <el-form-item label="项目编码"><el-input v-model="form.code" placeholder="新项目编码（提交后生成可留空）" @input="markDirty" /></el-form-item>
-          <el-form-item label="项目名称"><el-input v-model="form.name" placeholder="新项目名称" @input="markDirty" /></el-form-item>
-          <el-form-item label="客户">
+          <el-form-item label="项目名称" required><el-input v-model="form.name" placeholder="新项目名称" @input="markDirty" /></el-form-item>
+          <el-form-item label="客户" required>
             <el-select v-model="form.customer" filterable placeholder="从客户主数据选择" style="width: 100%" @change="markDirty">
               <el-option v-for="c in store.customers" :key="c.id" :value="c.name" :label="`${c.name}（${c.code}）`" />
             </el-select>
           </el-form-item>
-          <el-form-item label="产品线 / 平台">
-            <div class="row" style="width: 100%">
-              <el-select v-model="form.productLine" filterable placeholder="从产品线主数据选择" style="flex: 1" @change="markDirty">
-                <el-option-group v-for="cat in productCategories" :key="cat.id" :label="cat.name">
-                  <el-option v-for="l in linesOf(cat.id)" :key="l.id" :value="l.name" :label="`${l.name}${l.code ? '（' + l.code + '）' : ''}`" />
-                </el-option-group>
-              </el-select>
-              <el-input v-model="form.platform" placeholder="平台（自由文本）" style="flex: 1" @input="markDirty" />
-            </div>
+          <el-form-item label="产品线" required>
+            <el-select v-model="form.productLine" filterable placeholder="从产品线主数据选择" style="width: 100%" @change="markDirty">
+              <el-option-group v-for="cat in productCategories" :key="cat.id" :label="cat.name">
+                <el-option v-for="l in linesOf(cat.id)" :key="l.id" :value="l.name" :label="`${l.name}${l.code ? '（' + l.code + '）' : ''}`" />
+              </el-option-group>
+            </el-select>
           </el-form-item>
-          <el-form-item label="负责人">
+          <el-form-item label="平台">
+            <el-input v-model="form.platform" placeholder="平台（自由文本，可选）" style="width: 100%" @input="markDirty" />
+          </el-form-item>
+          <el-form-item label="负责人" required>
             <PersonSelect v-model="form.owner" placeholder="输入姓名或首拼（如 zlq → 周立群）" @select="onOwnerSelect" />
           </el-form-item>
-          <el-form-item label="起止日期">
+          <el-form-item label="起止日期" required>
             <div class="row" style="width: 100%">
               <el-date-picker v-model="form.start" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" style="flex: 1" @change="markDirty" />
               <el-date-picker v-model="form.end" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" style="flex: 1" @change="markDirty" />
             </div>
           </el-form-item>
-          <el-form-item label="OTS 期">
+          <el-form-item label="OTS 期" required>
             <el-date-picker v-model="form.otsDate" type="date" value-format="YYYY-MM-DD" placeholder="选择 OTS 日期" style="width: 100%" @change="markDirty" />
           </el-form-item>
-          <el-form-item label="SOP 日期">
+          <el-form-item label="SOP 日期" required>
             <el-date-picker v-model="form.sopDate" type="date" value-format="YYYY-MM-DD" placeholder="选择 SOP 日期" style="width: 100%" @change="markDirty" />
           </el-form-item>
-          <el-form-item label="车型年产量">
+          <el-form-item label="车型年产量" required>
             <el-input-number v-model="form.annualVolume" :min="0" :step="1000" placeholder="年产量" style="width: 100%" @change="markDirty" />
           </el-form-item>
-          <el-form-item label="生命周期（年）">
-            <el-input-number v-model="form.lifecycleYears" :min="0" :max="30" :step="1" placeholder="年" style="width: 100%" @change="markDirty" />
+          <el-form-item label="生命周期（年）" required>
+            <el-input-number v-model="form.lifecycleYears" :min="1" :max="30" :step="1" placeholder="年" style="width: 100%" @change="markDirty" />
           </el-form-item>
         </el-form>
 
@@ -189,6 +189,25 @@ function markDirty() {
   dirty.value = true
 }
 
+/** 必填字段清单（label → 取值是否为空）。红色 * 标注，未填不允许提交进入下一步。 */
+const REQUIRED_FIELDS: Array<{ label: string; empty: () => boolean }> = [
+  { label: '项目名称', empty: () => !form.name.trim() },
+  { label: '客户', empty: () => !form.customer },
+  { label: '产品线', empty: () => !form.productLine },
+  { label: '负责人', empty: () => !form.owner },
+  { label: '开始日期', empty: () => !form.start },
+  { label: '结束日期', empty: () => !form.end },
+  { label: 'OTS 期', empty: () => !form.otsDate },
+  { label: 'SOP 日期', empty: () => !form.sopDate },
+  { label: '车型年产量', empty: () => !form.annualVolume || form.annualVolume <= 0 },
+  { label: '生命周期（年）', empty: () => !form.lifecycleYears || form.lifecycleYears <= 0 }
+]
+
+/** 收集所有未填的必填项 */
+function missingRequiredFields(): string[] {
+  return REQUIRED_FIELDS.filter((f) => f.empty()).map((f) => f.label)
+}
+
 const ownerMeta = ref<PersonCandidate | null>(null)
 function onOwnerSelect(person: PersonCandidate) {
   ownerMeta.value = person.id ? person : null
@@ -264,11 +283,13 @@ function wfClose() {
 function wfSubmit() {
   if (!wfForm.value) return
   const blockers: string[] = []
+  // 必填项强制校验：红色 * 标注项未填，不允许提交进入下一步
+  const missing = missingRequiredFields()
+  if (missing.length) {
+    blockers.push(`必填项未填写：${missing.join('、')}`)
+  }
   if (!result.value.level) {
     blockers.push('CLS-001：五项分级输入不齐，未定级')
-  }
-  if (!form.name.trim()) {
-    blockers.push('PRJ-002：项目名称必填')
   }
   if (!schemeLinked.value || !quoteLinked.value) {
     blockers.push('C-02：技术方案与报价必须已关联')
@@ -313,4 +334,6 @@ function wfSubmit() {
 .warn-box { margin-top: 8px; padding: 7px 9px; border: 1px solid #5b3c14; background: #2a1f10; color: #ffd79a; border-radius: 6px; font-size: 11.5px; }
 .empty-panel { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 40px 0; }
 .row.center { justify-content: center; }
+.required-note { font-size: 11px; font-weight: 400; color: var(--text-3); margin-left: 8px; }
+.required-note::before { content: '* '; color: #f87171; }
 </style>
