@@ -19,7 +19,9 @@ import {
   initiateProject,
   traceRequirements,
   submitEcr,
-  submitSample
+  submitSample,
+  advanceStage,
+  type StagePayload
 } from '@/infra/apiV1'
 import {
   mapProjectInitiate,
@@ -281,6 +283,65 @@ export async function runSampleProbe(
   if (!consistent) report.changed = 1
   report.rows.push({
     key: sample.code,
+    feConclusion,
+    beConclusion,
+    consistent,
+    status: result.status,
+    code: result.ok ? 'OK' : result.blocked ? 'BLOCKED' : undefined,
+    message: result.error
+  })
+  report.verdict = report.responded === 0 ? '后端不可用' : report.changed === 0 ? '一致' : '不一致'
+  return report
+}
+
+// ------------------------------------------------------------------
+// 探针五：研发阶段推进
+// ------------------------------------------------------------------
+
+/**
+ * 阶段推进探针：比对「前端阶段门禁结论」与「后端 advance 判定」。
+ * 探针固定推进目标阶段（默认 S2），前端结论由调用方传入（store.stageRelease 或 canAdvanceToStage），
+ * 后端结论为 StageResult.allowed。二者一致性即「后端权威 + 前端提示」的落点验证。
+ */
+export async function runStageProbe(
+  payload: StagePayload | null,
+  feAllowed: boolean,
+  feNote: string,
+  key: string
+): Promise<ProbeReport> {
+  const report: ProbeReport = {
+    name: '研发阶段推进（审批驱动门禁）',
+    endpoint: 'POST /api/v1/stages/advance',
+    requested: 0,
+    responded: 0,
+    changed: 0,
+    verdict: '后端不可用',
+    rows: []
+  }
+  if (!payload) return report
+
+  report.requested = 1
+  const { result } = await withToken((token) => advanceStage(payload, token))
+  if (result.status !== undefined) report.responded = 1
+
+  const feConclusion = `${feAllowed ? '可进入' : '阻断'}：${feNote}`
+  let beConclusion: string
+  let consistent = false
+  if (result.ok && result.data) {
+    const d = result.data
+    beConclusion = `${d.allowed ? '可进入' : '阻断'}：${d.note}`
+    // 一致性：前端放行结论与后端 allowed 一致
+    consistent = feAllowed === d.allowed
+  } else if (result.blocked) {
+    beConclusion = `阻断（422）：${result.error ?? '领域规则不通过'}`
+    // 后端硬拒绝 → 前端应也是「阻断」
+    consistent = feAllowed === false
+  } else {
+    beConclusion = result.error ?? '后端不可用'
+  }
+  if (!consistent) report.changed = 1
+  report.rows.push({
+    key,
     feConclusion,
     beConclusion,
     consistent,

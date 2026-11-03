@@ -317,3 +317,96 @@ export interface SampleData {
 export function submitSample(payload: SamplePayload, token: string) {
   return postJson<SampleData>('/api/v1/samples/trial', payload, { token })
 }
+
+// ------------------------------------------------------------------
+// 端点五：研发阶段管控（审批驱动阶段门禁，产品核心）
+// ------------------------------------------------------------------
+
+/** 审批链—阶段绑定 DTO。 */
+export interface StageBindingDto {
+  stageCode?: string
+  defId?: string
+  label?: string
+}
+
+/** 审批链实例 DTO（对齐 FlowInstance）。 */
+export interface StageInstanceDto {
+  id?: string
+  defId?: string
+  defCode?: string
+  title?: string
+  submitter?: string
+  form?: Record<string, string | number | boolean>
+  currentNodeId?: string
+  status?: string
+  passedNodeIds?: string[]
+  nodeEnteredAt?: string
+  escalated?: boolean
+  escalatedToRole?: string
+  addedSigners?: string[]
+  createdAt?: string
+  finishedAt?: string
+}
+
+/** 闸门通过状态 DTO。 */
+export interface StageGatePassedDto {
+  gate?: string
+  passed?: boolean
+}
+
+/** 阶段管控请求（对齐后端 StageRequest）。 */
+export interface StagePayload {
+  tenantId: string
+  projectId: string
+  orgId?: string
+  userName?: string
+  roleName?: string
+  /** 动作：advance / createWorkItem / configure / release */
+  op: string
+  templateId?: string
+  targetStageCode?: string
+  stageCode?: string
+  stageName?: string
+  stageOrder?: number
+  gateCode?: string
+  prerequisites?: string[]
+  bindings?: StageBindingDto[]
+  instances?: StageInstanceDto[]
+  gatePassed?: StageGatePassedDto[]
+  // 🟡 档配置字段
+  strictMode?: boolean
+  allowConditional?: boolean
+  approvalRequired?: boolean
+  allowPartialApprove?: boolean
+  signMode?: string
+  allowDeferredDeliverable?: boolean
+}
+
+/** 阶段管控结果（对齐后端 StageResult）。 */
+export interface StageData {
+  op: string
+  stageCode: string
+  allowed: boolean
+  note: string
+  blockers: string[]
+}
+
+/** 阶段推进：前置「已批准」才可进入下一阶段。 */
+export function advanceStage(payload: StagePayload, token: string) {
+  return postJson<StageData>('/api/v1/stages/advance', payload, { token })
+}
+
+/** 工作对象创建：前序未批准则阻断（未批准不得实施）。 */
+export function createWorkItem(payload: StagePayload, token: string) {
+  return postJson<StageData>('/api/v1/stages/work-item', payload, { token })
+}
+
+/** 阶段模板配置：增删改阶段，依赖环/code 冲突硬拒绝。 */
+export function configureStage(payload: StagePayload, token: string) {
+  return postJson<StageData>('/api/v1/stages/configure', payload, { token })
+}
+
+/** 审批放行：审批完成 + 闸门通过才放行，驳回硬拒绝。 */
+export function releaseStage(payload: StagePayload, token: string) {
+  return postJson<StageData>('/api/v1/stages/release', payload, { token })
+}

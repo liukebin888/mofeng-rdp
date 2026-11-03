@@ -13,11 +13,15 @@
  */
 
 import type { Project, Requirement, TraceLink, EcrItem, SampleReq, BomNode, ActorContext } from '@/domain/types'
+import type { StageTemplate } from '@/domain/stageTemplate'
+import type { ApprovalBinding } from '@/domain/approvalBinding'
+import type { FlowInstance } from '@/domain/flowEngine'
 import type {
   ProjectInitiatePayload,
   RequirementTracePayload,
   ChangePayload,
   SamplePayload,
+  StagePayload,
   TraceLinkDto,
   ImpactDto,
   ClosureDto,
@@ -174,5 +178,53 @@ export function mapSample(
     event,
     conclusion: '合格',
     nonconformityIds: []
+  }
+}
+
+// ------------------------------------------------------------------
+// 端点五：研发阶段管控
+// ------------------------------------------------------------------
+
+/**
+ * 把前端阶段模板 + 审批绑定 + 审批实例 + 闸门通过状态映射为后端 StagePayload。
+ * 阶段推进探针：用「目标阶段 S2」发起推进，比对前端 stageRelease 结论 vs 后端 advance 判定。
+ */
+export function mapStageAdvance(
+  tpl: StageTemplate,
+  targetStageCode: string,
+  bindings: ApprovalBinding[],
+  instances: FlowInstance[],
+  gatePassed: Array<{ gate: string; passed: boolean }>,
+  actor: ActorContext
+): StagePayload | null {
+  if (!tpl) return null
+  return {
+    tenantId: actor.tenantId,
+    projectId: actor.projectId ?? '',
+    orgId: 'org-1',
+    userName: actor.userName,
+    roleName: actor.roleName,
+    op: 'advance',
+    templateId: tpl.id,
+    targetStageCode,
+    bindings: bindings.map((b) => ({ stageCode: b.stageCode, defId: b.defId, label: b.label })),
+    instances: instances.map((i) => ({
+      id: i.id,
+      defId: i.defId,
+      defCode: i.defCode,
+      title: i.title,
+      submitter: i.submitter,
+      form: i.form,
+      currentNodeId: i.currentNodeId,
+      status: i.status,
+      passedNodeIds: i.passedNodeIds,
+      nodeEnteredAt: i.nodeEnteredAt,
+      escalated: i.escalated,
+      escalatedToRole: i.escalatedToRole,
+      addedSigners: i.addedSigners,
+      createdAt: i.createdAt,
+      finishedAt: i.finishedAt
+    })),
+    gatePassed: gatePassed.map((g) => ({ gate: g.gate, passed: g.passed }))
   }
 }

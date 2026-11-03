@@ -1,6 +1,6 @@
 <template>
   <div>
-    <PageHeader title="服务端一致性探针" desc="四组闭环的前端 domain 引擎结论 vs 后端 REST 复核结论一致性比对（联调验证）。披露请求数 / 有效响应数 / 差异数，防「零缺陷」假阳性。">
+    <PageHeader title="服务端一致性探针" desc="五组闭环的前端 domain 引擎结论 vs 后端 REST 复核结论一致性比对（联调验证）。披露请求数 / 有效响应数 / 差异数，防「零缺陷」假阳性。">
       <template #actions>
         <el-button size="small" type="primary" :loading="running" @click="runAll">
           {{ running ? '探针执行中…' : '运行全部探针' }}
@@ -17,7 +17,7 @@
     </div>
 
     <div v-if="!reports.length && !running" class="panel" style="text-align: center; padding: 40px">
-      <div style="color: var(--text-2)">尚未执行探针。点击「运行全部探针」发起四组闭环的前后端一致性比对。</div>
+      <div style="color: var(--text-2)">尚未执行探针。点击「运行全部探针」发起五组闭环的前后端一致性比对。</div>
     </div>
 
     <div v-for="r in reports" :key="r.name" class="panel" style="margin-bottom: 12px">
@@ -56,11 +56,13 @@ import PageHeader from '@/components/PageHeader.vue'
 import KpiCard from '@/components/KpiCard.vue'
 import { useAppStore } from '@/store/app'
 import { API_V1_BASE } from '@/infra/apiV1'
+import { mapStageAdvance } from '@/infra/probeMapping'
 import {
   runProjectProbe,
   runTraceProbe,
   runEcrProbe,
   runSampleProbe,
+  runStageProbe,
   type ProbeReport
 } from '@/infra/probeRunner'
 
@@ -91,6 +93,19 @@ async function runAll() {
     reports.value.push(await runEcrProbe(store.projectEcrs[0], actor))
     // 探针四：样件试制（取第一条样件）
     reports.value.push(await runSampleProbe(store.data.samples?.[0], store.data.boms ?? [], actor))
+    // 探针五：研发阶段推进（固定推进 S2，比对前端 stageRelease 结论 vs 后端 advance 判定）
+    const targetStage = 'S2'
+    const gatePassed = store.stageGateRuns.map((g) => ({ gate: g.gate, passed: g.passed && !g.conditional }))
+    const stagePayload = mapStageAdvance(
+      store.stageTemplate,
+      targetStage,
+      store.approvalBindings,
+      store.flowInstances,
+      gatePassed,
+      actor
+    )
+    const feRelease = store.stageRelease(targetStage)
+    reports.value.push(await runStageProbe(stagePayload, feRelease.released, feRelease.note, `阶段 ${targetStage}`))
   } finally {
     running.value = false
   }

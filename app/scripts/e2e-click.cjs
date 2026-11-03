@@ -501,6 +501,31 @@ async function resetState(page) {
   ok('KPI 卡显示三档统计（6/8/2）', rejInfo.kpis.some((k) => k.includes('6')) && rejInfo.kpis.some((k) => k.includes('8')) && rejInfo.kpis.some((k) => k.includes('2')), rejInfo.kpis.join('|'))
   ok('锁定事项（数据完整性底线）有锁定标记', /锁定/.test(rejInfo.body))
 
+  // ============ 链路 17：服务端一致性探针（前端引擎结论 vs 后端 REST 复核，含第 5 组「研发阶段推进」） ============
+  console.log('\n[链路17] 服务端一致性探针（五组闭环 + 研发阶段推进）')
+  await page.goto(BASE + '/#/system/probe', { waitUntil: 'domcontentloaded' })
+  await page.waitForTimeout(400)
+  const probeInfo = await page.evaluate(() => {
+    const body = document.body.innerText
+    const btns = [...document.querySelectorAll('button')].map((b) => b.innerText.trim())
+    return { body, btns }
+  })
+  ok('存在「服务端一致性探针」页面', /服务端一致性探针|前后端一致性比对/.test(probeInfo.body))
+  ok('有「运行全部探针」按钮', probeInfo.btns.some((b) => /运行全部探针|探针执行中/.test(b)))
+  // 点击运行全部探针，验证五组探针面板（含「研发阶段推进」）被发起
+  await page.evaluate(() => {
+    const btn = [...document.querySelectorAll('button')].find((b) => /运行全部探针/.test(b.innerText))
+    if (btn) btn.click()
+  })
+  await page.waitForTimeout(1500)
+  const probeAfter = await page.evaluate(() => {
+    const titles = [...document.querySelectorAll('.probe-title')].map((t) => t.innerText.trim())
+    const endpoints = [...document.querySelectorAll('.probe-head .mono.dim')].map((t) => t.innerText.trim())
+    return { titles, endpoints }
+  })
+  ok('五组探针面板齐全（含「研发阶段推进」）', probeAfter.titles.some((t) => t.includes('研发阶段推进')), probeAfter.titles.join('|'))
+  ok('研发阶段推进探针指向 /api/v1/stages/advance', probeAfter.endpoints.some((e) => e.includes('/api/v1/stages/advance')), probeAfter.endpoints.join('|'))
+
   console.log('\n========== 结果 ==========')
   console.log(`PASS ${passed} / FAIL ${failed}`)
   if (errors.length) console.log('pageerror:', JSON.stringify([...new Set(errors)].slice(0, 10)))
