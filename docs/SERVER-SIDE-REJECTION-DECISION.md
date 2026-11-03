@@ -116,13 +116,13 @@
 
 - ✅ **配置层**：`app/src/domain/rejectionPolicy.ts` 引擎（16 事项注册表 + 三档枚举 + `shouldReject` 力度判定 + 变更校验），系统设置页 `/system/rejection` 可逐项自定义档位与配置值。
 - ✅ **写路径拦截（路线 C：前端 store 权威预校验）**：`store/app.ts` 新增统一拦截闸 `rejectIf(itemId, engineViolated, ...)`，已接入 `submitGate`（A2 闸门未通过）、`approveOts`（A2 Gate4 未放行）、`advanceSample`（A2 闸门未通过）三处写路径。引擎判定违规 → 策略决定拦截力度，三档可配置，不再写死。
-- ⏸ **后端 Java REST 层**：尚未建（application 层无 controller/service），「后端权威」为后续工程（路线 B）。
+- ✅ **后端权威下沉（路线 B）**：`mofeng-application` 新建 stage 包 `StageApplicationService` + `StageController`（`/api/v1/stages`），把 4 个领域引擎编排为服务端写路径。🔴 档（A3 阶段不存在 / B3 审批驳回放行 / D1 依赖环 / D2 删被依赖 / D3 code 冲突）抛 `IllegalArgumentException` → 全局异常处理器收敛为 HTTP 422 BLOCKED（fail-closed 硬拒绝）；🟡 档读请求携带的 7 配置字段（strictMode/allowConditional/approvalRequired/allowPartialApprove/signMode/required/allowDeferredDeliverable）决定放行/拒绝；🟢 档只返回状态不拦截。前端写操作切到 Java 的迁移为后续工程（当前前端仍挂 Node 后端）。
 
 ### 下一步
 
-1. **后端权威下沉（路线 B）**：application 层建 controller/service，把 4 引擎 + `shouldReject` 接到 Java 写路径，前端写操作切到 Java。
-2. **🟡 档字段级细判**：CONFIGURABLE 档的配置字段（strictMode/allowConditional/signMode 等）目前以「宽松值放行/其余按引擎」的简化映射生效，后续把字段语义精确落到各引擎判定。
-3. **E2 安全校验**：鉴权/防绕过属基础设施层，独立立项评估。
+1. **前端切 Java 迁移**：前端 store 的写操作从 Node `PUT /api/state` 切换到 Java `/api/v1/stages` 细粒度写接口（迁移工程，非本轮范围）。
+2. **🟡 档字段级细判**：CONFIGURABLE 档的 7 配置字段目前以「宽松值放行/其余按引擎判定」的映射生效，后续把字段语义精确落到各引擎判定（如 signMode=all 的会签齐套细判）。
+3. **E2 安全校验**：鉴权/防绕过属基础设施层（`RequiresPermission` + `JwtAuthenticationFilter` 已就绪），独立立项评估。
 
 ---
 
