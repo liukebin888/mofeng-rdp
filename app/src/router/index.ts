@@ -37,6 +37,7 @@ export const MENUS: MenuGroup[] = [
   {
     key: 'presale', title: '项目前期', icon: 'Document', stage: 'P1–P2', role: '项目经理 / 研发副总', cp: 'K1 K2',
     items: [
+      { path: '/presale/presale-apply', title: '前期交申请', desc: '客户/产品线/预估金额，市场总监审核→三中心会签→总经理批准', comp: v('presale/PresaleApplyView') },
       { path: '/presale/apply', title: '立项申请', desc: '五项分级输入 + 技术方案↔报价关联', comp: v('presale/ApplyView') },
       { path: '/presale/review', title: '立项评审', desc: 'Gate1 准入逐条校验', comp: v('presale/ApplyView') },
       { path: '/presale/scheme', title: '技术方案与报价', desc: '方案版本与报价单关联（C-02）', comp: v('presale/SchemeView') },
