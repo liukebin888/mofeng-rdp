@@ -466,6 +466,24 @@ async function resetState(page) {
   ok('归档卷含保留期标识（15 年）', archiveInfo.vols.some((v) => /15 年/.test(v.body)), archiveInfo.vols.map((v) => v.name).join(' | '))
   ok('归档卷含保留状态标签', archiveInfo.tags.some((t) => /保留中|临近到期|已到期/.test(t)), archiveInfo.tags.join(' | '))
 
+  // ============ 链路 15：交付物审批齐套（P3：交付物「有效提供」= 审批完成） ============
+  console.log('\n[链路15] 交付物审批齐套')
+  await page.goto(BASE + '/#/dev/gate', { waitUntil: 'domcontentloaded' })
+  await page.waitForTimeout(400)
+  const deliverInfo = await page.evaluate(() => {
+    const panel = [...document.querySelectorAll('.panel-title')].find((p) => /交付物审批齐套/.test(p.innerText))
+    const rows = [...document.querySelectorAll('.deliver-row')].map((r) => ({
+      gate: r.querySelector('.deliver-gate .tag')?.innerText.trim() || '',
+      num: r.querySelector('.deliver-gate .num')?.innerText.trim() || '',
+      miss: [...r.querySelectorAll('.deliver-miss .tag')].map((t) => t.innerText.trim())
+    }))
+    return { hasPanel: !!panel, rows }
+  })
+  ok('存在「交付物审批齐套」面板', deliverInfo.hasPanel)
+  ok('覆盖 G3/G4/G5 三闸门交付物', deliverInfo.rows.length === 3 && ['G3', 'G4', 'G5'].every((g) => deliverInfo.rows.some((r) => r.gate === g)), deliverInfo.rows.map((r) => r.gate).join('|'))
+  ok('G3 交付物审批齐套判定有数值（已批准/应批）', /^\d+\/\d+$/.test(deliverInfo.rows.find((r) => r.gate === 'G3')?.num || ''), deliverInfo.rows.find((r) => r.gate === 'G3')?.num)
+  ok('未批准交付物列为缺件（DEL-004 安全分析报告）', deliverInfo.rows.some((r) => r.miss.some((m) => /DEL-004/.test(m))), JSON.stringify(deliverInfo.rows.map((r) => r.miss)))
+
   console.log('\n========== 结果 ==========')
   console.log(`PASS ${passed} / FAIL ${failed}`)
   if (errors.length) console.log('pageerror:', JSON.stringify([...new Set(errors)].slice(0, 10)))

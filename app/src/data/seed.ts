@@ -69,9 +69,10 @@ import type { VulnerabilityItem, Issue8D } from '@/domain/defect'
 import type { Sci, CompatibilityRecord, ReleaseSignoff } from '@/domain/softwareVersion'
 import type { Space } from '@/domain/spaceEngine'
 import { buildApprovalChain, DEFAULT_APPROVAL_ROLES, type ApprovalBinding } from '@/domain/approvalBinding'
+import type { DeliverableApprovalBinding } from '@/domain/deliverableApproval'
 import { appendRecord, manifestHashOf, type ArchiveLayer, type ArchiveVolume } from '@/domain/archiveLayer'
 
-export const SEED_VERSION = 'mofeng.rdp.v1.0.22'
+export const SEED_VERSION = 'mofeng.rdp.v1.0.23'
 const TENANT = 'T-1001'
 
 export interface SeedUser {
@@ -1496,7 +1497,18 @@ export function buildSeed() {
       buildApprovalChain('DEF-STAGE-S3', 'FLOW-STAGE-S3', 'S3 过程设计与开发审批', { ...DEFAULT_APPROVAL_ROLES, signRoles: ['工艺技术中心', '制造中心', '质量中心'] }, [{ key: 'process', label: '过程方案' }]),
       buildApprovalChain('DEF-STAGE-S4', 'FLOW-STAGE-S4', 'S4 试制与 OTS 验证审批', { ...DEFAULT_APPROVAL_ROLES, signRoles: ['制造中心', '质量中心', '试验中心'] }, [{ key: 'ots', label: 'OTS 结果' }]),
       buildApprovalChain('DEF-STAGE-S5', 'FLOW-STAGE-S5', 'S5 量产与交付审批', { ...DEFAULT_APPROVAL_ROLES, signRoles: ['制造中心', '计划物流中心', '质量中心'] }, [{ key: 'sop', label: 'SOP 准备' }]),
-      buildApprovalChain('DEF-STAGE-S6', 'FLOW-STAGE-S6', 'S6 反馈与改进审批', { ...DEFAULT_APPROVAL_ROLES, signRoles: ['质量中心', '项目管理中心'] }, [{ key: 'feedback', label: '反馈结论' }])
+      buildApprovalChain('DEF-STAGE-S6', 'FLOW-STAGE-S6', 'S6 反馈与改进审批', { ...DEFAULT_APPROVAL_ROLES, signRoles: ['质量中心', '项目管理中心'] }, [{ key: 'feedback', label: '反馈结论' }]),
+      // ⑨ 交付物审批链（P3：交付物绑定审批，交付物「有效提供」= 审批完成）
+      buildApprovalChain('DEF-DEL-D1', 'FLOW-DEL-1', 'DEL-001 系统需求规格书审批', { ...DEFAULT_APPROVAL_ROLES, signRoles: ['电子研发中心', '功能安全', '质量中心'] }, [{ key: 'deliverable', label: '交付物' }]),
+      buildApprovalChain('DEF-DEL-D2', 'FLOW-DEL-2', 'DEL-002 系统架构设计说明审批', { ...DEFAULT_APPROVAL_ROLES, signRoles: ['电子研发中心', '结构研发中心', '质量中心'] }, [{ key: 'deliverable', label: '交付物' }]),
+      buildApprovalChain('DEF-DEL-D3', 'FLOW-DEL-3', 'DEL-003 硬件原理图与 PCB 审批', { ...DEFAULT_APPROVAL_ROLES, signRoles: ['硬件', '工艺技术中心', '质量中心'] }, [{ key: 'deliverable', label: '交付物' }]),
+      buildApprovalChain('DEF-DEL-D4', 'FLOW-DEL-4', 'DEL-004 安全分析报告审批', { ...DEFAULT_APPROVAL_ROLES, signRoles: ['功能安全', '信息安全', '质量中心'] }, [{ key: 'deliverable', label: '交付物' }]),
+      buildApprovalChain('DEF-DEL-D5', 'FLOW-DEL-5', 'DEL-005 软件发布包审批', { ...DEFAULT_APPROVAL_ROLES, signRoles: ['软件', '测试中心', '配置管理'] }, [{ key: 'deliverable', label: '交付物' }]),
+      buildApprovalChain('DEF-DEL-D6', 'FLOW-DEL-6', 'DEL-006 DV/PV 试验报告审批', { ...DEFAULT_APPROVAL_ROLES, signRoles: ['试验中心', '质量中心'] }, [{ key: 'deliverable', label: '交付物' }]),
+      buildApprovalChain('DEF-DEL-D7', 'FLOW-DEL-7', 'DEL-007 OTS 样件认可报告审批', { ...DEFAULT_APPROVAL_ROLES, signRoles: ['质量中心', '试验中心', '制造中心'] }, [{ key: 'deliverable', label: '交付物' }]),
+      buildApprovalChain('DEF-DEL-D8', 'FLOW-DEL-8', 'DEL-008 PPAP 文件包审批', { ...DEFAULT_APPROVAL_ROLES, signRoles: ['供应链', '质量中心', '工艺技术中心'] }, [{ key: 'deliverable', label: '交付物' }]),
+      buildApprovalChain('DEF-DEL-D9', 'FLOW-DEL-9', 'DEL-009 追溯矩阵审批', { ...DEFAULT_APPROVAL_ROLES, signRoles: ['系统', '软件', '质量中心'] }, [{ key: 'deliverable', label: '交付物' }]),
+      buildApprovalChain('DEF-DEL-D10', 'FLOW-DEL-10', 'DEL-010 交付清单与签收单审批', { ...DEFAULT_APPROVAL_ROLES, signRoles: ['计划物流中心', '质量中心'] }, [{ key: 'deliverable', label: '交付物' }])
     ] as FlowDefinition[],
     /** 审批链—阶段绑定（APR-002：每个阶段走一条标准四步审批链，作为闸门放行的审批证据） */
     approvalBindings: [
@@ -1507,6 +1519,19 @@ export function buildSeed() {
       { stageCode: 'S5', defId: 'DEF-STAGE-S5', label: '量产与交付审批' },
       { stageCode: 'S6', defId: 'DEF-STAGE-S6', label: '反馈与改进审批' }
     ] as ApprovalBinding[],
+    /** 交付物—审批链绑定（P3：必交交付物走审批链，审批完成才算「有效提供」） */
+    deliverableApprovalBindings: [
+      { deliverableId: 'D1', defId: 'DEF-DEL-D1', label: '系统需求规格书审批' },
+      { deliverableId: 'D2', defId: 'DEF-DEL-D2', label: '系统架构设计说明审批' },
+      { deliverableId: 'D3', defId: 'DEF-DEL-D3', label: '硬件原理图与 PCB 审批' },
+      { deliverableId: 'D4', defId: 'DEF-DEL-D4', label: '安全分析报告审批' },
+      { deliverableId: 'D5', defId: 'DEF-DEL-D5', label: '软件发布包审批' },
+      { deliverableId: 'D6', defId: 'DEF-DEL-D6', label: 'DV/PV 试验报告审批' },
+      { deliverableId: 'D7', defId: 'DEF-DEL-D7', label: 'OTS 样件认可报告审批' },
+      { deliverableId: 'D8', defId: 'DEF-DEL-D8', label: 'PPAP 文件包审批' },
+      { deliverableId: 'D9', defId: 'DEF-DEL-D9', label: '追溯矩阵审批' },
+      { deliverableId: 'D10', defId: 'DEF-DEL-D10', label: '交付清单与签收单审批' }
+    ] as DeliverableApprovalBinding[],
     flowInstances: [
       {
         id: 'F1', defId: 'DEF-GATE', defCode: 'FLOW-GATE', title: 'PRJ-2026-018 Gate3 设计闸门放行', submitter: '周立群',
@@ -1537,6 +1562,27 @@ export function buildSeed() {
       {
         id: 'PRE-2-001', defId: 'DEF-PRE-2', defCode: 'FLOW-PRE-2', title: 'XX 客户电驱控制器报价', submitter: '市场客户经理 王芳',
         form: { productLine: '电驱控制器' }, currentNodeId: 'q2', status: '运行中', passedNodeIds: ['q1'], history: [],
+        nodeEnteredAt: '2026-11-01T09:00:00+08:00', escalated: false, addedSigners: [], createdAt: '2026-11-01T09:00:00+08:00'
+      },
+      // 交付物审批实例（P3：交付物绑定审批，体现「已批准」与「进行中」两态）
+      {
+        id: 'FD-001', defId: 'DEF-DEL-D1', defCode: 'FLOW-DEL-1', title: 'DEL-001 系统需求规格书审批', submitter: '郑昊',
+        form: { deliverable: 'DEL-001' }, currentNodeId: 'en', status: '已完成', passedNodeIds: ['st', 'rv', 'sg', 'ap'], history: [],
+        nodeEnteredAt: '2026-10-20T09:00:00+08:00', escalated: false, addedSigners: [], createdAt: '2026-10-20T09:00:00+08:00', finishedAt: '2026-10-23T18:00:00+08:00'
+      },
+      {
+        id: 'FD-002', defId: 'DEF-DEL-D2', defCode: 'FLOW-DEL-2', title: 'DEL-002 系统架构设计说明审批', submitter: '郑昊',
+        form: { deliverable: 'DEL-002' }, currentNodeId: 'en', status: '已完成', passedNodeIds: ['st', 'rv', 'sg', 'ap'], history: [],
+        nodeEnteredAt: '2026-10-22T09:00:00+08:00', escalated: false, addedSigners: [], createdAt: '2026-10-22T09:00:00+08:00', finishedAt: '2026-10-25T17:00:00+08:00'
+      },
+      {
+        id: 'FD-004', defId: 'DEF-DEL-D4', defCode: 'FLOW-DEL-4', title: 'DEL-004 安全分析报告（HARA/TARA/FMEDA）审批', submitter: '吴敏',
+        form: { deliverable: 'DEL-004' }, currentNodeId: 'rv', status: '运行中', passedNodeIds: ['st'], history: [],
+        nodeEnteredAt: '2026-11-02T10:00:00+08:00', escalated: false, addedSigners: [], createdAt: '2026-11-02T10:00:00+08:00'
+      },
+      {
+        id: 'FD-007', defId: 'DEF-DEL-D7', defCode: 'FLOW-DEL-7', title: 'DEL-007 OTS 样件认可报告审批', submitter: '质量工程师 顾晨',
+        form: { deliverable: 'DEL-007' }, currentNodeId: 'rv', status: '运行中', passedNodeIds: ['st'], history: [],
         nodeEnteredAt: '2026-11-01T09:00:00+08:00', escalated: false, addedSigners: [], createdAt: '2026-11-01T09:00:00+08:00'
       }
     ] as FlowInstance[],

@@ -24,6 +24,7 @@ import { runGate, GATE_TEMPLATES } from '@/domain/gate'
 import { enforceStageGate, canCreateWorkItem, type WorkItemKind, type GateEnforceVerdict } from '@/domain/gateEnforce'
 import { AUTOMOTIVE_STAGE_TEMPLATE, findStageTemplate, orderedStages, type StageTemplate } from '@/domain/stageTemplate'
 import { gateReleaseEvidence, stageFullyReleased, type ApprovalBinding } from '@/domain/approvalBinding'
+import { deliverableProvidedEvidence, stageDeliverablesComplete, type DeliverableApprovalBinding } from '@/domain/deliverableApproval'
 import { freeze as freezeBaseline, verifyBaseline } from '@/domain/baseline'
 import { appendAudit, verifyChain } from '@/domain/audit'
 import { appendRecord, archiveFromAudit, DEFAULT_RETENTION_YEARS, destroyVolume, retentionVerdict, verifyLayer, type ArchiveLayer, type ArchiveVolume } from '@/domain/archiveLayer'
@@ -1253,6 +1254,21 @@ export const useAppStore = defineStore('app', () => {
     const stage = stages.value.find((s) => s.code === stageCode)
     const gatePassed = stage?.gateCode ? !!stageGateRuns.value.find((g) => g.gate === stage.gateCode && g.passed && !g.conditional) : false
     return stageFullyReleased(stageTemplate.value, stageCode, approvalBindings.value, flowInstances.value, gatePassed)
+  }
+
+  // —— 交付物审批（P3：交付物绑定审批，产品核心「交付物审批嵌入阶段审批」）——
+  /** 交付物↔审批链绑定关系（seed 播入，可配置） */
+  const deliverableApprovalBindings = computed<DeliverableApprovalBinding[]>(() => (data.value.deliverableApprovalBindings ?? []) as DeliverableApprovalBinding[])
+  /** 某交付物「有效提供」证据判定（复用引擎，禁止自造判定） */
+  function deliverableEvidence(deliverableId: string) {
+    const d = projectDeliverables.value.find((x) => x.id === deliverableId)
+    if (!d) return { provided: false, code: 'OPTIONAL' as const, note: `交付物 ${deliverableId} 不存在` }
+    const binding = deliverableApprovalBindings.value.find((b) => b.deliverableId === deliverableId)
+    return deliverableProvidedEvidence(d, binding, flowInstances.value)
+  }
+  /** 某阶段（gate 维度）交付物审批齐套判定 */
+  function deliverableComplete(gateCode: string) {
+    return stageDeliverablesComplete(gateCode, projectDeliverables.value, deliverableApprovalBindings.value, flowInstances.value)
   }
 
   // —— 企业级聚合视图（对标 Oracle 组合驾驶舱：跨项目汇总健康指标，兑现 V4.0 第五种介入方式「聚合」）——
@@ -2923,6 +2939,9 @@ export const useAppStore = defineStore('app', () => {
     approvalBindings,
     stageReleaseEvidence,
     stageRelease,
+    deliverableApprovalBindings,
+    deliverableEvidence,
+    deliverableComplete,
     aiSwitchState,
     aiScope,
     aiVisibleCorpus,

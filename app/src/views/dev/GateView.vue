@@ -29,6 +29,25 @@
       </div>
     </div>
 
+    <div class="panel" style="margin-bottom: 12px">
+      <div class="panel-title">
+        交付物审批齐套（P3）· 交付物「有效提供」= 审批完成
+        <span class="dim">必交交付物审批链批准后才计入齐套，否则按缺件处理</span>
+      </div>
+      <div v-for="g in ['G3', 'G4', 'G5']" :key="g" class="deliver-row">
+        <div class="deliver-gate">
+          <span class="tag" :class="deliverState(g).complete ? 'ok' : 'l3'">{{ g }}</span>
+          <span class="dim">{{ g === 'G3' ? '设计闸门' : g === 'G4' ? '样件闸门' : '交付闸门' }}</span>
+          <span class="num">{{ deliverState(g).approvedCount }}/{{ deliverState(g).requiredCount }}</span>
+          <span class="dim">已批准交付物</span>
+        </div>
+        <div v-if="deliverState(g).missing.length" class="deliver-miss">
+          <span v-for="m in deliverState(g).missing" :key="m.code" class="tag l1">{{ m.code }} {{ m.name }}：{{ m.reason }}</span>
+        </div>
+        <div v-else class="dim">齐套（全部必交交付物已审批批准）</div>
+      </div>
+    </div>
+
     <div class="grid grid-5" style="margin-bottom: 12px">
       <div v-for="t in GATE_TEMPLATES" :key="t.code" class="gcard" :class="{ ok: store.gateResults[t.code].passed, bad: !store.gateResults[t.code].passed }">
         <div class="between">
@@ -124,6 +143,10 @@ function demoSod() {
   store.notify('error', r.message)
   store.log('RELEASE', 'Gate', 'G3', { submitter: '周立群', releaser: '周立群' }, undefined, 'DENY')
 }
+/** 交付物审批齐套状态（复用 store.deliverableComplete 口径，禁止自造判定） */
+function deliverState(gateCode: string) {
+  return store.deliverableComplete(gateCode)
+}
 </script>
 
 <style scoped>
@@ -147,4 +170,9 @@ function demoSod() {
 .irow { display: grid; grid-template-columns: 46px 56px 1fr 1.1fr; gap: 8px; align-items: start; padding: 6px 0; border-bottom: 1px dashed #16233a; font-size: 11.5px; }
 .irow em { font-style: normal; color: var(--text-3); }
 .nm { color: var(--text-2); }
+.deliver-row { display: flex; flex-direction: column; gap: 6px; padding: 8px 0; border-bottom: 1px dashed #16233a; }
+.deliver-row:last-child { border-bottom: none; }
+.deliver-gate { display: flex; align-items: center; gap: 8px; font-size: 11.5px; }
+.deliver-gate .num { font-size: 15px; font-weight: 700; color: var(--text-1); }
+.deliver-miss { display: flex; flex-wrap: wrap; gap: 6px; }
 </style>
