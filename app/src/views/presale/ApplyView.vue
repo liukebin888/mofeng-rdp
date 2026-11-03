@@ -25,8 +25,8 @@
       <div class="panel">
         <div class="panel-title">项目基本信息（PRJ-002 八项必填）</div>
         <el-form label-width="96px" size="small">
-          <el-form-item label="项目编码"><el-input :model-value="p.code" disabled /></el-form-item>
-          <el-form-item label="项目名称"><el-input v-model="form.name" @input="markDirty" /></el-form-item>
+          <el-form-item label="项目编码"><el-input v-model="form.code" placeholder="新项目编码（提交后生成可留空）" @input="markDirty" /></el-form-item>
+          <el-form-item label="项目名称"><el-input v-model="form.name" placeholder="新项目名称" @input="markDirty" /></el-form-item>
           <el-form-item label="客户">
             <el-select v-model="form.customer" filterable placeholder="从客户主数据选择" style="width: 100%" @change="markDirty">
               <el-option v-for="c in store.customers" :key="c.id" :value="c.name" :label="`${c.name}（${c.code}）`" />
@@ -150,12 +150,14 @@ import type { PersonCandidate } from '@/domain/personSearch'
 
 const store = useAppStore()
 const { te } = useI18n()
-const p = computed(() => store.currentProject)
-const form = reactive({ name: p.value.name, customer: p.value.customer, productLine: p.value.productLine, platform: p.value.platform, owner: p.value.owner, start: p.value.start, end: p.value.end })
-const init = p.value.grading?.input
-const input = reactive<GradingInput>({ asil: init?.asil ?? '', cal: init?.cal ?? -1, selfDev: init?.selfDev ?? '', newArch: init?.newArch ?? null, customerSafety: init?.customerSafety ?? null })
-const schemeLinked = ref(true)
-const quoteLinked = ref(true)
+
+// 空白表单默认值：新增打开的是空白模板，所有字段由用户新填写，不带入任何已有项目数据。
+const EMPTY_FORM = { code: '', name: '', customer: '', productLine: '', platform: '', owner: '', start: '', end: '' }
+const EMPTY_INPUT: GradingInput = { asil: '', cal: -1, selfDev: '', newArch: null, customerSafety: null }
+const form = reactive({ ...EMPTY_FORM })
+const input = reactive<GradingInput>({ ...EMPTY_INPUT })
+const schemeLinked = ref(false)
+const quoteLinked = ref(false)
 
 // —— 统一工作流单据（WF-001 四按钮）——
 const wfForm = ref<WorkflowForm | null>(null)
@@ -173,15 +175,6 @@ const gate = computed(() => store.gateResults.G1)
 
 function markDirty() {
   dirty.value = true
-}
-
-function fillDemo(level: 'L1' | 'L3') {
-  if (level === 'L1') {
-    Object.assign(input, { asil: 'B', cal: 2, selfDev: 'FULL', newArch: true, customerSafety: false })
-  } else {
-    Object.assign(input, { asil: 'QM', cal: 0, selfDev: 'PARAM_ONLY', newArch: false, customerSafety: false })
-  }
-  markDirty()
 }
 
 const ownerMeta = ref<PersonCandidate | null>(null)
@@ -211,16 +204,22 @@ function hydrateContent(content: string) {
   }
 }
 
-/** 新增：打开立项模板，若已有草稿则续编 */
+/** 新增：打开空白立项模板（不带入任何已有项目数据）；若此前有未提交草稿则续编 */
 function wfNew() {
   const def = store.flowDefinitions.find((d) => d.id === INITIATION_DEF_ID)
   if (!def) {
     store.notify('error', '立项流程模板不存在，无法新增')
     return
   }
-  const objectId = p.value.id ?? 'project'
+  // 单据自身标识（不绑定任何已有项目）：每张立项单独立建档
+  const objectId = `INIT-${Date.now()}`
   const draft = store.data.drafts?.find((d) => d.userId === store.currentUser.id && d.objectType === '立项申请' && d.id === objectId)
   const f = newWorkflowForm({ def, objectType: '立项申请', objectId, content: draft?.content })
+  // 空白模板：先清空表单，再决定是否续编草稿
+  Object.assign(form, EMPTY_FORM)
+  Object.assign(input, EMPTY_INPUT)
+  schemeLinked.value = false
+  quoteLinked.value = false
   if (draft?.content) hydrateContent(draft.content)
   wfForm.value = f
   dirty.value = false
@@ -249,12 +248,15 @@ function wfClose() {
   wfBlockers.value = []
 }
 
-/** 提交：校验 → 走审批链 */
+/** 提交：校验 → 走审批链（立项申请为独立新单据，不修改任何已有项目） */
 function wfSubmit() {
   if (!wfForm.value) return
   const blockers: string[] = []
   if (!result.value.level) {
     blockers.push('CLS-001：五项分级输入不齐，未定级')
+  }
+  if (!form.name.trim()) {
+    blockers.push('PRJ-002：项目名称必填')
   }
   if (!schemeLinked.value || !quoteLinked.value) {
     blockers.push('C-02：技术方案与报价必须已关联')
@@ -264,27 +266,19 @@ function wfSubmit() {
     store.notify('error', blockers.join('；'))
     return
   }
-  // 回写项目台账（分级判定 + 主数据）
-  const proj = store.currentProject
-  const before = { level: proj.level }
-  proj.level = result.value.level
-  proj.grading = { input: { ...input }, result: result.value }
-  proj.customer = form.customer
-  proj.productLine = form.productLine
-  proj.name = form.name
-  proj.platform = form.platform
 
   // 保存最终内容并提交（走 startFlow 进入「立项申请」审批链）
   const content = serializeContent()
   wfForm.value = saveWorkflowForm(wfForm.value, content)
   const formData: Record<string, string | number | boolean> = {
     name: form.name,
+    code: form.code,
     customer: form.customer,
-    productLine: form.productLine
+    productLine: form.productLine,
+    level: result.value.level ?? ''
   }
   const ok = store.submitWorkflowForm(wfForm.value, `${wfForm.value.title}：${form.name}`, formData)
   if (ok) {
-    store.log('SUBMIT', '项目', proj.id, { level: proj.level, row: result.value.hitRowNo }, before)
     store.notify('success', `立项申请已提交审批：判定 ${result.value.level}（命中第 ${result.value.hitRowNo} 行）`)
     dirty.value = false
     wfBlockers.value = []
