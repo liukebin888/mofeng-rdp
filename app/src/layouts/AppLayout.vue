@@ -47,7 +47,7 @@
 
         <div class="foot">
           <div class="dim">SRS V1.4 · 方案 V4.0</div>
-          <div class="dim">16 {{ t('app.menuCount') }} / 48 {{ t('app.controlPoints') }}</div>
+          <div class="dim">{{ menuCount }} {{ t('app.menuCount') }} / {{ cpCount }} {{ t('app.controlPoints') }}</div>
           <div class="dim" style="margin-top: 4px">
             <span class="tag" :class="store.repoMode === 'rest' ? 'ok' : ''">{{ store.repoMode === 'rest' ? t('app.restPersisted') : t('app.localStorage') }}</span>
           </div>
@@ -145,6 +145,7 @@ import { MENUS } from '@/router'
 import { useAppStore } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
 import { breakpointOf, sideModeOf, type Breakpoint } from '@/domain/mobilePortal'
+import { CP_DEFINITIONS } from '@/domain/controlPoints'
 
 const store = useAppStore()
 const route = useRoute()
@@ -158,6 +159,10 @@ const sid = ref(store.spaceId)
 /** 顶部横向导航：工作中心分组；侧栏渲染其余分组 */
 const workbenchItems = computed(() => MENUS.find((m) => m.key === 'workbench')?.items ?? [])
 const sideMenus = computed(() => MENUS.filter((m) => m.key !== 'workbench'))
+
+/** 底部统计：菜单组数与控制点数改为动态计数，避免增删菜单/控制点后文案失配 */
+const menuCount = computed(() => MENUS.length)
+const cpCount = computed(() => CP_DEFINITIONS.length)
 
 /** Element Plus 组件内部文案随语言切换 */
 const epLocale = computed(() => (store.locale === 'en-US' ? en : zhCn))

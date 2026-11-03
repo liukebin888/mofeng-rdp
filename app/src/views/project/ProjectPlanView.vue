@@ -26,7 +26,9 @@
         <div class="panel-title">项目主计划信息（<span class="required-note">红色 * 为必填项</span>）</div>
         <el-form label-width="100px" size="small">
           <el-form-item label="项目名称" required>
-            <el-input v-model="form.name" placeholder="项目名称" @input="markDirty" />
+            <el-select v-model="form.name" filterable allow-create default-first-option placeholder="选择或输入项目名称" style="width: 100%" @change="markDirty">
+              <el-option v-for="p in store.spaceProjects" :key="p.id" :value="p.name" :label="`${p.code} · ${p.name}`" />
+            </el-select>
           </el-form-item>
           <el-form-item label="计划周期" required>
             <div class="row" style="width: 100%">
