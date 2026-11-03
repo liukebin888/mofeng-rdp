@@ -1,0 +1,188 @@
+<template>
+  <div>
+    <PageHeader title="PPAP 提交" desc="统一工作流单据（WF-001）：新增打开 PPAP 提交模板 → 编辑中可保存/关闭 → 提交走审批链（质量工程师发起 → 部门会签 → 客户批准）。红色 * 为必填项，未填不允许提交进入下一步">
+      <template #actions>
+        <WorkflowFormShell
+          :form="wfForm"
+          :blockers="wfBlockers"
+          :dirty="dirty"
+          @new="wfNew"
+          @save="wfSave"
+          @close="wfClose"
+          @submit="wfSubmit"
+        />
+      </template>
+    </PageHeader>
+
+    <div v-if="!wfForm" class="panel empty-panel">
+      <el-empty description="点击「新增」打开 PPAP 提交模板，开始填写" :image-size="80" />
+      <div class="row center">
+        <el-button type="primary" size="small" @click="wfNew">新增 PPAP 提交</el-button>
+      </div>
+    </div>
+
+    <div v-else class="grid" style="grid-template-columns: 1.3fr 1fr">
+      <div class="panel">
+        <div class="panel-title">PPAP 提交信息（<span class="required-note">红色 * 为必填项</span>）</div>
+        <el-form label-width="120px" size="small">
+          <el-form-item label="项目名称" required>
+            <el-input v-model="form.name" placeholder="项目名称" @input="markDirty" />
+          </el-form-item>
+          <el-form-item label="PPAP 等级" required>
+            <el-select v-model="form.level" placeholder="选择 PPAP 等级" style="width: 100%" @change="markDirty">
+              <el-option value="等级1" label="等级 1（仅提交 PSW）" />
+              <el-option value="等级2" label="等级 2（PSW + 样品 + 部分文件）" />
+              <el-option value="等级3" label="等级 3（PSW + 样品 + 完整文件）" />
+              <el-option value="等级4" label="等级 4（客户自定义）" />
+              <el-option value="等级5" label="等级 5（PSW + 完整文件，现场审核）" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="文件包编号" required>
+            <el-input v-model="form.pkgNo" placeholder="PPAP 文件包编号" @input="markDirty" />
+          </el-form-item>
+          <el-form-item label="18 要素齐全性" required>
+            <el-select v-model="form.elements" placeholder="18 要素是否齐全" style="width: 100%" @change="markDirty">
+              <el-option value="齐全" label="齐全（18/18）" />
+              <el-option value="不齐全" label="不齐全" />
+            </el-select>
+          </el-form-item>
+        </el-form>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">审批链路（DEF-PRJ-PPAP）</div>
+        <div class="flow-chain">
+          <div class="chain-node start">发起（质量工程师）</div>
+          <div class="chain-arrow">↓</div>
+          <div class="chain-node sign">部门会签（供应链/质量/工艺，全签）</div>
+          <div class="chain-arrow">↓</div>
+          <div class="chain-node approve">客户批准</div>
+          <div class="chain-arrow">↓</div>
+          <div class="chain-node end">结束</div>
+        </div>
+        <div class="muted" style="margin-top: 12px; font-size: 12px">
+          PPAP（生产件批准程序）是量产前的关键质量闸门，18 要素须齐全方可提交客户批准，批准后进入量产放行。
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { reactive, ref } from 'vue'
+import PageHeader from '@/components/PageHeader.vue'
+import WorkflowFormShell from '@/components/WorkflowFormShell.vue'
+import { useAppStore } from '@/store/app'
+import { newWorkflowForm, saveWorkflowForm } from '@/domain/workflowForm'
+import type { WorkflowForm } from '@/domain/workflowForm'
+
+const store = useAppStore()
+
+const EMPTY_FORM = { name: '', level: '', pkgNo: '', elements: '' }
+const form = reactive({ ...EMPTY_FORM })
+
+const wfForm = ref<WorkflowForm | null>(null)
+const dirty = ref(false)
+const wfBlockers = ref<string[]>([])
+
+const INITIATION_DEF_ID = 'DEF-PRJ-PPAP'
+
+function markDirty() {
+  dirty.value = true
+}
+
+const REQUIRED_FIELDS: Array<{ label: string; empty: () => boolean }> = [
+  { label: '项目名称', empty: () => !form.name.trim() },
+  { label: 'PPAP 等级', empty: () => !form.level },
+  { label: '文件包编号', empty: () => !form.pkgNo.trim() },
+  { label: '18 要素齐全性', empty: () => !form.elements }
+]
+
+function missingRequiredFields(): string[] {
+  return REQUIRED_FIELDS.filter((f) => f.empty()).map((f) => f.label)
+}
+
+function serializeContent(): string {
+  return JSON.stringify({ form: { ...form } })
+}
+
+function hydrateContent(content: string) {
+  try {
+    const obj = JSON.parse(content)
+    if (obj.form) Object.assign(form, obj.form)
+  } catch {
+    /* 忽略损坏草稿 */
+  }
+}
+
+function wfNew() {
+  const def = store.flowDefinitions.find((d) => d.id === INITIATION_DEF_ID)
+  if (!def) {
+    store.notify('error', 'PPAP 提交流程模板不存在，无法新增')
+    return
+  }
+  const objectId = `PPAP-${Date.now()}`
+  const draft = store.data.drafts?.find((d) => d.userId === store.currentUser.id && d.objectType === 'PPAP提交' && d.id === objectId)
+  const f = newWorkflowForm({ def, objectType: 'PPAP提交', objectId, content: draft?.content })
+  Object.assign(form, EMPTY_FORM)
+  if (draft?.content) hydrateContent(draft.content)
+  wfForm.value = f
+  dirty.value = false
+  wfBlockers.value = []
+}
+
+function wfSave() {
+  if (!wfForm.value) return
+  const content = serializeContent()
+  wfForm.value = saveWorkflowForm(wfForm.value, content)
+  store.saveDraft('PPAP提交', wfForm.value.id, content)
+  dirty.value = false
+}
+
+function wfClose() {
+  store.notify('info', dirty.value ? '已关闭编辑（未保存的改动不会保留）' : '已关闭编辑（草稿已保存，可再次打开续编）')
+  wfForm.value = null
+  dirty.value = false
+  wfBlockers.value = []
+}
+
+function wfSubmit() {
+  if (!wfForm.value) return
+  const blockers: string[] = []
+  const missing = missingRequiredFields()
+  if (missing.length) blockers.push(`必填项未填写：${missing.join('、')}`)
+  if (blockers.length) {
+    wfBlockers.value = blockers
+    store.notify('error', blockers.join('；'))
+    return
+  }
+  const content = serializeContent()
+  wfForm.value = saveWorkflowForm(wfForm.value, content)
+  const formData: Record<string, string | number | boolean> = {
+    name: form.name,
+    level: form.level,
+    pkgNo: form.pkgNo,
+    elements: form.elements
+  }
+  const ok = store.submitWorkflowForm(wfForm.value, `PPAP 提交：${form.name}`, formData)
+  if (ok) {
+    store.notify('success', 'PPAP 提交已提交审批（部门会签 → 客户批准）')
+    dirty.value = false
+    wfBlockers.value = []
+  }
+}
+</script>
+
+<style scoped>
+.required-note { font-size: 11px; font-weight: 400; color: var(--text-3); margin-left: 8px; }
+.required-note::before { content: '* '; color: #f87171; }
+.empty-panel { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 40px 0; }
+.row.center { justify-content: center; }
+.flow-chain { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0; }
+.chain-node { width: 100%; text-align: center; padding: 7px 10px; border-radius: 6px; font-size: 12px; border: 1px solid var(--line); background: var(--panel-bg, #0f1a2a); color: var(--text-1); }
+.chain-node.start { border-color: #1d4a2e; color: #8ee6b0; }
+.chain-node.approve { border-color: #1d3a5f; color: #93c5fd; }
+.chain-node.sign { border-color: #5b3c14; color: #ffd79a; }
+.chain-node.end { border-color: var(--line); color: var(--text-3); }
+.chain-arrow { color: var(--text-3); font-size: 12px; line-height: 1; }
+</style>

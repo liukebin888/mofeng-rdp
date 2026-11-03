@@ -744,6 +744,12 @@ export type DraftObjectType =
   | '项目产品报价'
   | '豁免申请'
   | 'ECR申请'
+  // —— 项目正式启动后工作流（项目任务书/主计划/OTS/PPAP/SOP）——
+  | '项目任务书'
+  | '项目主计划'
+  | 'OTS认可'
+  | 'PPAP提交'
+  | 'SOP'
 
 export interface FormDraft {
   id: string

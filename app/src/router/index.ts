@@ -46,6 +46,16 @@ export const MENUS: MenuGroup[] = [
     ]
   },
   {
+    key: 'project', title: '项目执行', icon: 'Flag', stage: 'P3–P6', role: '项目经理 / 质量', cp: 'K3 K9 K10 K12',
+    items: [
+      { path: '/project/task', title: '项目任务书', desc: '任务目标/交付物/里程碑，项目经理发起→研发副总审核→总经理批准', comp: v('project/ProjectTaskView') },
+      { path: '/project/plan', title: '项目主计划', desc: '计划周期/里程碑/资源，PMO审核→部门会签→总经理批准', comp: v('project/ProjectPlanView') },
+      { path: '/project/ots', title: 'OTS 认可', desc: '样件/报告/认可结论，部门会签→客户认可→总经理批准', comp: v('project/OtsApprovalView') },
+      { path: '/project/ppap', title: 'PPAP 提交', desc: '等级/文件包/18要素，部门会签→客户批准', comp: v('project/PpapView') },
+      { path: '/project/sop', title: 'SOP', desc: 'SOP日期/产能/爬坡计划，部门会签→总经理批准', comp: v('project/SopView') }
+    ]
+  },
+  {
     key: 'portfolio', title: '组合与投资', icon: 'TrendCharts', stage: 'P1–P7', role: 'PMO / 研发副总', cp: 'C-43 C-44',
     items: [
       { path: '/portfolio/score', title: '评分与排序', desc: '40/35/25 三维加权 ×20', comp: v('portfolio/ScoreView') },

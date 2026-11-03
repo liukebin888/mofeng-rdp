@@ -73,7 +73,7 @@ import type { DeliverableApprovalBinding } from '@/domain/deliverableApproval'
 import { appendRecord, manifestHashOf, type ArchiveLayer, type ArchiveVolume } from '@/domain/archiveLayer'
 import { DEFAULT_REJECTION_POLICIES, type RejectionPolicyItem } from '@/domain/rejectionPolicy'
 
-export const SEED_VERSION = 'mofeng.rdp.v1.0.25'
+export const SEED_VERSION = 'mofeng.rdp.v1.0.26'
 const TENANT = 'T-1001'
 
 export interface SeedUser {
@@ -1500,6 +1500,110 @@ export function buildSeed() {
         ],
         enabled: true,
         version: 2
+      },
+      // ⑦b 项目正式启动后主要工作流（项目任务书 → 项目主计划 → OTS 认可 → PPAP 提交 → SOP）
+      {
+        id: 'DEF-PRJ-TASK',
+        code: 'FLOW-PRJ-TASK',
+        name: '项目任务书',
+        formFields: [
+          { key: 'name', label: '项目名称' },
+          { key: 'objective', label: '任务目标' },
+          { key: 'deliverables', label: '交付物' },
+          { key: 'milestones', label: '关键里程碑' }
+        ],
+        startNodeId: 't1',
+        nodes: [
+          { id: 't1', name: '发起（项目经理）', type: 'start' },
+          { id: 't2', name: '研发副总审核', type: 'approve', approverRole: '研发副总', slaHours: 48, escalateToRole: '总经理' },
+          { id: 't3', name: '总经理批准', type: 'approve', approverRole: '总经理', slaHours: 24 },
+          { id: 't4', name: '结束', type: 'end' }
+        ],
+        enabled: true,
+        version: 1
+      },
+      {
+        id: 'DEF-PRJ-PLAN',
+        code: 'FLOW-PRJ-PLAN',
+        name: '项目主计划',
+        formFields: [
+          { key: 'name', label: '项目名称' },
+          { key: 'startDate', label: '计划开始' },
+          { key: 'endDate', label: '计划结束' },
+          { key: 'milestones', label: '关键里程碑' },
+          { key: 'resource', label: '资源需求' }
+        ],
+        startNodeId: 'pl1',
+        nodes: [
+          { id: 'pl1', name: '发起（项目经理）', type: 'start' },
+          { id: 'pl2', name: 'PMO 审核', type: 'approve', approverRole: 'PMO', slaHours: 48, escalateToRole: '研发副总' },
+          { id: 'pl3', name: '部门会签（并行）', type: 'sign', signMode: 'all', signRoles: ['电子研发中心', '结构研发中心', '工艺技术中心', '项目管理中心'], slaHours: 72, escalateToRole: '研发副总' },
+          { id: 'pl4', name: '总经理批准', type: 'approve', approverRole: '总经理', slaHours: 24 },
+          { id: 'pl5', name: '结束', type: 'end' }
+        ],
+        enabled: true,
+        version: 1
+      },
+      {
+        id: 'DEF-PRJ-OTS',
+        code: 'FLOW-PRJ-OTS',
+        name: 'OTS 认可',
+        formFields: [
+          { key: 'name', label: '项目名称' },
+          { key: 'sampleNo', label: '样件编号' },
+          { key: 'reportNo', label: 'OTS 报告编号' },
+          { key: 'conclusion', label: '认可结论' }
+        ],
+        startNodeId: 'o1',
+        nodes: [
+          { id: 'o1', name: '发起（质量工程师）', type: 'start' },
+          { id: 'o2', name: '部门会签（并行）', type: 'sign', signMode: 'all', signRoles: ['质量中心', '试验中心', '制造中心'], slaHours: 72, escalateToRole: '质量总监' },
+          { id: 'o3', name: '客户认可', type: 'approve', approverRole: '质量总监', slaHours: 48, escalateToRole: '总经理' },
+          { id: 'o4', name: '总经理批准', type: 'approve', approverRole: '总经理', slaHours: 24 },
+          { id: 'o5', name: '结束', type: 'end' }
+        ],
+        enabled: true,
+        version: 1
+      },
+      {
+        id: 'DEF-PRJ-PPAP',
+        code: 'FLOW-PRJ-PPAP',
+        name: 'PPAP 提交',
+        formFields: [
+          { key: 'name', label: '项目名称' },
+          { key: 'level', label: 'PPAP 等级' },
+          { key: 'pkgNo', label: '文件包编号' },
+          { key: 'elements', label: '18 要素齐全性' }
+        ],
+        startNodeId: 'pp1',
+        nodes: [
+          { id: 'pp1', name: '发起（质量工程师）', type: 'start' },
+          { id: 'pp2', name: '部门会签（并行）', type: 'sign', signMode: 'all', signRoles: ['供应链', '质量中心', '工艺技术中心'], slaHours: 72, escalateToRole: '质量总监' },
+          { id: 'pp3', name: '客户批准', type: 'approve', approverRole: '质量总监', slaHours: 48, escalateToRole: '总经理' },
+          { id: 'pp4', name: '结束', type: 'end' }
+        ],
+        enabled: true,
+        version: 1
+      },
+      {
+        id: 'DEF-PRJ-SOP',
+        code: 'FLOW-PRJ-SOP',
+        name: 'SOP（量产启动）',
+        formFields: [
+          { key: 'name', label: '项目名称' },
+          { key: 'sopDate', label: 'SOP 日期' },
+          { key: 'capacity', label: '设计产能' },
+          { key: 'rampPlan', label: '爬坡计划' }
+        ],
+        startNodeId: 's1',
+        nodes: [
+          { id: 's1', name: '发起（制造中心）', type: 'start' },
+          { id: 's2', name: '部门会签（并行）', type: 'sign', signMode: 'all', signRoles: ['制造中心', '计划物流中心', '质量中心'], slaHours: 72, escalateToRole: '总经理' },
+          { id: 's3', name: '总经理批准', type: 'approve', approverRole: '总经理', slaHours: 24 },
+          { id: 's4', name: '结束', type: 'end' }
+        ],
+        enabled: true,
+        version: 1
       },
       // ⑧ 研发阶段标准审批链（APR-001：发起→审核→并行会签→批准，绑定 S1~S6 阶段闸门）
       buildApprovalChain('DEF-STAGE-S1', 'FLOW-STAGE-S1', 'S1 立项与策划审批', { ...DEFAULT_APPROVAL_ROLES, signRoles: ['电子研发中心', '结构研发中心', '工艺技术中心', '项目管理中心', '质量中心'] }, [{ key: 'name', label: '项目名称' }]),
