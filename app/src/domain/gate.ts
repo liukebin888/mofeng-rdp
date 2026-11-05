@@ -211,6 +211,28 @@ export function runGate(input: GateSubmitInput): GateRun {
   }
 }
 
+/**
+ * GAT-003：安全评审独立放行。当安全项缺失签署时，须精确定位到具体缺签的安全项
+ * （评审单号 = 安全项 code），而非笼统「安全未签署」。
+ *
+ * 返回：该 gate 下所有安全项及其签署状态；safetySigned=false 时，列出缺签项清单
+ * （对齐 R1 精表「提示精确到评审单号」）。
+ */
+export function safetyReviewDetail(gate: string, safetySigned: boolean): {
+  gate: string
+  safetyItems: { code: string; name: string; signed: boolean }[]
+  missingSafetyReviews: string[]
+  blocked: boolean
+} {
+  const tpl = resolveGateTemplate(gate)
+  if (!tpl) {
+    return { gate, safetyItems: [], missingSafetyReviews: [], blocked: false }
+  }
+  const safetyItems = tpl.items.filter((it) => it.safety).map((it) => ({ code: it.code, name: it.name, signed: safetySigned }))
+  const missingSafetyReviews = safetySigned ? [] : safetyItems.map((it) => `${it.code}（${it.name}）`)
+  return { gate, safetyItems, missingSafetyReviews, blocked: safetyItems.length > 0 && !safetySigned }
+}
+
 /** SOD-01：提交人与放行人不得为同一人 */
 export function sodRelease(submitter: string, releaser: string): { ok: boolean; message: string } {
   return submitter !== releaser

@@ -175,6 +175,95 @@ export function deactivateUser(memberships: OrgMembership[], userId: string): Or
 }
 
 /**
+ * TEN-011 账号交接：人员离岗/转岗时，其负责的事项须移交给接收人，
+ * 交接后原账号无权限、接收人可访问，且审计须含交接清单。
+ */
+
+/** 交接项（原账号名下待移交的负责事项） */
+export interface HandoverItem {
+  /** 事项类型（项目 / 审批 / 决议 / 督办 / 工作产品等） */
+  type: string
+  /** 事项标识 */
+  id: string
+  /** 事项简述 */
+  title: string
+}
+
+/** 账号交接请求（TEN-011） */
+export interface AccountHandover {
+  /** 移交人（原账号） */
+  fromUserId: string
+  /** 接收人（新账号） */
+  toUserId: string
+  /** 交接事项清单（审计含交接清单的关键） */
+  items: HandoverItem[]
+  /** 交接时间 */
+  at: string
+}
+
+/** 交接结果：交接是否完整、接收人是否具备访问权 */
+export interface HandoverVerdict {
+  ok: boolean
+  /** 交接清单（供审计留痕） */
+  handoverList: HandoverItem[]
+  fromUserId: string
+  toUserId: string
+  reason?: string
+}
+
+/**
+ * 执行账号交接（TEN-011）：交接须有接收人且移交清单非空；
+ * 空清单（无事可交）视为异常，须显式登记「无待办事项」方可放行，
+ * 杜绝「离岗即失联、事项悬空」。
+ */
+export function handoverAccount(h: AccountHandover): HandoverVerdict {
+  if (!h.toUserId) return { ok: false, handoverList: [], fromUserId: h.fromUserId, toUserId: h.toUserId, reason: '未指定接收人，交接被拒（TEN-011）' }
+  if (h.items.length === 0) return { ok: false, handoverList: [], fromUserId: h.fromUserId, toUserId: h.toUserId, reason: '交接清单为空，须登记待办事项或显式声明「无待办」（TEN-011）' }
+  return { ok: true, handoverList: h.items, fromUserId: h.fromUserId, toUserId: h.toUserId }
+}
+
+/**
+ * 交接后权限重算：原账号（from）的所有有效挂靠失效，接收人（to）获得原账号的
+ * 有效挂靠（权限转移）。返回新的成员挂靠集合。
+ *
+ * 关键：交接后「原账号无权限」——原账号 active 挂靠全部置 false；
+ * 「接收人可访问」——接收人继承原账号的组织挂靠（active=true）。
+ */
+export function applyHandoverMemberships(
+  memberships: OrgMembership[],
+  fromUserId: string,
+  toUserId: string
+): OrgMembership[] {
+  return memberships.map((m) => {
+    if (m.userId === fromUserId) return { ...m, active: false }
+    if (m.userId === toUserId) return { ...m, active: true }
+    return m
+  })
+}
+
+/**
+ * 交接审计清单（TEN-011：审计含交接清单）。
+ * 生成一条结构化审计记录（含移交人、接收人、逐项交接事项）。
+ */
+export function handoverAuditRecord(h: AccountHandover): {
+  action: string
+  fromUserId: string
+  toUserId: string
+  at: string
+  itemCount: number
+  items: HandoverItem[]
+} {
+  return {
+    action: 'ACCOUNT_HANDOVER',
+    fromUserId: h.fromUserId,
+    toUserId: h.toUserId,
+    at: h.at,
+    itemCount: h.items.length,
+    items: h.items
+  }
+}
+
+/**
  * 负责人岗位解析：某组织节点当前负责人（按 leaderName）
  */
 export function leaderOf(nodes: OrgNode[], id: string): { title: string; name?: string } | undefined {

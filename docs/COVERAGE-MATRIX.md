@@ -32,8 +32,8 @@
 | CLS 项目分级 | 4 | grading | ✅ | — |
 | REQ 需求/安全要求 | 10 | **requirement**, stateMachine, trace, codingEngine, naming | ✅ | **已补 `requirement.ts`（17 例）：SG 安全目标/信息安全对象 TARA 关联/标识规则批量/安全评审受控单人批准拒/废弃审批/版本化 diff** |
 | TRC 双向追溯 | 8 | trace | ✅ | — |
-| GAT Gate 门控 | 7 | gate, flowEngine, stateMachine, aiAssist | 🟡 | GAT-003 安全评审独立放行、GAT-004 基线冻结前置联动（gate.ts 已消 `!` 断言，可再补联动判据） |
-| CHG 变更管理 | 6 | change, stateMachine, trace | 🟡 | CHG-004 供应链参与、CHG-010 变更台账聚合 |
+| GAT Gate 门控 | 7 | gate, flowEngine, stateMachine, aiAssist | ✅ | GAT-003 安全评审独立放行（`safetyReviewDetail` 精确到评审单号）、GAT-004 基线冻结前置联动（`runGate` 内 `baselineFrozen` 判据） |
+| CHG 变更管理 | 6 | change, stateMachine, trace | ✅ | CHG-004 供应链参与（`supplyChainInvolved`/`approvalComplete` 增补+缺签拒批）、CHG-010 变更台账（`toChangeLedger`/`exportChangeLedger` 8 字段） |
 | VER 软件版本 | 10 | **softwareVersion**, stateMachine, baseline | ✅ | **已补 `softwareVersion.ts`（17 例）：SCI/12 类关联/分支管理补丁拒新功能/变体/四类差异对比/兼容回滚/发布双签/软硬件组合基线** |
 | **HW 样件/EBOM/物料** | **16** | **sample**, kitting, stateMachine, baseline, gate, change | ✅ | **已补 `sample.ts`（20 例）：样件需求/状态机/EBOM 引用冻结/试制采购/工装三态/检验记录/不合格闭环/送样确认/发运签收，贯通「需求→EBOM→齐套→工单→检验→送样→发运」主链，落实 P-03 先 BOM 后样件** |
 | **SUP 供应商协同** | **8** | **supplier**, stateMachine, shareLink, cipher | ✅ | **已补 `supplier.ts`（12 例）：档案/状态机/准入/定点评审/PPAP 18 项/未闭环阻塞 Gate4/代录强制标记，落实 P-02 证据由责任方产生** |
@@ -41,14 +41,14 @@
 | BAS 基线证据包 | 5 | baseline, hash, stateMachine | ✅ | — |
 | RPT 报表看板 | 2 | reportLibrary, dataQuality | 🟡 | RPT-010 驾驶舱（R2 主体已由 reportLibrary 承接） |
 | AIA AI 辅助 | 7 | aiAssist | ✅ | — |
-| INT 集成 | 0 | interop, extensionPoint | 🟡 | 全 R2：INT-001 PLM 同步、INT-004 需求工具、INT-009/010 迁移 |
+| INT 集成 | 0 | interop, extensionPoint | 🟡 | INT-001 PLM 同步（`plmSyncConsistency`）、INT-009/010 迁移（`migrateRows`/`rollbackMigration`/`assessMigrationDrill`）已补；INT-004 需求工具适配器待补 |
 | NFR 非功能 | 8 | compliance, cipher, password, audit, hash, accessibility, i18n, opsMonitor | 🟡 | NFR-001/002/004 性能并发、NFR-019 容量（属压测/基础设施，非纯函数） |
-| OPS 运维监控 | 0 | opsMonitor | 🟡 | 全 R2：OPS-003 日志归集、OPS-006 灾备、OPS-008 手册 |
+| OPS 运维监控 | 0 | opsMonitor | 🟡 | OPS-003 日志归集（`aggregateByTrace`/`traceCompleteness`）、OPS-006 灾备（`assessDrill`）已补；OPS-008 手册属评审文档 |
 | ARC 系统架构 | 10 | stateMachine, extensionPoint, types, trace, baseline, interop, opsMonitor | ✅ | — |
 | FUN 功能基线 | 17 | flowEngine, stateMachine, mobilePortal, messageCenter, draftEngine | 🟡 | FUN-015/016 列表表单校验、FUN-019/020 导入导出消息（偏前端组件） |
 | TPS 技术参数 | 9 | opsMonitor, quota | 🟡 | TPS-001~004/026/027 性能容量（属基准压测） |
 | PMC 管控体系 | 16 | **pmc**, controlPoints, evm, flowEngine, risk, audit | ✅ | **已补 `pmc.ts`（12 例）：PMC-001 十二类管控对象/PMC-005 PDCA 四要素闭环/PMC-008 质量三项指标/PMC-009 偏差 D1~D4/PMC-013 纠偏闭环率+升级/PMC-014 超时升级**；其余由 controlPoints/evm/risk 承接 |
-| SCH 计划调度 | 4 | schedule, calendarEngine, baseline, simulation | 🟡 | R1 四条完整；R2 SCH-001/004/006/009/011/012/022 缺 |
+| SCH 计划调度 | 4 | schedule, calendarEngine, baseline, simulation, **scheduleAdvance** | 🟡 | SCH-004 四型关系+lag 已在 `schedule.ts` `computeCpm` 实现；SCH-006 九类约束（`detectConstraintConflicts`/`hardConstraintRatio`）、SCH-009 重算（`rescheduleRemaining`/`revertReschedule`）、SCH-012 多基线（`compareBaselines`/`validateBaselineSet`）已补 `scheduleAdvance.ts`；SCH-001 EPS≥5级、SCH-011 并行调度待补 |
 | RES 资源管理 | 0 | resourcePool, resourceCapacity, resourceConflict, resourcePlan, resourceShare, overallocation, supplyDemand, leveling, bottleneck | 🟡 | 全 R2，引擎全家桶最完整 |
 | CST 成本挣值 | 0 | evm, schedule, resourcePlan | 🟡 | 全 R2：CST-001/002 科目预算、CST-005 计量、CST-008/012 转移超支、CST-013 多币种 |
 | PFM 组合管理 | 9 | portfolio, portfolioFinance, whatif, resourceShare | 🟡 | PFM-013 EPS 树、PFM-015 逐层汇总、PFM-016 跨节点共享 |
@@ -77,9 +77,9 @@
 | P1 | REQ 需求 | 10/4 | 补 `requirement.ts`（信息安全对象+版本化+安全评审受控） | ✅ 完成（17 例） |
 | P1 | VER 版本 | 10/3 | 补 `softwareVersion.ts`（SCI+分支+变体+差异对比+兼容回滚） | ✅ 完成（17 例） |
 | P1 | PRJ/TEN 横切 | 17/6 | 补 `projectControl.ts`（编码唯一性+循环依赖+交付物缺件+汇率快照） | ✅ 完成（10 例） |
-| P1 | GAT 门控 | 7/6 | 补 `gate.ts`（GAT-003 安全评审独立放行/GAT-004 基线冻结前置强联动） | 🟡 待补（gate.ts 已消 `!` 断言，联动判据可再深化） |
-| P1 | CHG 变更 | 6/2 | 补 `change.ts`（供应链参与+变更台账聚合） | 🟡 待补 |
-| P2 | TEN/其余 | 12/8 | 补 `tenant.ts`（文件隔离+检索隔离+账号生命周期） | 🟡 待补 |
+| P1 | GAT 门控 | 7/6 | 补 `gate.ts`（GAT-003 安全评审独立放行/GAT-004 基线冻结前置强联动） | ✅ 完成（`safetyReviewDetail` 精确评审单号 + `runGate` 基线冻结判据） |
+| P1 | CHG 变更 | 6/2 | 补 `change.ts`（供应链参与+变更台账聚合） | ✅ 完成（CHG-004 增补缺签拒批 + CHG-010 8 字段台账导出） |
+| P2 | TEN/其余 | 12/8 | 补 `tenant.ts`（文件隔离+检索隔离+账号生命周期） | ✅ 完成（`org.ts` 补 TEN-011 账号交接：`handoverAccount`/`applyHandoverMemberships`/`handoverAuditRecord`） |
 
 > **注**：完整 R1 逐条精表（含验收要点与阈值）见 `docs/R1-REQUIREMENTS.md`。P0 全部 + P1 主力域（REQ/VER/PRJ）已完成，剩余 GAT/CHG/TEN 为「判据深化」而非「从零补全」，风险低。
 

@@ -371,3 +371,75 @@ export function approveChange(req: ChangeRequest, approver: string): ChangeAppro
   }
   return { approved: true }
 }
+
+/**
+ * OPS-003：日志统一归集。一次请求/任务在全链路（网关→应用→领域→存储）产生多条日志，
+ * 通过 trace_id 串联。本引擎提供 trace 归集与链路完整性校验。
+ */
+
+/** 一条链路日志 */
+export interface LogEntry {
+  /** 全链路唯一串联键 */
+  traceId: string
+  /** 服务/层（gateway / app / domain / storage） */
+  service: string
+  /** 日志级别 */
+  level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR'
+  message: string
+  at: number
+}
+
+/** 按 trace_id 归集结果（OPS-003：按 trace_id 可串联全链路日志） */
+export interface TraceAgg {
+  traceId: string
+  entries: LogEntry[]
+  /** 链路是否跨越多层（完整链路应覆盖 ≥2 层） */
+  spansServices: number
+  hasError: boolean
+}
+
+/** 按 trace_id 归集全链路日志 */
+export function aggregateByTrace(logs: LogEntry[]): TraceAgg[] {
+  const map = new Map<string, LogEntry[]>()
+  for (const l of logs) {
+    const arr = map.get(l.traceId) ?? []
+    arr.push(l)
+    map.set(l.traceId, arr)
+  }
+  return [...map.entries()].map(([traceId, entries]) => {
+    const services = new Set(entries.map((e) => e.service))
+    return {
+      traceId,
+      entries: entries.sort((a, b) => a.at - b.at),
+      spansServices: services.size,
+      hasError: entries.some((e) => e.level === 'ERROR')
+    }
+  })
+}
+
+/**
+ * 链路完整性校验（OPS-003）：一条完整链路应跨 ≥2 个服务层，
+ * 孤立日志（仅 1 层）视为链路不完整，可能丢失中间层。
+ */
+export function traceCompleteness(agg: TraceAgg): { complete: boolean; reason?: string } {
+  if (agg.spansServices < 2) return { complete: false, reason: `trace ${agg.traceId} 仅覆盖 ${agg.spansServices} 层，链路不完整` }
+  return { complete: true }
+}
+
+/** 灾备演练（OPS-006）：演练须有结果归档，问题项须有整改 */
+export interface DrDrill {
+  id: string
+  scope: string
+  result: '成功' | '部分成功' | '失败'
+  issues: { title: string; remediated: boolean }[]
+  archived: boolean
+  at: string
+}
+
+/** 灾备演练判定（OPS-006：演练报告归档 + 问题项有整改） */
+export function assessDrill(d: DrDrill): { ok: boolean; reason?: string } {
+  if (!d.archived) return { ok: false, reason: '演练报告未归档' }
+  const unresolved = d.issues.filter((i) => !i.remediated)
+  if (unresolved.length > 0) return { ok: false, reason: `存在 ${unresolved.length} 项问题未整改：${unresolved.map((i) => i.title).join('、')}` }
+  return { ok: true }
+}

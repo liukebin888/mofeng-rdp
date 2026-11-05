@@ -189,3 +189,98 @@ export function explainDiff(diffs: ReconciliationDiff[]): { total: number; expla
   const total = diffs.reduce((s, d) => s + d.amount, 0)
   return { total, explained: diffs.every((d) => d.reason.trim().length > 0) }
 }
+
+/**
+ * INT-009：数据迁移工具。1000 条迁移准确率 100%；失败可回滚。
+ * 迁移采用「源 → 目标」映射 + 逐条校验 + 快照回滚，fail-closed。
+ */
+
+/** 迁移源数据行 */
+export interface MigrationRow {
+  id: string
+  [key: string]: unknown
+}
+
+/** 迁移结果 */
+export interface MigrationResult {
+  total: number
+  migrated: number
+  failed: number
+  accuracy: number
+  errors: { id: string; reason: string }[]
+  /** 迁移前快照（供回滚） */
+  snapshot: MigrationRow[]
+}
+
+/**
+ * 执行迁移（INT-009）：逐条映射 + 校验，任一失败即记录并停止该条（不中断整体），
+ * 准确率 = 成功条数 / 总数。返回迁移前快照供回滚。
+ */
+export function migrateRows(rows: MigrationRow[], mapFn: (row: MigrationRow) => MigrationRow | null): MigrationResult {
+  const errors: { id: string; reason: string }[] = []
+  const migrated: MigrationRow[] = []
+  for (const r of rows) {
+    const mapped = mapFn(r)
+    if (mapped === null) {
+      errors.push({ id: r.id, reason: '映射失败或字段缺失' })
+    } else {
+      migrated.push(mapped)
+    }
+  }
+  const failed = errors.length
+  return {
+    total: rows.length,
+    migrated: migrated.length,
+    failed,
+    accuracy: rows.length ? migrated.length / rows.length : 1,
+    errors,
+    snapshot: rows.map((r) => ({ ...r }))
+  }
+}
+
+/**
+ * INT-009：迁移回滚。从快照恢复原数据，保证失败可回滚。
+ */
+export function rollbackMigration(snapshot: MigrationRow[]): MigrationRow[] {
+  return snapshot.map((r) => ({ ...r }))
+}
+
+/**
+ * INT-010：迁移演练。演练报告须含耗时、问题清单与修复情况。
+ */
+export interface MigrationDrill {
+  totalRows: number
+  /** 演练耗时（分钟） */
+  durationMinutes: number
+  issues: { title: string; fixed: boolean }[]
+}
+
+/** 演练判定（INT-010：报告含耗时 + 问题清单 + 修复情况） */
+export function assessMigrationDrill(d: MigrationDrill): { ok: boolean; reason?: string } {
+  if (d.durationMinutes <= 0) return { ok: false, reason: '演练报告缺耗时' }
+  const unresolved = d.issues.filter((i) => !i.fixed)
+  if (unresolved.length > 0) return { ok: false, reason: `存在 ${unresolved.length} 项问题未修复：${unresolved.map((i) => i.title).join('、')}` }
+  return { ok: true }
+}
+
+/**
+ * INT-001：PLM 主数据同步。平台对 PLM 权威源只读，无回写入口。
+ * 同步一致率 = 一致条数 / 总数。
+ */
+export interface PlmSyncRow {
+  id: string
+  /** 平台侧值 */
+  platform: unknown
+  /** PLM 权威侧值 */
+  plm: unknown
+}
+
+export function plmSyncConsistency(rows: PlmSyncRow[]): { consistent: number; total: number; ratio: number; noWriteback: true } {
+  const consistent = rows.filter((r) => r.platform === r.plm).length
+  return {
+    consistent,
+    total: rows.length,
+    ratio: rows.length ? consistent / rows.length : 1,
+    noWriteback: true
+  }
+}

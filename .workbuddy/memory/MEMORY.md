@@ -7,8 +7,11 @@
 - 技术栈：纯前端 Vue3+Pinia+Element Plus + Node.js 后端（R2 起）。依据 SRS V1.4 / 技术方案 V4.0。
 
 ## 关键路径
-- 根目录 `app/`（前端）、`server/`（Node 后端 index.js，零依赖，端口 8787）、`spec/`（SRS）、`docs/`（架构/测试报告/规格冲突清单）。
-- 前端 dev 端口 5178，preview/e2e 端口 4180，后端 8787。
+- 根目录 `app/`（前端）、`server/`（Node 后端 index.js，零依赖，端口 8787）、`backend/`（Java 后端，端口 8787 起）、`spec/`（SRS）、`docs/`（架构/测试报告/规格冲突清单）。
+- 前端 dev 端口 5178，preview/e2e 端口 4180，Node 后端 8787（本机被 WorkBuddy 占用时用 8788）。
+- **后端 Java 验证环境（本机已定位，务必记住）**：JDK 21 在 `C:\jdk\jdk-21.0.2`，Maven 3.9.9 在 `C:\maven\apache-maven-3.9.9`（均未进 PATH，须手动 export）。跑后端测试：
+  `export JAVA_HOME="C:/jdk/jdk-21.0.2" && export PATH="$JAVA_HOME/bin:/c/Windows/System32:/c/maven/apache-maven-3.9.9/bin:$PATH"`
+  然后 `mvn test -pl mofeng-domain`（375 例）、`mvn test -pl mofeng-application -am`（90 例，须带 -am 构建依赖）。注意：java.exe 需 `C:/jdk/jdk-21.0.2/bin` 在 PATH 且含 `C:/Windows/System32`，否则报 vcruntime140_1.dll 缺失。
 - 四层架构：views → application(store) → domain ← infra。domain 零 DOM/零 vue/pinia，可被 vitest 直接调用。
 - **Git 仓库**：已建立，分支 main，远程 origin = https://github.com/liukebin888/mofeng-rdp.git（已跟踪 origin/main）。提交身份 留总 <liuzong@mofeng.com>（项目级）。.gitignore 排除 node_modules/dist/server/data/.env/密钥。后续 `git add -A && git commit && git push` 即可。
 - **部署（Docker 化）**：server/Dockerfile（Node 20-alpine 零依赖、非 root、HEALTHCHECK、数据卷）、deploy/Dockerfile.web（多阶段 vite→nginx + SPA 回退 + /api 反代）、deploy/nginx.conf、docker-compose.yml（前端:8080 + 后端仅内网 + 命名卷 mofeng-data）、.dockerignore。部署手册 docs/DEPLOYMENT.md。启动 `docker compose up -d --build`。后端构建上下文 context=./server（非根目录）。
