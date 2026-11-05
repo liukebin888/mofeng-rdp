@@ -37,7 +37,7 @@ import type { ActorContext, Baseline, GateDef, GateRun, Level, WbsNode, Threshol
 import { can, type ActionKey } from '@/domain/rbac'
 import { guardTenant, visibleInTenant, groupDrillDown, type TenantContext } from '@/domain/tenant'
 import { canAccessSpace, visibleInSpace, accessibleSpaces, describeSwitch, type Space, type SpaceContext } from '@/domain/spaceEngine'
-import { advanceThroughBranch, approveNode, availableActions, escalate, getNode, isOverdue, rejectNode, startFlow, addSigner, transferNode, signNode, type FlowDefinition } from '@/domain/flowEngine'
+import { advanceThroughBranch, applyCustomApprovers, approveNode, availableActions, escalate, getNode, isOverdue, rejectNode, startFlow, addSigner, transferNode, signNode, type FlowDefinition, type CustomApproverAddition } from '@/domain/flowEngine'
 import {
   addComment,
   archive,
@@ -56,6 +56,7 @@ import {
 } from '@/domain/docEngine'
 import { summarizeAnnotations, type DocAnnotation } from '@/domain/docAnnotation'
 import { appendRemoteAudit, checkBackend, loadRemoteState, saveRemoteState, seedRemoteAudit, repoBase } from '@/infra/repo'
+import { issueJwt, DEV_JWT_SECRET, savePlan, listPlan, scanPlanAlerts as scanPlanAlertsApi, type PlanSavePayload, type PlanSaveData, type PlanAlertScanData, type PlanNodeDto } from '@/infra/apiV1'
 import { knowledgeStats, markReused, nextLessonCode, pushToLibrary, searchLessons as searchLessonsEngine, validateLesson } from '@/domain/lessonEngine'
 import {
   advanceSupervise as advanceSuperviseEngine,
@@ -92,11 +93,15 @@ import { detectOverallocations, gateBlocked } from '@/domain/overallocation'
 import { levelResources, smoothResources, revert, type LevelingResult } from '@/domain/leveling'
 import { scanThresholds, DEFAULT_THRESHOLD_RULES, type ThresholdMetrics } from '@/domain/thresholdEngine'
 import { evaluateHandoffs } from '@/domain/handoffEngine'
+import { evaluateInterfacePlan, exportInterfacePlan, interfacePlanHealth, type InterfaceEvaluation } from '@/domain/interfacePlan'
+import { summarizeGateConsistency, type ProjectGateDecl } from '@/domain/gateConsistency'
 import { aggregatePortfolio, interventionRows, type ProjectHealthSnapshot } from '@/domain/portfolioAggregate'
 import { buildResourceProfile, type TaskResourceSpan } from '@/domain/resourceProfile'
 import { buildCostSheet } from '@/domain/costSheet'
+import { emptyQuoteCostSheet, type QuoteCostSheet } from '@/domain/quoteCost'
 import { isOverdue as isCollabOverdue } from '@/domain/collabEngine'
 import { rpn } from '@/domain/risk'
+import { reviewProject, humanReviewEvidence, type HumanReview } from '@/domain/projectReview'
 import { summarizePolarity, type PolarityRisk } from '@/domain/riskOpportunity'
 import { analyzeBottlenecks } from '@/domain/bottleneck'
 import { cloneStructure, validateClone } from '@/domain/projectClone'
@@ -1009,6 +1014,33 @@ export const useAppStore = defineStore('app', () => {
   /** 交接点评估（单一权威：evaluateHandoffs 纯函数，禁止自造状态/逾期） */
   const handoffEval = computed(() => evaluateHandoffs(projectHandoffs.value, todayStr()))
 
+  // —— 界面（接口）计划（SCH-022：跨项目接口，四要素 + 下游延误传播）——
+  /** 跨项目界面计划评估（单一权威：evaluateInterfacePlan 纯函数，禁止自造状态/逾期/影响） */
+  const interfacePlans = computed<InterfaceEvaluation[]>(() => {
+    const plans = data.value.interfacePlans ?? []
+    const today = todayStr()
+    return plans.map((p) => {
+      // 下游受影响的 WBS 节点：接收方项目中依赖此交付物的节点（演示口径：接收方项目全部叶子节点）
+      const downstream = data.value.wbs
+        .filter((w) => w.projectId === p.targetProjectId)
+        .map((w) => ({ wbsId: w.id, wbsCode: w.code, projectId: w.projectId, name: w.name }))
+      return evaluateInterfacePlan(p, today, downstream)
+    })
+  })
+  /** 界面计划健康度汇总（四要素齐备率 / 逾期率 / 健康度） */
+  const interfacePlanHealthSummary = computed(() => interfacePlanHealth(interfacePlans.value))
+  /** 界面计划清单导出（R-IF-EXPORT 结构化清单） */
+  const interfacePlanExport = computed(() =>
+    exportInterfacePlan(interfacePlans.value, (id) => data.value.projects.find((pr) => pr.id === id)?.name ?? id, todayStr())
+  )
+
+  // —— 组合闸门一致性（PFM-011：跨项目同一 Gate 判据集统一 + 例外登记 + 合规率复算）——
+  /** 组合闸门一致性（单一权威：summarizeGateConsistency 纯函数，禁止自造合规率） */
+  const gateConsistency = computed(() => {
+    const decls: ProjectGateDecl[] = data.value.gateDecls ?? []
+    return summarizeGateConsistency(decls)
+  })
+
   // —— 资源剖析表（对标 Oracle Resource Profile：角色 × 周 负荷矩阵，从 CPM 最早时间派生）——
   /** 资源剖析表（单一权威：buildResourceProfile 纯函数，输入来自 CPM es/ef，禁止自造工时） */
   const resourceProfile = computed(() => {
@@ -1033,6 +1065,20 @@ export const useAppStore = defineStore('app', () => {
       data.value.costDocs.filter((d) => d.projectId === projectId.value)
     )
   )
+
+  // —— 报价费用明细（单一数据源：费用表单填报，报价单自动汇总引入）——
+  /** 报价费用明细八类（来自 seed.quoteCosts，含 source 标记 form/manual） */
+  const quoteCosts = computed<QuoteCostSheet>(() =>
+    (data.value.quoteCosts ?? emptyQuoteCostSheet()) as QuoteCostSheet
+  )
+
+  // —— OTS 认可三大条件附件（单一数据源：附件驱动判定，视图不可手填）——
+  /** OTS 认可三类附件（附件 A 设计文件归档 / B 样件评审 / C DV 试验），旧存档缺省时兜底空 */
+  const otsAttachments = computed(() => (data.value.otsAttachments ?? null) as {
+    archiveTable: import('@/domain/otsApproval').DesignArchiveTable
+    sampleReview: import('@/domain/otsApproval').SampleReviewReport
+    dvReport: import('@/domain/otsApproval').DvTestReport
+  } | null)
 
   // —— 临界值自动触发（对标 Oracle Thresholds：业务指标越限→自动生成问题→分派）——
   /** 当前项目可观测业务指标（阈值引擎输入，全部同源自既有派生，禁止自造比例） */
@@ -1222,7 +1268,194 @@ export const useAppStore = defineStore('app', () => {
 
   const traceBreaks = computed(() => detectBreaks(projectReqs.value, projectLinks.value))
   const traceCoverage = computed(() => coverage(projectReqs.value, projectLinks.value))
+
+  // —— 立项评审（PRV-001~004：人工 + AI 共同参与，四维度评估）——
+  /** 立项评审结论（单一权威：reviewProject 纯函数，输入全部同源自既有派生，禁止自造比例） */
+  const projectReview = computed(() => {
+    const redRisks = projectRisks.value.filter((r) => rpn(r) >= 200)
+    const redNoStrategy = redRisks.filter((r) => !r.strategy?.trim())
+    const unassigned = projectWbs.value.filter((w) => !w.resource).length
+    const unassignedPct = projectWbs.value.length ? Math.round((unassigned / projectWbs.value.length) * 10000) / 100 : 0
+    const missingDeliverables = projectDeliverables.value.filter((d) => d.required && !d.provided).length
+    const peakLoad = resourceProfile.value.buckets.length
+      ? Math.max(...resourceProfile.value.buckets.map((b) => b.loadRate / 100))
+      : 0
+    const negativeFloatCount = cpm.value.nodes.filter((n) => n.totalFloat < 0).length
+    return reviewProject({
+      projectName: currentProject.value.name,
+      projectCode: currentProject.value.code,
+      spi: evm.value.spi,
+      planHealth: quality.value.health,
+      completionPercent: completion.value.weightedPercent,
+      criticalDuration: cpm.value.duration,
+      negativeFloatCount,
+      resourcePeakLoad: peakLoad,
+      unassignedResourcePct: unassignedPct,
+      availableResourceCount: resourcePool.value.filter((r) => r.available).length,
+      redRiskCount: redRisks.length,
+      redRiskNoStrategyCount: redNoStrategy.length,
+      reqCount: projectReqs.value.length,
+      tracedReqCount: traceCoverage.value.numerator,
+      missingDeliverableCount: missingDeliverables,
+      cpi: evm.value.cpi,
+      cvRate: currentProject.value.budget ? Math.round(((currentProject.value.spent - evm.value.ev) / currentProject.value.budget) * 10000) / 100 : 0,
+      overControlCount: costSheet.value.summary.overControlCount,
+      eacWarn: evm.value.eacWarn
+    })
+  })
+
+  /** 已提交的人工评审结论（持久化证据，刷新不丢；PRV-005） */
+  const projectReviews = computed<HumanReview[]>(() => (data.value.projectReviews ?? []) as HumanReview[])
+
+  /**
+   * 提交人工评审结论（PRV-005）：
+   *   持久化评审证据 + 审计留痕。人工结论作为「拍板」证据，与 AI 建议并列，
+   *   不覆盖纯函数产出的四维度结论（单一权威仍在 reviewProject）。
+   */
+  function submitProjectReview(review: HumanReview): boolean {
+    if (!review.reviewer?.trim() || !review.decision) {
+      notify('error', '评审人 / 评审结论不能为空')
+      return false
+    }
+    if (!data.value.projectReviews) data.value.projectReviews = []
+    data.value.projectReviews = [...(data.value.projectReviews as HumanReview[]), review]
+    log('REVIEW', '项目', projectId.value, {
+      reviewer: review.reviewer,
+      decision: review.decision,
+      note: review.note,
+      at: review.at
+    })
+    notify('success', `人工评审已提交：${review.decision}（${review.reviewer}）`)
+    return true
+  }
+
+  /**
+   * 提交四级计划落表（PLN-4LV，方向 2：复用后端权威校验）。
+   *
+   * 语义：本 action 只做「编排 + 落表结果透传」，不做任何本地规则判定——
+   * 三硬约束（R-COVER / R-NOLAG / R-COMPLETE）的单一权威在后端
+   * {@code FourLevelPlanEngine.validateFourLevelPlan}，前端本地预检仅为即时反馈，
+   * 最终以 {@code POST /api/v1/plans/save} 的 {@code saved/passable/violations} 为准。
+   *
+   * fail-closed：后端不可用或返回违规则不落表、不推进审批，回传阻断清单。
+   *
+   * @return Promise<PlanSaveData | null>：null 表示后端不可用/异常（调用方据此阻断）
+   */
+  async function submitFourLevelPlan(
+    nodes: Array<import('@/domain/fourLevelPlan').PlanNode>
+  ): Promise<PlanSaveData | null> {
+    const payload: PlanSavePayload = {
+      tenantId: data.value.tenantId,
+      projectId: projectId.value,
+      userName: currentUser.value.name,
+      roleName: currentUser.value.roleName,
+      nodes: nodes.map((n) => ({
+        id: n.id,
+        level: n.level,
+        code: n.code,
+        name: n.name,
+        date: n.date,
+        baselineDate: n.baselineDate,
+        actualDate: n.actualDate,
+        milestone: !!n.milestone,
+        ownerName: n.ownerName,
+        ownerRole: n.ownerRole,
+        upperNodeId: n.upperNodeId
+      }))
+    }
+    try {
+      const token = await issueJwt(currentUser.value.id, currentUser.value.roleCode, data.value.tenantId, DEV_JWT_SECRET, 3600)
+      const res = await savePlan(payload, token)
+      if (res.ok && res.data) {
+        if (!res.data.saved) {
+          notify('error', `四级计划未通过后端校验：${res.data.violations.join('；')}`)
+          log('PLAN_SAVE', '四级计划', projectId.value, { saved: false, passable: res.data.passable, violations: res.data.violations }, undefined, 'DENY')
+        } else {
+          notify('success', `四级计划已落表（对齐率 ${res.data.alignRate}%）`)
+          log('PLAN_SAVE', '四级计划', projectId.value, { saved: true, alignRate: res.data.alignRate, nodeCount: nodes.length })
+        }
+        return res.data
+      }
+      notify('error', res.blocked ? (res.error ?? '后端领域规则阻断') : (res.error ?? '后端不可用'))
+      log('PLAN_SAVE', '四级计划', projectId.value, { saved: false, error: res.error }, undefined, 'DENY')
+      return null
+    } catch {
+      notify('error', '四级计划落表失败：后端不可用')
+      log('PLAN_SAVE', '四级计划', projectId.value, { saved: false, error: '后端不可用' }, undefined, 'DENY')
+      return null
+    }
+  }
+
   const portfolio = computed(() => rankProjects(visibleProjects.value))
+
+  /**
+   * 从后端拉取某项目已落表的四级计划节点（PLN-4LV 回显，方向 4 第 4 项）。
+   *
+   * 语义：纯编排 + 透传，落表数据以后端为权威。返回领域 {@code PlanNode[]} 供视图回显；
+   * 后端不可用/无数据时返回空数组（视图据长度判断是否回显，不伪造「已加载」）。
+   *
+   * @return Promise<PlanNode[]>：已落表节点（后端不可用时为空数组）
+   */
+  async function loadFourLevelPlan(): Promise<Array<import('@/domain/fourLevelPlan').PlanNode>> {
+    try {
+      const token = await issueJwt(currentUser.value.id, currentUser.value.roleCode, data.value.tenantId, DEV_JWT_SECRET, 3600)
+      const res = await listPlan(data.value.tenantId, projectId.value, token)
+      if (res.ok && res.data) {
+        const nodes: Array<import('@/domain/fourLevelPlan').PlanNode> = (res.data as PlanNodeDto[]).map((d) => ({
+          id: d.id,
+          level: d.level as import('@/domain/fourLevelPlan').PlanLevel,
+          code: d.code,
+          name: d.name,
+          date: d.date,
+          baselineDate: d.baselineDate,
+          actualDate: d.actualDate,
+          milestone: !!d.milestone,
+          ownerName: d.ownerName,
+          ownerRole: d.ownerRole,
+          upperNodeId: d.upperNodeId
+        }))
+        log('PLAN_LOAD', '四级计划回显', projectId.value, { nodeCount: nodes.length })
+        return nodes
+      }
+      log('PLAN_LOAD', '四级计划回显', projectId.value, { error: res.error }, undefined, 'DENY')
+      return []
+    } catch {
+      log('PLAN_LOAD', '四级计划回显', projectId.value, { error: '后端不可用' }, undefined, 'DENY')
+      return []
+    }
+  }
+
+  /**
+   * 触发四级计划告警巡检（PLN-ALERT，方向 4：前端对接）。
+   *
+   * 语义：纯编排 + 透传，告警判定权威在后端 {@code PlanAlertEngine}。
+   * 中间指标披露（scannedNodes/hitNodes/fired/skipped）由后端结果承载，
+   * 视图据此渲染「零告警」时须注明「扫描 0 节点」而非宣称无告警（防假阳性）。
+   *
+   * @return Promise<PlanAlertScanData | null>：null 表示后端不可用/异常
+   */
+  async function scanPlanAlerts(): Promise<PlanAlertScanData | null> {
+    try {
+      const token = await issueJwt(currentUser.value.id, currentUser.value.roleCode, data.value.tenantId, DEV_JWT_SECRET, 3600)
+      const res = await scanPlanAlertsApi({ tenantId: data.value.tenantId, projectId: projectId.value }, token)
+      if (res.ok && res.data) {
+        log('PLAN_ALERT_SCAN', '四级计划告警', projectId.value, {
+          scannedNodes: res.data.scannedNodes,
+          hitNodes: res.data.hitNodes,
+          fired: res.data.fired,
+          skipped: res.data.skipped
+        })
+        return res.data
+      }
+      notify('error', res.error ?? '告警巡检失败：后端不可用')
+      log('PLAN_ALERT_SCAN', '四级计划告警', projectId.value, { error: res.error }, undefined, 'DENY')
+      return null
+    } catch {
+      notify('error', '告警巡检失败：后端不可用')
+      log('PLAN_ALERT_SCAN', '四级计划告警', projectId.value, { error: '后端不可用' }, undefined, 'DENY')
+      return null
+    }
+  }
 
   // —— 研发阶段模板 + 门禁强制阻断（STG-001/002/003 + GAT-ENF-001，产品核心 P0）——
   /** 当前项目所用阶段模板（默认汽车零部件六阶段，可配置切换） */
@@ -2379,6 +2612,12 @@ export const useAppStore = defineStore('app', () => {
     notify('success', '草稿已清除（提交后自动清除）')
   }
 
+  /** 写回报价费用明细（费用表单为唯一权威数据源，报价单自动汇总引入） */
+  function setQuoteCosts(sheet: QuoteCostSheet) {
+    data.value.quoteCosts = sheet
+    persist()
+  }
+
   function submitGate(gate: string) {
     const run = gateResults.value[gate]
     if (!run.passed) {
@@ -2680,13 +2919,23 @@ export const useAppStore = defineStore('app', () => {
     return flowDefinitions.value.find((d) => d.id === id)
   }
 
-  /** 启动流程（配置驱动，新增实例即按定义生效，无需发版）；返回实例 id（找不到定义返回 undefined） */
-  function launchFlow(defId: string, title: string, form: Record<string, string | number | boolean> = {}): string | undefined {
+  /** 启动流程（配置驱动，新增实例即按定义生效，无需发版）；返回实例 id（找不到定义返回 undefined）
+   *  customNodes：发起人自定义追加的审批节点（审核/并行会签），会合并进实例专属定义并在实例留痕。
+   *  projectId：关联的项目/产品 id，供监视页按项目聚合审批过程与结果。 */
+  function launchFlow(defId: string, title: string, form: Record<string, string | number | boolean> = {}, customNodes?: CustomApproverAddition[], projectId?: string): string | undefined {
     const def = flowDef(defId)
     if (!def) return undefined
-    const inst = startFlow({ def, title, submitter: currentUser.value.name, form })
+    const inst = startFlow({ def, title, submitter: currentUser.value.name, form, customNodes, projectId })
+    // 发起人自定义了审批节点：基于固定定义生成实例专属定义，实例 defId 指向它，
+    // 后续审批引擎（approveNode/signNode/flowView）无需改动即自动走带自定义节点的链。
+    if (customNodes && customNodes.length > 0) {
+      const customDef = applyCustomApprovers(def, customNodes)
+      const instDef: FlowDefinition = { ...customDef, id: `INST-${inst.id}`, code: def.code, name: `${def.name}（含自定义审批）` }
+      data.value.flowDefinitions = [...(data.value.flowDefinitions ?? []), instDef]
+      inst.defId = instDef.id
+    }
     data.value.flowInstances = [...(data.value.flowInstances ?? []), inst]
-    log('START', '流程', inst.id, { defCode: def.code, title })
+    log('START', '流程', inst.id, { defCode: def.code, title, customNodes: customNodes?.length ?? 0 })
     persist()
     notify('success', `流程已发起：${title}`)
     return inst.id
@@ -2697,13 +2946,13 @@ export const useAppStore = defineStore('app', () => {
    *   校验放行 → 启动流程实例 → 绑定 flowInstanceId → 清除草稿。
    * 返回 true 表示已提交；false 表示被 gate 阻断（blockers 已写入 form）。
    */
-  function submitWorkflowForm(form: import('@/domain/workflowForm').WorkflowForm, title: string, formData: Record<string, string | number | boolean> = {}) {
+  function submitWorkflowForm(form: import('@/domain/workflowForm').WorkflowForm, title: string, formData: Record<string, string | number | boolean> = {}, customNodes?: CustomApproverAddition[], projectId?: string) {
     const def = flowDef(form.defId)
     if (!def) {
       notify('error', `流程模板 ${form.defCode} 不存在，无法提交`)
       return false
     }
-    const instId = launchFlow(form.defId, title, formData)
+    const instId = launchFlow(form.defId, title, formData, customNodes, projectId)
     if (!instId) return false
     form.status = 'submitted'
     form.flowInstanceId = instId
@@ -2917,8 +3166,14 @@ export const useAppStore = defineStore('app', () => {
     projectWbs,
     projectHandoffs,
     handoffEval,
+    interfacePlans,
+    interfacePlanHealthSummary,
+    interfacePlanExport,
+    gateConsistency,
     resourceProfile,
     costSheet,
+    quoteCosts,
+    otsAttachments,
     handoffHand,
     handoffReceive,
     projectReqs,
@@ -3051,6 +3306,12 @@ export const useAppStore = defineStore('app', () => {
     quality,
     completion,
     evm,
+    projectReview,
+    projectReviews,
+    submitProjectReview,
+    submitFourLevelPlan,
+    loadFourLevelPlan,
+    scanPlanAlerts,
     statusDay,
     pvInfo,
     traceBreaks,
@@ -3136,6 +3397,7 @@ export const useAppStore = defineStore('app', () => {
     resetPortalSections,
     saveDraft,
     removeDraft,
+    setQuoteCosts,
     submitGate,
     setLevel,
     advanceSample,

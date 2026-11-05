@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest'
 import {
   addSigner,
   advanceThroughBranch,
+  applyCustomApprovers,
   approveNode,
   availableActions,
   escalate,
@@ -142,6 +143,20 @@ describe('QA-flow 加签与转办', () => {
     expect(inst.history.some((h) => h.action === 'addSign')).toBe(true)
   })
 
+  it('加签角色纳入会签范围：须加签角色也签署才通过（并行、全通过才过）', () => {
+    const def = ecrFlowDef()
+    let inst = startFlow({ def, title: 'E', submitter: 'A', form: { riskLevel: '高' }, id: 'F-add', now: T0 })
+    inst = { ...inst, currentNodeId: 'n4' }
+    inst = addSigner(inst, def, '工艺工程师', T0)
+    // 两个固定角色都签，但加签的工艺工程师未签 → 仍不通过
+    let r = signNode(inst, def, { approverRole: '结构工程师', signRole: '结构工程师' })
+    r = signNode(r.inst, def, { approverRole: '硬件工程师', signRole: '硬件工程师' })
+    expect(r.nodePassed).toBe(false)
+    // 加签角色签署后 → 通过
+    const r3 = signNode(r.inst, def, { approverRole: '工艺工程师', signRole: '工艺工程师' })
+    expect(r3.nodePassed).toBe(true)
+  })
+
   it('transferNode 转办重置进入时间并留痕', () => {
     const def = ecrFlowDef()
     let inst = startFlow({ def, title: 'E', submitter: 'A', id: 'Fs', now: T0 })
@@ -151,8 +166,63 @@ describe('QA-flow 加签与转办', () => {
   })
 })
 
-describe('QA-flow 通过/驳回推进', () => {
-  it('approveNode 推进到下一节点；最后节点通过 → 已完成', () => {
+describe('QA-flow 发起人自定义审批节点（审核/并行会签）', () => {
+  it('applyCustomApprovers 把自定义节点插入到最后一个 approve 批准节点之前', () => {
+    const def = ecrFlowDef()
+    const merged = applyCustomApprovers(def, [
+      { kind: 'approve', name: '法务审核', approverRole: '法务' },
+      { kind: 'sign', name: '财务会签', signRoles: ['财务部', '采购部'] }
+    ])
+    const names = merged.nodes.map((n) => n.name)
+    // 自定义节点位于「审批」批准节点之前，且不改变起始/结束
+    expect(names.indexOf('法务审核')).toBeGreaterThan(0)
+    expect(names.indexOf('财务会签')).toBeGreaterThan(0)
+    expect(names.indexOf('法务审核')).toBeLessThan(names.indexOf('审批'))
+    expect(names.indexOf('财务会签')).toBeLessThan(names.indexOf('审批'))
+    expect(merged.nodes[0].type).toBe('start')
+    expect(merged.nodes[merged.nodes.length - 1].type).toBe('end')
+    // 原定义不可变
+    expect(def.nodes.some((n) => n.name === '法务审核')).toBe(false)
+  })
+
+  it('会签自定义节点 signMode=all（并行、全通过才过）', () => {
+    const def = ecrFlowDef()
+    const merged = applyCustomApprovers(def, [
+      { kind: 'sign', name: '财务会签', signRoles: ['财务部', '采购部'] }
+    ])
+    const custom = merged.nodes.find((n) => n.name === '财务会签')!
+    expect(custom.type).toBe('sign')
+    expect(custom.signMode).toBe('all')
+    expect(custom.signRoles).toEqual(['财务部', '采购部'])
+  })
+
+  it('非法自定义节点被忽略（会签无角色 / 审核无审批角色）', () => {
+    const def = ecrFlowDef()
+    const merged = applyCustomApprovers(def, [
+      { kind: 'sign', name: '空会签', signRoles: [] },
+      { kind: 'approve', name: '空审核', approverRole: '' }
+    ])
+    expect(merged).toBe(def)
+  })
+
+  it('空自定义列表原样返回定义', () => {
+    const def = ecrFlowDef()
+    expect(applyCustomApprovers(def, [])).toBe(def)
+  })
+
+  it('startFlow 记录 customNodes 留痕', () => {
+    const def = ecrFlowDef()
+    const inst = startFlow({
+      def, title: 'E', submitter: 'A',
+      customNodes: [{ kind: 'approve', name: '法务审核', approverRole: '法务' }],
+      id: 'F-c', now: T0
+    })
+    expect(inst.customNodes).toHaveLength(1)
+    expect(inst.customNodes![0].name).toBe('法务审核')
+  })
+})
+
+describe('QA-flow 通过/驳回推进', () => {  it('approveNode 推进到下一节点；最后节点通过 → 已完成', () => {
     const def = ecrFlowDef()
     let inst = startFlow({ def, title: 'E', submitter: 'A', id: 'Fr', now: T0 })
     inst = approveNode(inst, def, { approverRole: '配置管理员', approverName: '陈', now: T0 })

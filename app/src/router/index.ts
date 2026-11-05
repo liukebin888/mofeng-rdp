@@ -37,12 +37,13 @@ export const MENUS: MenuGroup[] = [
   {
     key: 'presale', title: '项目前期', icon: 'Document', stage: 'P1–P2', role: '项目经理 / 研发副总', cp: 'K1 K2',
     items: [
-      { path: '/presale/presale-apply', title: '前期交申请', desc: '客户/产品线/预估金额，市场总监审核→三中心会签→总经理批准', comp: v('presale/PresaleApplyView') },
-      { path: '/presale/quote-apply', title: '项目/产品报价', desc: '电子/结构BOM+过程报价+采购价格，四角色并行填报→财务汇总→总经理批准', comp: v('presale/QuoteApplyView') },
-      { path: '/presale/apply', title: '立项申请', desc: '五项分级输入 + 技术方案↔报价关联', comp: v('presale/ApplyView') },
-      { path: '/presale/review', title: '立项评审', desc: 'Gate1 准入逐条校验', comp: v('presale/ApplyView') },
-      { path: '/presale/scheme', title: '技术方案与报价', desc: '方案版本与报价单关联（C-02）', comp: v('presale/SchemeView') },
-      { path: '/presale/flow', title: '前期审批流程', desc: '前期交申请→报价→立项 三流程固定次序', comp: v('presale/PreSaleFlowView') }
+      { path: '/presale/presale-apply', title: '前期交流申请', desc: '客户/产品线/预估金额，市场总监审核→三中心会签→总经理批准', comp: v('presale/PresaleApplyView') },
+      { path: '/presale/quote-apply', title: '项目/产品报价', desc: '报价唯一权威：四角色并行填报成本→财务汇总→总经理批准，报价单清单与金额汇总', comp: v('presale/QuoteApplyView') },
+      { path: '/presale/quote-cost', title: '报价费用明细', desc: '八类报价费用明细行填报（材料/制造/研发/工装/设备/试验/合规/包装），自动汇总引入报价单', comp: v('presale/QuoteCostView') },
+      { path: '/presale/scheme', title: '技术方案（TR）', desc: '技术方案版本管理 + TR 技术评审审批流（评审委员会→总经理，C-02 技术输入）', comp: v('presale/SchemeView') },
+      { path: '/presale/apply', title: '立项申请', desc: '五项分级输入定级 + 审批链同前期交流申请（市场总监审核→三中心会签→总经理批准）', comp: v('presale/ApplyView') },
+      { path: '/presale/review', title: '立项评审', desc: '人工+AI 四维度评估（进度/资源/技术/成本）+ 参考结论与图表', comp: v('presale/ProjectReviewView') },
+      { path: '/presale/flow', title: '前期审批流程', desc: '纯监视：按项目/产品聚合五流程（前期交流→TR→报价→立项→立项评审）审批过程与结果', comp: v('presale/PreSaleFlowView') }
     ]
   },
   {
@@ -50,7 +51,10 @@ export const MENUS: MenuGroup[] = [
     items: [
       { path: '/project/task', title: '项目任务书', desc: '任务目标/交付物/里程碑，项目经理发起→研发副总审核→总经理批准', comp: v('project/ProjectTaskView') },
       { path: '/project/plan', title: '项目主计划', desc: '计划周期/里程碑/资源，PMO审核→部门会签→总经理批准', comp: v('project/ProjectPlanView') },
-      { path: '/project/ots', title: 'OTS 认可', desc: '样件/报告/认可结论，部门会签→客户认可→总经理批准', comp: v('project/OtsApprovalView') },
+      { path: '/project/ots', title: 'OTS 认可', desc: '三大条件附件驱动 + L1-L4 等级自动判定，部门会签→客户认可→总经理批准', comp: v('project/OtsApprovalView') },
+      { path: '/project/ots-attachment-a', title: '附件 A 设计文件归档', desc: '设计文件归档汇总表（A-1 电子 / A-2 结构 / A-3 工艺），只读', comp: v('project/OtsAttachmentA') },
+      { path: '/project/ots-attachment-b', title: '附件 B 样件评审报告', desc: 'OTS 样件评审报告，只读', comp: v('project/OtsAttachmentB') },
+      { path: '/project/ots-attachment-c', title: '附件 C DV 试验报告', desc: 'DV 试验报告，只读', comp: v('project/OtsAttachmentC') },
       { path: '/project/ppap', title: 'PPAP 提交', desc: '等级/文件包/18要素，部门会签→客户批准', comp: v('project/PpapView') },
       { path: '/project/sop', title: 'SOP', desc: 'SOP日期/产能/爬坡计划，部门会签→总经理批准', comp: v('project/SopView') }
     ]
@@ -61,7 +65,8 @@ export const MENUS: MenuGroup[] = [
       { path: '/portfolio/score', title: '评分与排序', desc: '40/35/25 三维加权 ×20', comp: v('portfolio/ScoreView') },
       { path: '/portfolio/capacity', title: '优选与容量', desc: '容量缺口三建议（PFM-019）', comp: v('portfolio/ScoreView') },
       { path: '/portfolio/analysis', title: '组合分析', desc: 'ROI/决策留痕/What-if', comp: v('portfolio/AnalysisView') },
-      { path: '/portfolio/eps', title: 'EPS 节点树', desc: '四级树逐层汇总', comp: v('portfolio/EpsView') }
+      { path: '/portfolio/eps', title: 'EPS 节点树', desc: '四级树逐层汇总', comp: v('portfolio/EpsView') },
+      { path: '/portfolio/gate-consistency', title: '闸门一致性', desc: '跨项目判据集统一（PFM-011）', comp: v('portfolio/GateConsistencyView') }
     ]
   },
   {
@@ -74,12 +79,16 @@ export const MENUS: MenuGroup[] = [
       { path: '/plan/milestone', title: '里程碑与关键节点', desc: 'OTS 绑定 Gate4（PRJ-010）', comp: v('plan/QualityView') },
       { path: '/plan/deviation', title: '进度偏差', desc: 'S 曲线与 SPI 判读', comp: v('plan/DeviationView') },
       { path: '/plan/resource', title: '资源负荷', desc: '负荷率 >110% 冲突', comp: v('plan/ResourceView') },
-      { path: '/plan/change', title: '计划变更', desc: '双轨计划与变更留痕', comp: v('plan/ChangeView') }
+      { path: '/plan/change', title: '计划变更', desc: '双轨计划与变更留痕', comp: v('plan/ChangeView') },
+      { path: '/plan/alert', title: '计划告警', desc: '四段式时点告警 S1~S4 巡检', comp: v('plan/PlanAlertView') },
+      { path: '/plan/interface', title: '界面（接口）计划', desc: '跨项目四要素接口 + 延误下游标红', comp: v('plan/InterfacePlanView') }
     ]
   },
   {
     key: 'dev', title: '研发过程', icon: 'Cpu', stage: 'P4', role: '系统工程师 / 设计', cp: 'K4 K5 K6 K7',
     items: [
+      { path: '/dev/product-code', title: '产品型号编制', desc: '12 位六段式编码 + 顾客/车型/产品类型字典 + 零件号申请命名（CJQW0106）', comp: v('dev/ProductCodeView') },
+      { path: '/dev/part-number-apply', title: '零件号申请命名', desc: '附表5 零件号申请命名表：表一~四 + 型号自动生成 + 查重 + 审批流转', comp: v('dev/PartNumberApplyView') },
       { path: '/dev/requirements', title: '需求条目库', desc: '六类多态 + 版本化', comp: v('dev/RequirementsView') },
       { path: '/dev/grading', title: '分级判定', desc: '13 行真值表查表留痕', comp: v('dev/GradingView') },
       { path: '/dev/trace', title: '追溯与覆盖率', desc: '闭包 ≤6 跳 + 四类断链', comp: v('dev/TraceView') },
@@ -116,7 +125,9 @@ export const MENUS: MenuGroup[] = [
       { path: '/quality/vuln', title: '漏洞台账', desc: '高危 0 方可结项（C-33）', comp: v('quality/RiskView') },
       { path: '/quality/coverage', title: '追溯覆盖率', desc: '安全 100% / ASPICE ≥95%', comp: v('dev/TraceView') },
       { path: '/quality/pdca', title: 'PDCA 闭环', desc: '处置与改进分离', comp: v('quality/PdcaView') },
-      { path: '/quality/knowledge', title: '复盘与经验库', desc: '阶段复盘 + 经验打标签（C-34/C-35）', comp: v('quality/KnowledgeView') }
+      { path: '/quality/knowledge', title: '复盘与经验库', desc: '阶段复盘 + 经验打标签（C-34/C-35）', comp: v('quality/KnowledgeView') },
+      { path: '/quality/report', title: '质量评估统计报告', desc: 'A-SPICE PQSR：周度质量趋势 R/Y/G/N（CAEA-E-PQSR-A2）', comp: v('quality/QualityReportView') },
+      { path: '/quality/nonconformity', title: '不符合项追踪表', desc: 'A-SPICE NTTT：不符合项四态追踪（CAEA-E-NTTT-A0）', comp: v('quality/NonconformityView') }
     ]
   },
   {
@@ -190,7 +201,8 @@ export const MENUS: MenuGroup[] = [
     items: [
       { path: '/basic/customer', title: '客户管理', desc: '车厂主数据：名称/编号/车型，增删改+导入导出', comp: v('basic/CustomerView') },
       { path: '/basic/product', title: '产品管理', desc: '产品三级分类：类别→产品线→产品，增删改+导入导出', comp: v('basic/ProductView') },
-      { path: '/basic/naming', title: '命名与编码规则', desc: '客户/产品/文档/部门/人员 命名规范与编码规范', comp: v('basic/NamingView') }
+      { path: '/basic/naming', title: '命名与编码规则', desc: '客户/产品/文档/部门/人员 命名规范与编码规范', comp: v('basic/NamingView') },
+      { path: '/basic/deliverable-control', title: '输出物管控标准', desc: '产品开发输出物管控一览表（部门×门控阶段×等级）', comp: v('basic/DeliverableControlView') }
     ]
   },
   {

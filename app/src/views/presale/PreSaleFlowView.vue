@@ -1,225 +1,238 @@
 <template>
   <div>
-    <PageHeader title="项目前期审批流程" desc="三条审批主线次序固定（前期交申请 → 报价 → 立项申请），每条均为独立审批流；部门会签须全部签署方通过">
+    <PageHeader title="项目前期审批流程" desc="纯监视视图：按项目/产品聚合前期五条审批流程（前期交流申请 → 技术方案 TR → 报价 → 立项申请 → 立项评审）的过程与结果，只读、不提供发起与审批操作">
       <template #actions>
-        <el-select v-model="launchDefId" size="small" placeholder="选择要发起的流程" style="width: 190px; margin-right: 8px">
-          <el-option v-for="d in presaleDefs" :key="d.id" :label="`${d.order}. ${d.name}`" :value="d.id" />
+        <el-select v-model="selectedProjectId" size="small" placeholder="选择项目/产品" style="width: 260px" filterable>
+          <el-option v-for="p in selectableProjects" :key="p.id" :label="`${p.code} · ${p.name}`" :value="p.id" />
         </el-select>
-        <el-button size="small" type="primary" @click="launch">发起流程</el-button>
       </template>
     </PageHeader>
 
-    <!-- 三条流程次序总览 -->
-    <div class="grid grid-3" style="margin-bottom: 12px">
-      <div v-for="d in presaleDefs" :key="d.id" class="panel" :class="{ active: launchDefId === d.id }">
-        <div class="panel-title">{{ d.order }}. {{ d.name }}</div>
-        <div class="stage-flow">
-          <template v-for="(n, i) in d.def.nodes" :key="n.id">
-            <span v-if="i" class="arrow">→</span>
-            <span class="stage-tag" :class="{ sign: n.type === 'sign', end: n.type === 'end' }">{{ n.name }}</span>
-          </template>
-        </div>
-        <div class="dim" style="margin-top: 6px">
-          <span v-if="d.order === 1">市场客户经理发起 → 市场总监审核 → 三中心总监会签 → 总经理批准</span>
-          <span v-else-if="d.order === 2">四角色并行填报 → 财务汇总核对 → 总经理批准报价</span>
-          <span v-else>市场客户经理发起 → 市场总监审核 → 八部门会签 → 总经理批准</span>
-        </div>
-      </div>
-    </div>
-
+    <!-- 监视 KPI -->
     <div class="grid grid-4" style="margin-bottom: 12px">
-      <KpiCard label="运行中" :value="running.length" unit="单" :zone="running.length ? 'brand' : 'ok'" />
-      <KpiCard label="已走完" :value="finished.length" unit="单" :zone="finished.length ? 'ok' : 'ok'" />
-      <KpiCard label="会签节点" :value="signNodes" unit="个" sub="全签方通过" />
-      <KpiCard label="当前身份" :value="store.currentUser.roleName" sub="可切换角色模拟会签" />
+      <KpiCard label="监控项目数" :value="monitoredProjects.length" unit="个" sub="已产生前期审批的项目" />
+      <KpiCard label="运行中流程" :value="runningCount" unit="单" :zone="runningCount ? 'brand' : 'ok'" />
+      <KpiCard label="已完成流程" :value="finishedCount" unit="单" zone="ok" />
+      <KpiCard label="已驳回流程" :value="rejectedCount" unit="单" :zone="rejectedCount ? 'warn' : 'ok'" />
     </div>
 
-    <!-- 审批列表 -->
+    <!-- ① 全项目总览矩阵：行=项目，列=五流程，单元格=审批状态 -->
     <div class="panel">
-      <div class="panel-title">前期流程实例（次序固定：前期交 → 报价 → 立项）</div>
-      <el-table :data="rows" size="small">
-        <el-table-column prop="defCode" label="流程" width="110">
+      <div class="panel-title">全项目审批总览（行=项目/产品，列=前期流程，格=审批状态）</div>
+      <el-table :data="overviewRows" size="small" :highlight-current-row="false">
+        <el-table-column label="项目/产品" min-width="200" fixed>
           <template #default="{ row }">
-            <span class="tag" :class="row.order === 1 ? 'cond' : row.order === 2 ? 'brand' : 'ok'">{{ row.defName }}</span>
+            <div class="proj-cell" :class="{ active: row.id === selectedProjectId }" @click="selectedProjectId = row.id">
+              <span class="mono dim">{{ row.code }}</span>
+              <span class="nm">{{ row.name }}</span>
+              <span class="dim" style="font-size: 10.5px">{{ row.customer }}</span>
+            </div>
           </template>
         </el-table-column>
-        <el-table-column prop="title" label="标题" min-width="220" />
-        <el-table-column label="当前节点" width="150">
-          <template #default="{ row }"><span class="tag" :class="row.status === '已完成' ? 'ok' : 'cond'">{{ row.view.node?.name ?? '—' }}</span></template>
-        </el-table-column>
-        <el-table-column label="进度" min-width="160">
+        <el-table-column v-for="d in presaleDefs" :key="d.id" :label="d.name" min-width="130" align="center">
           <template #default="{ row }">
-            <span class="dim">{{ passedCount(row) }}/{{ row.def?.nodes.length ?? 0 }} 节点</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="状态" width="90">
-          <template #default="{ row }"><span class="tag" :class="row.status === '已完成' ? 'ok' : row.status === '已驳回' ? 'fail' : 'cond'">{{ row.status }}</span></template>
-        </el-table-column>
-        <el-table-column label="操作" min-width="230">
-          <template #default="{ row }">
-            <template v-if="row.status === '运行中'">
-              <template v-if="row.view.node?.type === 'sign'">
-                <el-select v-model="signRole[row.id]" size="small" placeholder="选角色会签" style="width: 120px; margin-right: 4px">
-                  <el-option v-for="r in remainingSignRoles(row)" :key="r" :label="r" :value="r" />
-                </el-select>
-                <el-button link size="small" type="primary" @click="sign(row)">会签</el-button>
-              </template>
-              <template v-else>
-                <el-button link size="small" type="primary" @click="approve(row)">通过</el-button>
-                <el-button link size="small" type="danger" @click="reject(row)">驳回</el-button>
-              </template>
-            </template>
-            <span v-else class="dim">—</span>
+            <span v-if="row.cells[d.id]" class="tag" :class="statusZone(row.cells[d.id].status)">
+              {{ row.cells[d.id].status }}
+            </span>
+            <span v-else class="dim" style="font-size: 11px">未发起</span>
           </template>
         </el-table-column>
       </el-table>
-      <el-empty v-if="!rows.length" description="暂无前期流程实例" :image-size="54" />
     </div>
 
-    <!-- 会签进度明细 -->
-    <div class="grid" style="grid-template-columns: 1fr 1fr; margin-top: 12px">
-      <div class="panel">
-        <div class="panel-title">会签进度（已签署角色 / 待签角色）</div>
-        <div v-for="f in signInstances" :key="f.id" class="mrow">
-          <span class="mono">{{ f.id }}</span>
-          <span class="nm">{{ f.view.node?.name }}</span>
-          <span class="dim">{{ signedRoles(f).join('、') || '尚未签署' }}</span>
+    <!-- ② 选中项目的审批过程与结果明细 -->
+    <div class="panel" style="margin-top: 12px">
+      <div class="panel-title">
+        选中项目审批明细
+        <span class="dim" style="font-weight: 400; margin-left: 8px">
+          {{ selectedProject ? `${selectedProject.code} · ${selectedProject.name}` : '请选择项目' }}
+        </span>
+      </div>
+
+      <div v-if="selectedProject && selectedInstances.length" class="detail-list">
+        <div v-for="f in selectedInstances" :key="f.id" class="detail-card">
+          <div class="detail-head">
+            <span class="tag" :class="defZone(f.defId)">{{ f.defName }}</span>
+            <span class="nm">{{ f.title }}</span>
+            <span class="dim" style="font-size: 11px">{{ f.submitter }} · {{ f.createdAt?.slice(0, 10) }}</span>
+            <span class="tag" :class="statusZone(f.status)">{{ f.status }}</span>
+          </div>
+          <!-- 审批过程：节点链路，已过=绿，当前=蓝闪，未到=灰 -->
+          <div class="stage-flow">
+            <template v-for="(n, i) in f.nodes" :key="n.id">
+              <span v-if="i" class="arrow">→</span>
+              <span
+                class="stage-tag"
+                :class="nodeClass(n.id, f)"
+              >
+                {{ n.name }}
+              </span>
+            </template>
+          </div>
+          <!-- 结果摘要 -->
+          <div class="result-line">
+            <span class="dim">结果：</span>
+            <span :class="resultTextClass(f)">{{ resultText(f) }}</span>
+            <span v-if="f.status === '运行中'" class="dim" style="margin-left: 8px">当前待：{{ currentNodeName(f) }}</span>
+            <span v-if="f.finishedAt" class="dim" style="margin-left: 8px">完成于 {{ f.finishedAt?.slice(0, 16).replace('T', ' ') }}</span>
+          </div>
         </div>
-        <el-empty v-if="!signInstances.length" description="当前无会签中的节点" :image-size="44" />
       </div>
-      <div class="panel">
-        <div class="panel-title">次序约束说明</div>
-        <div class="kv"><span>次序固定</span><em>前期交申请 → 报价 → 立项申请，不可颠倒</em></div>
-        <div class="kv"><span>每流程独立</span><em>各自完整审批链，互不合并</em></div>
-        <div class="kv"><span>会签规则</span><em>部门会签全通过方推进（signMode: all）</em></div>
-        <div class="kv"><span>并行填报</span><em>报价四角色（电子/结构/工艺/采购）并行，全部完成后财务汇总</em></div>
-      </div>
-      <div class="panel">
-        <div class="panel-title">会签人映射（组织负责人 → 审批流）</div>
-        <div v-for="s in signerMapping" :key="s.role" class="mrow">
-          <span class="mono">{{ s.role }}</span>
-          <span class="arr">→</span>
-          <span class="nm" :class="{ dim: !s.matched }">{{ s.name }}</span>
-          <span v-if="!s.matched" class="dim">（未匹配到组织负责人）</span>
-        </div>
-        <div class="dim" style="margin-top: 6px">会签角色按组织架构自动解析到负责人，组织负责人变更后审批人同步更新。</div>
-      </div>
+      <el-empty v-else-if="selectedProject" description="该项目暂无前期审批记录" :image-size="54" />
+      <el-empty v-else description="请在上方选择项目/产品查看审批明细" :image-size="54" />
+    </div>
+
+    <!-- 次序约束说明 -->
+    <div class="panel" style="margin-top: 12px">
+      <div class="panel-title">前期流程次序约束</div>
+      <div class="kv"><span>主链次序</span><em>前期交流申请 → 技术方案 TR → 报价 → 立项申请，不可颠倒</em></div>
+      <div class="kv"><span>立项评审</span><em>立项申请勾选「是」时自动触发，无需手动发起</em></div>
+      <div class="kv"><span>TR 前置</span><em>技术方案 TR 通过后方可作为报价与立项的技术输入（C-02）</em></div>
+      <div class="kv"><span>监视只读</span><em>本页仅监视审批过程与结果；发起与审批操作请在各自单据页完成</em></div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, ref } from 'vue'
 import PageHeader from '@/components/PageHeader.vue'
 import KpiCard from '@/components/KpiCard.vue'
 import { useAppStore } from '@/store/app'
-import { useI18n } from '@/infra/i18nPlugin'
 import type { FlowInstance } from '@/domain/flowEngine'
 
 const store = useAppStore()
-const { te } = useI18n()
-void te
+const selectedProjectId = ref<string>('P-001')
 
-const launchDefId = ref<string>('')
-const signRole = reactive<Record<string, string>>({})
-
-// 三条前期流程（按次序）
+// 五条前期流程（次序固定）
 const presaleDefs = computed(() => {
-  const order = ['DEF-PRE-1', 'DEF-PRE-2', 'DEF-PRE-3']
+  const order: { id: string; name: string }[] = [
+    { id: 'DEF-PRE-1', name: '前期交流申请' },
+    { id: 'DEF-PRE-5', name: '技术方案（TR）' },
+    { id: 'DEF-PRE-2', name: '项目/产品报价' },
+    { id: 'DEF-PRE-3', name: '立项申请' },
+    { id: 'DEF-PRE-4', name: '立项评审' }
+  ]
   return order
-    .map((id, i) => {
-      const def = store.flowDefinitions.find((d) => d.id === id)
-      return def ? { id, order: i + 1, name: def.name, def } : null
+    .map((o) => {
+      const def = store.flowDefinitions.find((d) => d.id === o.id)
+      return def ? { id: o.id, name: def.name } : null
     })
     .filter((x): x is NonNullable<typeof x> => !!x)
 })
 
-// 仅取前期流程的实例
-const presaleInstances = computed(() =>
-  (store.data.flowInstances ?? []).filter((f) => ['DEF-PRE-1', 'DEF-PRE-2', 'DEF-PRE-3'].includes(f.defId))
+// 前期流程实例
+const presaleInstances = computed<FlowInstance[]>(() =>
+  (store.data.flowInstances ?? []).filter((f) => ['DEF-PRE-1', 'DEF-PRE-2', 'DEF-PRE-3', 'DEF-PRE-4', 'DEF-PRE-5'].includes(f.defId))
 )
 
-const rows = computed(() =>
-  presaleInstances.value.map((f) => {
-    const pd = presaleDefs.value.find((d) => d.id === f.defId)
-    return { ...f, def: pd?.def, defName: pd?.name ?? f.defCode, order: pd?.order ?? 0, view: store.flowView(f as FlowInstance) }
+// 可监视的项目列表：优先取「已产生前期审批实例」的项目，再补齐当前空间内其余项目
+const selectableProjects = computed(() => {
+  const projects = store.visibleProjects ?? []
+  const withFlowIds = new Set(presaleInstances.value.map((f) => f.projectId).filter(Boolean))
+  const withFlow = projects.filter((p) => withFlowIds.has(p.id))
+  const rest = projects.filter((p) => !withFlowIds.has(p.id))
+  return [...withFlow, ...rest]
+})
+
+// 实际被监视（已产生审批实例）的项目
+const monitoredProjects = computed(() => {
+  const ids = new Set(presaleInstances.value.map((f) => f.projectId).filter(Boolean))
+  return (store.visibleProjects ?? []).filter((p) => ids.has(p.id))
+})
+
+const selectedProject = computed(() => selectableProjects.value.find((p) => p.id === selectedProjectId.value))
+
+// 全项目总览矩阵：每个项目 × 每条流程 → 该流程最新实例
+const overviewRows = computed(() =>
+  monitoredProjects.value.map((p) => {
+    const cells: Record<string, FlowInstance | undefined> = {}
+    for (const d of presaleDefs.value) {
+      const insts = presaleInstances.value.filter((f) => f.projectId === p.id && f.defId === d.id)
+      cells[d.id] = insts.length ? insts[0] : undefined
+    }
+    return { ...p, cells }
   })
 )
 
-const running = computed(() => rows.value.filter((r) => r.status === '运行中'))
-const finished = computed(() => rows.value.filter((r) => r.status === '已完成'))
-const signNodes = computed(() => running.value.filter((r) => r.view.node?.type === 'sign').length)
-const signInstances = computed(() => running.value.filter((r) => r.view.node?.type === 'sign'))
+// KPI
+const runningCount = computed(() => presaleInstances.value.filter((f) => f.status === '运行中').length)
+const finishedCount = computed(() => presaleInstances.value.filter((f) => f.status === '已完成').length)
+const rejectedCount = computed(() => presaleInstances.value.filter((f) => f.status === '已驳回').length)
 
-// 会签人映射：三中心总监会签（DEF-PRE-1）的角色 → 组织负责人
-const signerMapping = computed(() => {
-  const def = presaleDefs.value.find((d) => d.id === 'DEF-PRE-1')?.def
-  const signNode = def?.nodes.find((n) => n.type === 'sign')
-  const roles = signNode?.signRoles ?? []
-  return store.resolveSignersOf(roles)
+// 选中项目的实例（按主链次序排序）
+const selectedInstances = computed(() => {
+  const order = ['DEF-PRE-1', 'DEF-PRE-5', 'DEF-PRE-2', 'DEF-PRE-3', 'DEF-PRE-4']
+  return presaleInstances.value
+    .filter((f) => f.projectId === selectedProjectId.value)
+    .sort((a, b) => order.indexOf(a.defId) - order.indexOf(b.defId))
+    .map((f) => {
+      const def = store.flowDefinitions.find((d) => d.id === f.defId)
+      const pd = presaleDefs.value.find((d) => d.id === f.defId)
+      return { ...f, nodes: def?.nodes ?? [], defName: pd?.name ?? f.defCode }
+    })
 })
 
-function passedCount(row: (typeof rows.value)[number]) {
-  return row.passedNodeIds.length
+function statusZone(status: string): string {
+  if (status === '已完成') return 'ok'
+  if (status === '已驳回' || status === '已终止') return 'fail'
+  return 'cond'
 }
 
-// 已签署的角色（从历史 counterSign 记录取）
-function signedRoles(row: (typeof rows.value)[number]): string[] {
-  const rec = row.history.find((h) => h.nodeId === row.currentNodeId && h.action === 'counterSign')
-  return rec?.signatures?.filter((s) => s.pass).map((s) => s.role) ?? []
+function defZone(defId: string): string {
+  const map: Record<string, string> = { 'DEF-PRE-1': 'cond', 'DEF-PRE-5': 'l2', 'DEF-PRE-2': 'ok', 'DEF-PRE-3': 'l3', 'DEF-PRE-4': 'l1' }
+  return map[defId] ?? 'l1'
 }
 
-// 剩余待签角色
-function remainingSignRoles(row: (typeof rows.value)[number]): string[] {
-  const node = row.view.node
-  const roles = node?.signRoles ?? []
-  const signed = signedRoles(row)
-  return roles.filter((r) => !signed.includes(r))
+// 节点显示状态：已过=绿(passed)，当前=高亮(current)，未到=灰(pending)
+function nodeClass(nodeId: string, f: { passedNodeIds: string[]; currentNodeId: string; status: string }): string {
+  if (f.passedNodeIds.includes(nodeId)) return 'passed'
+  if (f.currentNodeId === nodeId && f.status === '运行中') return 'current'
+  return 'pending'
 }
 
-function launch() {
-  const d = presaleDefs.value.find((x) => x.id === launchDefId.value)
-  if (!d) {
-    store.notify('warning', '请先选择要发起的流程')
-    return
-  }
-  const titles: Record<string, string> = {
-    'DEF-PRE-1': 'XX 客户项目前期交申请',
-    'DEF-PRE-2': 'XX 客户项目报价',
-    'DEF-PRE-3': 'XX 客户项目立项申请'
-  }
-  store.launchFlow(d.id, titles[d.id] ?? d.name, {})
+function currentNodeName(f: FlowInstance & { nodes?: { id: string; name: string }[] }): string {
+  return f.nodes?.find((n) => n.id === f.currentNodeId)?.name ?? '—'
 }
 
-function approve(row: (typeof rows.value)[number]) {
-  store.approveFlow(row.id)
+function resultText(f: FlowInstance & { nodes?: { id: string; name: string }[] }): string {
+  if (f.status === '已完成') return '审批通过'
+  if (f.status === '已驳回') return '审批驳回'
+  if (f.status === '已终止') return '流程终止'
+  return '审批进行中'
 }
 
-function reject(row: (typeof rows.value)[number]) {
-  store.rejectFlow(row.id)
-}
-
-function sign(row: (typeof rows.value)[number]) {
-  const role = signRole[row.id]
-  if (!role) {
-    store.notify('warning', '请先选择要会签的角色')
-    return
-  }
-  store.signAsFlow(row.id, role)
-  delete signRole[row.id]
+function resultTextClass(f: FlowInstance): string {
+  if (f.status === '已完成') return 'ok-text'
+  if (f.status === '已驳回' || f.status === '已终止') return 'fail-text'
+  return 'cond-text'
 }
 </script>
 
 <style scoped>
-.stage-flow { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 10.5px; }
-.arrow { color: var(--text-3); }
-.stage-tag { padding: 2px 6px; border-radius: 4px; background: var(--bg-2); color: var(--text-2); }
-.stage-tag.sign { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
-.stage-tag.end { background: rgba(74, 222, 128, 0.12); color: #4ade80; }
-.active { outline: 1px solid var(--brand, #4f8cff); }
-.mrow { display: grid; grid-template-columns: 90px 1fr 1fr; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px dashed #16233a; font-size: 11.5px; }
+.proj-cell { display: flex; flex-direction: column; gap: 1px; cursor: pointer; }
+.proj-cell.active .nm { color: var(--brand, #4f8cff); }
 .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.kv { display: grid; grid-template-columns: 90px 1fr; gap: 8px; padding: 6px 0; border-bottom: 1px dashed #16233a; font-size: 11.5px; }
+.mono { font-family: var(--mono); font-size: 10.5px; }
+.dim { color: var(--text-3); }
+
+.detail-list { display: flex; flex-direction: column; gap: 10px; }
+.detail-card { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: var(--bg-2); }
+.detail-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.detail-head .nm { flex: 1; }
+
+.stage-flow { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 10.5px; margin-bottom: 8px; }
+.arrow { color: var(--text-3); }
+.stage-tag { padding: 2px 7px; border-radius: 4px; background: var(--bg-3); color: var(--text-3); }
+.stage-tag.passed { background: rgba(74, 222, 128, 0.14); color: #4ade80; }
+.stage-tag.current { background: rgba(79, 140, 255, 0.18); color: #7fb0ff; box-shadow: 0 0 0 1px rgba(79, 140, 255, 0.5); }
+.stage-tag.pending { background: var(--bg-3); color: var(--text-3); }
+
+.result-line { font-size: 12px; }
+.ok-text { color: #4ade80; font-weight: 600; }
+.fail-text { color: #ff8a8a; font-weight: 600; }
+.cond-text { color: #ffd79a; font-weight: 600; }
+
+.kv { display: grid; grid-template-columns: 100px 1fr; gap: 8px; padding: 6px 0; border-bottom: 1px dashed #16233a; font-size: 11.5px; }
 .kv span { color: var(--text-3); }
 .kv em { font-style: normal; }
 </style>

@@ -11,6 +11,7 @@
  */
 
 import type { GateRun } from './types'
+import { hashOf } from './hash'
 
 /** 阶段状态 */
 export type StageStatus = '未开始' | '进行中' | '待批准' | '已批准' | '已关闭'
@@ -231,4 +232,24 @@ function hasCycle(tpl: StageTemplate, code: string, visited: Set<string>): boole
     if (hasCycle(tpl, p, new Set(visited))) return true
   }
   return false
+}
+
+/**
+ * 阶段模板快照哈希（确定性，供判定留痕 / K1 复算）。
+ * 阶段/次序/前置/闸门任一变更哈希必变，可与历史快照比对判断是否同一版。
+ */
+export function stageTemplateHash(tpl: StageTemplate): string {
+  const ordered = [...tpl.stages].sort((a, b) => a.order - b.order)
+  return hashOf({
+    id: tpl.id,
+    name: tpl.name,
+    tag: tpl.tag,
+    version: tpl.version,
+    stages: ordered.map((s) => ({
+      code: s.code,
+      order: s.order,
+      gateCode: s.gateCode ?? '',
+      prerequisites: s.prerequisites
+    }))
+  })
 }

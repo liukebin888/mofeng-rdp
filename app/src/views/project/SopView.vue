@@ -6,6 +6,7 @@
           :form="wfForm"
           :blockers="wfBlockers"
           :dirty="dirty"
+          v-model:custom-approvers="customApprovers"
           @new="wfNew"
           @save="wfSave"
           @close="wfClose"
@@ -87,6 +88,7 @@ const form = reactive({ ...EMPTY_FORM })
 const wfForm = ref<WorkflowForm | null>(null)
 const dirty = ref(false)
 const wfBlockers = ref<string[]>([])
+const customApprovers = ref<Array<import('@/domain/flowEngine').CustomApproverAddition & { signRoles: string[] }>>([])
 
 const INITIATION_DEF_ID = 'DEF-PRJ-SOP'
 
@@ -118,13 +120,14 @@ function missingRequiredFields(): string[] {
 }
 
 function serializeContent(): string {
-  return JSON.stringify({ form: { ...form } })
+  return JSON.stringify({ form: { ...form }, customApprovers: customApprovers.value })
 }
 
 function hydrateContent(content: string) {
   try {
     const obj = JSON.parse(content)
     if (obj.form) Object.assign(form, obj.form)
+    if (Array.isArray(obj.customApprovers)) customApprovers.value = obj.customApprovers
   } catch {
     /* 忽略损坏草稿 */
   }
@@ -140,6 +143,7 @@ function wfNew() {
   const draft = store.data.drafts?.find((d) => d.userId === store.currentUser.id && d.objectType === 'SOP' && d.id === objectId)
   const f = newWorkflowForm({ def, objectType: 'SOP', objectId, content: draft?.content })
   Object.assign(form, EMPTY_FORM)
+  customApprovers.value = []
   if (draft?.content) hydrateContent(draft.content)
   wfForm.value = f
   dirty.value = false
@@ -161,7 +165,7 @@ function wfClose() {
   wfBlockers.value = []
 }
 
-function wfSubmit() {
+function wfSubmit(customApprovers: import('@/domain/flowEngine').CustomApproverAddition[] = []) {
   if (!wfForm.value) return
   const blockers: string[] = []
   const missing = missingRequiredFields()
@@ -181,7 +185,7 @@ function wfSubmit() {
     capacity: form.capacity,
     rampPlan: form.rampPlan
   }
-  const ok = store.submitWorkflowForm(wfForm.value, `SOP：${form.name}`, formData)
+  const ok = store.submitWorkflowForm(wfForm.value, `SOP：${form.name}`, formData, customApprovers)
   if (ok) {
     store.notify('success', 'SOP 已提交审批（部门会签 → 总经理批准）')
     dirty.value = false

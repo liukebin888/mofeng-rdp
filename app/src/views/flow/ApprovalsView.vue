@@ -25,16 +25,23 @@
           <template #default="{ row }"><span class="tag" :class="row.view.overdue ? 'fail' : 'cond'">{{ row.view.node?.name ?? '—' }}</span></template>
         </el-table-column>
         <el-table-column prop="submitter" label="提交人" width="86" />
+        <el-table-column label="自定义审批" width="130">
+          <template #default="{ row }">
+            <span v-if="row.customNodes && row.customNodes.length" class="tag custom">{{ customLabel(row.customNodes) }}</span>
+            <span v-else class="muted">—</span>
+          </template>
+        </el-table-column>
         <el-table-column label="时限" width="90">
           <template #default="{ row }"><span class="num" :style="{ color: row.view.overdue ? '#f87171' : 'var(--text-2)' }">{{ row.view.node?.slaHours ?? '—' }}h</span></template>
         </el-table-column>
         <el-table-column label="超时" width="80">
           <template #default="{ row }"><span class="tag" :class="row.view.overdue ? 'fail' : 'ok'">{{ row.view.overdue ? '已超时' : '正常' }}</span></template>
         </el-table-column>
-        <el-table-column label="操作" width="210">
+        <el-table-column label="操作" width="250">
           <template #default="{ row }">
             <el-button link size="small" type="primary" @click="approve(row)">通过</el-button>
             <el-button link size="small" type="danger" @click="reject(row)">驳回</el-button>
+            <el-button link size="small" @click="addSign(row)">加签</el-button>
             <el-button v-if="row.view.overdue && !row.escalated" link size="small" type="warning" @click="escalate(row)">升级</el-button>
             <el-button link size="small" @click="transfer(row)">转办</el-button>
           </template>
@@ -49,6 +56,10 @@
           <span class="mono">{{ f.id }}</span>
           <span class="nm">{{ f.title }}</span>
           <span class="tag" :class="f.view.overdue ? 'fail' : 'ok'">{{ f.view.overdue ? '待升级' : '正常' }}</span>
+        </div>
+        <div v-for="f in runningWithCustom" :key="'c-' + f.id" class="mrow custom-row">
+          <span class="mono">{{ f.id }}</span>
+          <span class="nm">自定义审批：{{ customLabel(f.customNodes!) }}</span>
         </div>
         <div class="src-note" style="margin-top: 8px">
           超时升级触达记录见审计链（ESCALATE 动作）；安全相关项超时即升级、无延展（GAT-008）。
@@ -67,6 +78,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import PageHeader from '@/components/PageHeader.vue'
 import KpiCard from '@/components/KpiCard.vue'
 import { useAppStore } from '@/store/app'
@@ -84,6 +96,12 @@ const running = computed(() =>
 )
 const overdue = computed(() => running.value.filter((f) => f.view.overdue))
 const signNodes = computed(() => running.value.filter((f) => f.view.node?.type === 'sign').length)
+const runningWithCustom = computed(() => running.value.filter((f) => f.customNodes && f.customNodes.length > 0))
+
+/** 自定义审批节点展示文案 */
+function customLabel(nodes: import('@/domain/flowEngine').CustomApproverAddition[]) {
+  return nodes.map((c) => (c.kind === 'sign' ? '会签' : '审核') + '·' + c.name).join('、')
+}
 
 function launch() {
   if (!newDefId.value) {
@@ -111,6 +129,22 @@ function transfer(row: FlowInstance & { view: ReturnType<typeof store.flowView> 
   store.transferFlow(row.id, target)
   void def
 }
+
+/** 加签：审批人可在当前节点自行追加审核/会签角色（并行会签，全部通过才过） */
+async function addSign(row: FlowInstance & { view: ReturnType<typeof store.flowView> }) {
+  try {
+    const { value } = await ElMessageBox.prompt(te('flow.addSignPrompt'), te('flow.addSignTitle'), {
+      confirmButtonText: te('btn.confirm'),
+      cancelButtonText: te('btn.cancel'),
+      inputPlaceholder: '法务、财务部'
+    })
+    const roles = (value || '').split(/[、,，;；\s]+/).map((s) => s.trim()).filter(Boolean)
+    if (!roles.length) return
+    roles.forEach((r) => store.addSignFlow(row.id, r))
+  } catch {
+    /* 用户取消 */
+  }
+}
 </script>
 
 <style scoped>
@@ -119,4 +153,7 @@ function transfer(row: FlowInstance & { view: ReturnType<typeof store.flowView> 
 .kv em { font-style: normal; }
 .mrow { display: grid; grid-template-columns: 34px 1fr 62px; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px dashed #16233a; font-size: 11.5px; }
 .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.muted { font-size: 11px; color: var(--text-3); }
+.tag.custom { color: #ffd79a; border-color: #5b3c14; background: #2a1f10; }
+.custom-row { opacity: 0.85; }
 </style>

@@ -149,6 +149,8 @@ export interface GateRun {
   results: { code: string; name: string; ok: boolean; cp?: string; note: string }[]
   submittedBy?: string
   releasedBy?: string
+  templateVersion?: string // 执行时锁定的模板版本（K1 复算）
+  templateHash?: string // 模板快照哈希（判定留痕）
 }
 
 export interface Baseline {
@@ -740,7 +742,7 @@ export type DraftObjectType =
   | '工时单'
   // —— 工作流单据（WF-001 统一「新增/保存/关闭/提交」）：立项申请及后续各工作流单据均复用 ——
   | '立项申请'
-  | '前期交申请'
+  | '前期交流申请'
   | '项目产品报价'
   | '豁免申请'
   | 'ECR申请'
@@ -750,6 +752,7 @@ export type DraftObjectType =
   | 'OTS认可'
   | 'PPAP提交'
   | 'SOP'
+  | '零件号申请'
 
 export interface FormDraft {
   id: string

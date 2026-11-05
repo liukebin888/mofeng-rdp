@@ -3,6 +3,19 @@
  * 五要素：输入物清单、可机器校验判据、放行人与评审人分离、时限、驳回与豁免
  */
 import type { ControlPointResult, GateRun } from './types'
+import { hashOf } from './hash'
+
+/**
+ * 门禁模板版本（与后端 GateEngine.GATE_TEMPLATE_VERSION 保持一致）。
+ * 变更门禁判据（item/required/safety/cp/slaHours）时必须递增版本并同步后端，
+ * 判定结果携带该版本，支撑 K1「历史判定可复算」。
+ */
+export const GATE_TEMPLATE_VERSION = 'GATE-2026.11'
+
+/** 门禁模板快照哈希（确定性，供判定留痕 / K1 复算）。 */
+export function gateTemplateHash(): string {
+  return hashOf({ version: GATE_TEMPLATE_VERSION, templates: GATE_TEMPLATES })
+}
 
 export interface GateItem {
   code: string
@@ -192,7 +205,9 @@ export function runGate(input: GateSubmitInput): GateRun {
     missing,
     safetyBlocked,
     results,
-    submittedBy: input.submitter
+    submittedBy: input.submitter,
+    templateVersion: GATE_TEMPLATE_VERSION,
+    templateHash: gateTemplateHash()
   }
 }
 

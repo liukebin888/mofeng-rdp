@@ -1,6 +1,6 @@
 <template>
   <div>
-    <PageHeader title="客户管理" desc="车厂主数据：名称、编号、车型；支持增删改 + CSV 导入导出">
+    <PageHeader title="客户管理" desc="车厂主数据：客户编号与车型统一采用《产品型号编制办法》（CJQW0106 B1）附表1 顾客编码 / 附表2 车型代码，杜绝自定义编号与自由文本车型">
       <template #actions>
         <el-button size="small" @click="doExport">导出 CSV</el-button>
         <el-button size="small" type="primary" @click="openAdd">新增客户</el-button>
@@ -10,20 +10,28 @@
     <div class="grid grid-4" style="margin-bottom: 12px">
       <KpiCard label="客户总数" :value="store.customers.length" unit="家" sub="车厂主数据" />
       <KpiCard label="车型总数" :value="vehicleCount" unit="款" sub="全部客户车型汇总" />
-      <KpiCard label="平均车型" :value="avgVehicles" unit="款/家" sub="单车厂车型覆盖" />
-      <KpiCard label="数据来源" value="CSV" sub="支持导入导出往返" />
+      <KpiCard label="已统一编码" :value="unifiedCount" unit="家" sub="编号命中附表1 顾客编码" />
+      <KpiCard label="权威字典" value="附表1/2" sub="CJQW0106 B1 正式发布" />
     </div>
 
     <div class="panel">
       <div class="panel-title">客户台账</div>
       <el-table :data="store.customers" size="small" height="420">
-        <el-table-column prop="code" label="编号" width="140" />
-        <el-table-column prop="name" label="名称" width="160" />
-        <el-table-column prop="shortName" label="简称" width="100" />
-        <el-table-column label="车型" min-width="240">
+        <el-table-column prop="code" label="编号" width="90">
+          <template #default="{ row }"><span class="code-tag">{{ row.code }}</span></template>
+        </el-table-column>
+        <el-table-column prop="name" label="名称" width="180" />
+        <el-table-column prop="shortName" label="简称" width="110" />
+        <el-table-column label="车型" min-width="280">
           <template #default="{ row }">
-            <span v-for="(m, i) in row.vehicleModels" :key="m" class="tag vtag">{{ m }}</span>
+            <span v-for="(m, i) in row.vehicleModels" :key="m" class="tag vtag">{{ vehicleDisplay(row.code, m) }}</span>
             <span v-if="!row.vehicleModels?.length" class="dim">—</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="统一状态" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="isUnified(row)" size="small" type="success">已统一</el-tag>
+            <el-tag v-else size="small" type="warning">待核对</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="150" align="right">
@@ -37,18 +45,41 @@
       <div class="row" style="margin-top: 10px">
         <el-button size="small" @click="importInput?.click()">导入 CSV</el-button>
         <input ref="importInput" type="file" accept=".csv" style="display: none" @change="doImport" />
-        <span class="dim">CSV 格式：编号,名称,车型（车型用 ；分隔，首行表头可省略）</span>
+        <span class="dim">CSV 格式：编号,名称,车型（车型用 ；分隔，首行表头可省略；编号须为附表1 顾客编码，车型须为附表2 车型代码）</span>
       </div>
     </div>
 
-    <el-dialog v-model="dlgVisible" :title="editing ? '编辑客户' : '新增客户'" width="460px">
+    <el-dialog v-model="dlgVisible" :title="editing ? '编辑客户' : '新增客户'" width="560px">
       <el-form label-width="80px" size="small">
-        <el-form-item label="名称" required><el-input v-model="form.name" placeholder="如 上汽通用五菱" /></el-form-item>
-        <el-form-item label="编号"><el-input v-model="form.code" placeholder="留空自动生成，如 CUST-SGMW" /></el-form-item>
-        <el-form-item label="简称"><el-input v-model="form.shortName" placeholder="可选" /></el-form-item>
+        <el-form-item label="顾客编码" required>
+          <el-select
+            v-model="form.code"
+            filterable
+            placeholder="选择附表1 顾客编码"
+            style="width: 100%"
+            @change="onCustomerChange"
+          >
+            <el-option v-for="c in CUSTOMER_DICT" :key="c.code" :value="c.code" :label="`${c.code} · ${c.short || c.name}`" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="名称" required>
+          <el-input v-model="form.name" placeholder="选中编码自动带出，可微调" />
+        </el-form-item>
+        <el-form-item label="简称">
+          <el-input v-model="form.shortName" placeholder="自动带出附表1 简称" />
+        </el-form-item>
+        <el-form-item label="英文缩写">
+          <el-input v-model="form.eng" placeholder="附表1 英文缩写（只读展示）" disabled />
+        </el-form-item>
         <el-form-item label="车型">
-          <el-select v-model="form.vehicleModels" multiple filterable allow-create default-first-option placeholder="输入车型后回车添加" style="width: 100%">
-            <el-option v-for="m in allModels" :key="m" :label="m" :value="m" />
+          <el-select
+            v-model="form.vehicleModels"
+            multiple
+            filterable
+            placeholder="按所选客户从附表2 选择车型"
+            style="width: 100%"
+          >
+            <el-option v-for="v in vehicleOptions" :key="v.code" :value="v.code" :label="vehicleLabel(v)" />
           </el-select>
         </el-form-item>
       </el-form>
@@ -66,31 +97,69 @@ import PageHeader from '@/components/PageHeader.vue'
 import KpiCard from '@/components/KpiCard.vue'
 import { useAppStore } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
+import {
+  CUSTOMER_DICT,
+  customerByCode,
+  vehiclesForCustomer,
+  vehicleLabel,
+  isValidCustomerCode,
+  isValidVehicleCode,
+} from '@/domain/customerCodeSync'
 
 const store = useAppStore()
 const { te } = useI18n()
 
+function vehicleDisplay(customerCode: string, vehicleCode: string): string {
+  const v = vehiclesForCustomer(customerCode).find((x) => x.code === vehicleCode)
+  return v ? vehicleLabel(v) : vehicleCode
+}
+
 const vehicleCount = computed(() => store.customers.reduce((s, c) => s + (c.vehicleModels?.length ?? 0), 0))
-const avgVehicles = computed(() => (store.customers.length ? (vehicleCount.value / store.customers.length).toFixed(1) : '0'))
-const allModels = computed(() => [...new Set(store.customers.flatMap((c) => c.vehicleModels ?? []))])
+const unifiedCount = computed(() => store.customers.filter((c) => isValidCustomerCode(c.code)).length)
+
+function isUnified(row: any): boolean {
+  if (!isValidCustomerCode(row.code)) return false
+  return (row.vehicleModels ?? []).every((m: string) => isValidVehicleCode(m))
+}
 
 const dlgVisible = ref(false)
 const editing = ref<null | string>(null)
 const importInput = ref<HTMLInputElement>()
-const form = reactive({ name: '', code: '', shortName: '', vehicleModels: [] as string[] })
+const form = reactive({ name: '', code: '', shortName: '', eng: '', vehicleModels: [] as string[] })
+
+const vehicleOptions = computed(() => (form.code ? vehiclesForCustomer(form.code) : []))
+
+function onCustomerChange(code: string) {
+  const c = customerByCode(code)
+  if (!c) return
+  // 选中权威编码后自动带出名称/简称/英文，车型清空待选
+  form.name = c.name
+  form.shortName = c.short
+  form.eng = c.eng ?? ''
+  if (form.vehicleModels.length) form.vehicleModels = []
+}
 
 function openAdd() {
   editing.value = null
-  form.name = ''; form.code = ''; form.shortName = ''; form.vehicleModels = []
+  form.name = ''; form.code = ''; form.shortName = ''; form.eng = ''; form.vehicleModels = []
   dlgVisible.value = true
 }
 function openEdit(row: any) {
   editing.value = row.id
   form.name = row.name; form.code = row.code; form.shortName = row.shortName ?? ''
+  form.eng = customerByCode(row.code)?.eng ?? ''
   form.vehicleModels = [...(row.vehicleModels ?? [])]
   dlgVisible.value = true
 }
 function submit() {
+  if (!form.code) {
+    store.notify('warning', '请选择顾客编码（附表1）')
+    return
+  }
+  if (!isValidCustomerCode(form.code)) {
+    store.notify('warning', `顾客编码「${form.code}」不在附表1 中，无法保存`)
+    return
+  }
   if (editing.value) {
     if (store.saveCustomer(editing.value, { name: form.name, code: form.code, shortName: form.shortName, vehicleModels: form.vehicleModels })) dlgVisible.value = false
   } else {
@@ -120,5 +189,6 @@ async function doImport(e: Event) {
 
 <style scoped>
 .vtag { margin-right: 4px; }
+.code-tag { font-family: var(--font-mono, monospace); font-weight: 600; }
 .dim { color: var(--text-3); font-size: 11px; }
 </style>

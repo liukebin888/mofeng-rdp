@@ -80,6 +80,23 @@ export interface ApprovalRecord {
   signatures?: { role: string; name?: string; pass: boolean; at: string }[]
 }
 
+/** 发起人自定义的审批节点（在固定审批链之外自行增加的审核/会签） */
+export type CustomApproverKind = 'approve' | 'sign'
+
+/** 发起人自定义追加的一个审批节点 */
+export interface CustomApproverAddition {
+  /** 节点名（如「法务审核」「财务会签」） */
+  name: string
+  /** 节点类型：approve 单人审核 / sign 并行会签（全部通过才过） */
+  kind: CustomApproverKind
+  /** 审核人角色（approve 必填） */
+  approverRole?: string
+  /** 会签参与角色列表（sign 必填，并行、全部通过才过） */
+  signRoles?: string[]
+  /** 超时工作小时数（缺省 48h） */
+  slaHours?: number
+}
+
 /** 流程实例运行时状态 */
 export interface FlowInstance {
   id: string
@@ -88,6 +105,8 @@ export interface FlowInstance {
   title: string
   /** 发起人 */
   submitter: string
+  /** 关联的项目/产品 id（监视维度：按项目聚合审批过程与结果；可为空表示未绑定项目） */
+  projectId?: string
   /** 流程表单数据（分支条件据此判定） */
   form: Record<string, string | number | boolean>
   /** 当前所处节点 id */
@@ -106,6 +125,8 @@ export interface FlowInstance {
   escalatedToRole?: string
   /** 已加签的角色列表 */
   addedSigners?: string[]
+  /** 发起人自定义追加的审批节点（留痕；实际节点已合并进实例专属定义） */
+  customNodes?: CustomApproverAddition[]
   createdAt: string
   finishedAt?: string
 }
@@ -176,6 +197,60 @@ export function isOverdue(inst: FlowInstance, def: FlowDefinition, now: Date = n
 // 实例创建与流转
 // ---------------------------------------------------------------------------
 
+/**
+ * 发起人自定义审批节点合并（FUN-017 扩展）：在固定审批链之外，发起人可自行增加
+ * 「审核（单人）」与「会签（并行、全部通过才过）」节点。
+ *
+ * 插入规则（fail-closed，非法输入不改变定义）：
+ *   - 自定义节点统一插入到固定链中「最后一个 approve 批准节点」之前（即会签之后、批准之前），
+ *     保证自定义节点受后续固定批准节点兜底，且不改变固定链的起始/结束语义。
+ *   - 会签节点 signMode 固定为 'all'（并行、全部通过才过），与产品「会签并行」语义一致。
+ *   - 会签至少 1 个角色、审核至少 1 个审批角色，否则该条自定义节点被忽略。
+ *   - 节点 id 用前缀 'cxN-' 生成，避免与固定节点 id 冲突。
+ *
+ * 返回新的 FlowDefinition（原 def 不可变）；additions 为空则原样返回。
+ */
+export function applyCustomApprovers(
+  def: FlowDefinition,
+  additions: CustomApproverAddition[]
+): FlowDefinition {
+  if (!additions || additions.length === 0) return def
+  const valid = additions.filter((a) => {
+    if (a.kind === 'sign') return !!(a.name?.trim()) && !!(a.signRoles && a.signRoles.length > 0)
+    return !!(a.name?.trim()) && !!(a.approverRole?.trim())
+  })
+  if (valid.length === 0) return def
+
+  const nodes = [...def.nodes]
+  // 定位固定链最后一个 approve 批准节点（作为自定义节点的插入锚点）
+  const anchorIdx = nodes.reduce((acc, n, i) => (n.type === 'approve' ? i : acc), -1)
+  // 若无 approve 节点（异常），退化为在 end 节点之前插入
+  const insertIdx = anchorIdx >= 0 ? anchorIdx : nodes.findIndex((n) => n.type === 'end')
+
+  const customNodes: FlowNode[] = valid.map((a, i) => {
+    const base: FlowNode = {
+      id: `cxN-${i}`,
+      name: a.name.trim(),
+      type: a.kind,
+      slaHours: a.slaHours ?? 48
+    }
+    if (a.kind === 'sign') {
+      base.signMode = 'all'
+      base.signRoles = a.signRoles!.map((r) => r.trim()).filter(Boolean)
+    } else {
+      base.approverRole = a.approverRole!.trim()
+    }
+    return base
+  })
+
+  const nextNodes =
+    insertIdx >= 0
+      ? [...nodes.slice(0, insertIdx), ...customNodes, ...nodes.slice(insertIdx)]
+      : [...nodes, ...customNodes]
+
+  return { ...def, id: def.id, nodes: nextNodes }
+}
+
 export interface StartFlowInput {
   def: FlowDefinition
   title: string
@@ -183,6 +258,10 @@ export interface StartFlowInput {
   form?: FlowInstance['form']
   id?: string
   now?: Date
+  /** 关联的项目/产品 id（监视维度：按项目聚合审批过程与结果） */
+  projectId?: string
+  /** 发起人自定义追加的审批节点（留痕到实例） */
+  customNodes?: CustomApproverAddition[]
 }
 
 /** 从定义启动一个流程实例 */
@@ -195,6 +274,7 @@ export function startFlow(input: StartFlowInput): FlowInstance {
     defCode: input.def.code,
     title: input.title,
     submitter: input.submitter,
+    projectId: input.projectId,
     form: input.form ?? {},
     currentNodeId: input.def.startNodeId,
     status: '运行中',
@@ -203,6 +283,7 @@ export function startFlow(input: StartFlowInput): FlowInstance {
     nodeEnteredAt: now,
     escalated: false,
     addedSigners: [],
+    customNodes: input.customNodes && input.customNodes.length ? input.customNodes : undefined,
     createdAt: now
   }
   return inst
@@ -241,7 +322,12 @@ export function signNode(inst: FlowInstance, def: FlowDefinition, input: Approva
     return { inst, nodePassed: false, allPassed: false }
   }
   const now = (input.now ?? new Date()).toISOString()
-  const roles = node.signRoles ?? (node.approverRole ? [node.approverRole] : [])
+  // 会签范围 = 定义中的 signRoles + 审批中加签(addedSigners)的角色（并行，全部通过才过）
+  const baseRoles = node.signRoles ?? (node.approverRole ? [node.approverRole] : [])
+  const roles = [...baseRoles]
+  ;(inst.addedSigners ?? []).forEach((r) => {
+    if (!roles.includes(r)) roles.push(r)
+  })
   // 找到本节点已有的签署记录（同一角色不可重复签）
   const existing = inst.history.find((h) => h.nodeId === node.id && h.action === 'counterSign')
   const sigs = existing?.signatures ? [...existing.signatures] : []

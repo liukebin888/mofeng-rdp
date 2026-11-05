@@ -8,7 +8,7 @@
  *
  * 对外统一返回 ApiResult<T>，解包后端 ApiResponse{code,message,data}，三态分离：
  *   - code==='OK' → { ok: true, data }
- *   - 401 未认证 / 403 无权限 → { ok: false, error, status }
+ *   - 401 未认证 / 403 无权限（code==='FORBIDDEN'）→ { ok: false, error, status }
  *   - 422 BLOCKED（领域规则阻断）→ { ok: false, blocked: true, data }（data 常带阻断详情）
  *
  * 依赖方向：domain ← infra，本模块不 import domain（ARC-001 分层纪律）。
@@ -18,6 +18,8 @@ export interface ApiResult<T = unknown> {
   ok: boolean
   /** 阻断（领域规则不通过，422），data 常带阻断详情 */
   blocked?: boolean
+  /** 权限不足（403，code==='FORBIDDEN'），与 blocked（422）语义分离 */
+  forbidden?: boolean
   status?: number
   data?: T
   error?: string
@@ -109,6 +111,9 @@ async function postJson<T>(
     if (json.code === 'OK') return { ok: true, status: res.status, data: json.data }
     if (json.code === 'BLOCKED') {
       return { ok: false, blocked: true, status: res.status, data: json.data, error: json.message }
+    }
+    if (json.code === 'FORBIDDEN') {
+      return { ok: false, forbidden: true, status: res.status, error: json.message ?? '权限不足' }
     }
     return { ok: false, status: res.status, error: json.message ?? `请求失败(${res.status})` }
   } catch {
@@ -431,4 +436,115 @@ export function configureStage(payload: StagePayload, token: string) {
 /** 审批放行：审批完成 + 闸门通过才放行，驳回硬拒绝。 */
 export function releaseStage(payload: StagePayload, token: string) {
   return postJson<StageData>('/api/v1/stages/release', payload, { token })
+}
+
+// ------------------------------------------------------------------
+// 端点六：四级计划落表（PLN-4LV）
+// ------------------------------------------------------------------
+
+/** 计划节点 DTO（对齐后端 PlanRequest.NodeDto / FourLevelPlanEngine.PlanNode）。 */
+export interface PlanNodeDto {
+  id: string
+  level: string // L1~L4
+  code: string
+  name: string
+  date: string // yyyy-MM-dd
+  baselineDate?: string
+  actualDate?: string
+  milestone?: boolean
+  ownerName?: string
+  ownerRole?: string
+  upperNodeId?: string
+}
+
+/** 四级计划保存请求（对齐后端 PlanRequest）。 */
+export interface PlanSavePayload {
+  tenantId: string
+  orgId?: string
+  projectId: string
+  userName?: string
+  roleName?: string
+  nodes: PlanNodeDto[]
+}
+
+/** 四级计划保存结果（对齐后端 PlanResult）。 */
+export interface PlanSaveData {
+  projectId: string
+  saved: boolean
+  passable: boolean
+  alignRate: number
+  violations: string[]
+}
+
+/** 保存四级计划：三硬约束校验通过后落表（fail-closed，违规则 saved=false）。 */
+export function savePlan(payload: PlanSavePayload, token: string) {
+  return postJson<PlanSaveData>('/api/v1/plans/save', payload, { token })
+}
+
+/** 查询某项目当前四级计划节点（对齐后端 PlanController.list）。 */
+export async function listPlan(
+  tenantId: string,
+  projectId: string,
+  token: string
+): Promise<ApiResult<PlanNodeDto[]>> {
+  const ctrl = new AbortController()
+  const t = setTimeout(() => ctrl.abort(), 5000)
+  try {
+    const res = await fetch(
+      `${API_V1_BASE}/api/v1/plans?tenantId=${encodeURIComponent(tenantId)}&projectId=${encodeURIComponent(projectId)}`,
+      { method: 'GET', headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal }
+    )
+    const json = (await res.json().catch(() => null)) as {
+      code?: string
+      message?: string
+      data?: PlanNodeDto[]
+    } | null
+    if (!json) return { ok: false, status: res.status, error: '响应解析失败' }
+    if (json.code === 'OK') return { ok: true, status: res.status, data: json.data }
+    return { ok: false, status: res.status, error: json.message ?? `请求失败(${res.status})` }
+  } catch {
+    return { ok: false, error: '后端不可用' }
+  } finally {
+    clearTimeout(t)
+  }
+}
+
+// ------------------------------------------------------------------
+// 端点七：四级计划告警巡检（PLN-ALERT）
+// ------------------------------------------------------------------
+
+/** 告警巡检请求（对齐后端 PlanAlertRequest）。 */
+export interface PlanAlertScanPayload {
+  tenantId: string
+  projectId: string
+  today?: string
+}
+
+/** 告警明细（对齐后端 PlanAlertResult.AlertItem）。 */
+export interface PlanAlertItem {
+  stage: string // S1~S4
+  level: string // NORMAL/URGENT/CRITICAL
+  objType: string
+  objId: string
+  planLevel: string
+  receiverIds: string
+  channelMask: string
+  remainDays: number
+  prrTriggered: boolean
+}
+
+/** 告警巡检结果（对齐后端 PlanAlertResult）。 */
+export interface PlanAlertScanData {
+  projectId: string
+  today: string
+  scannedNodes: number
+  hitNodes: number
+  fired: number
+  skipped: number
+  items: PlanAlertItem[]
+}
+
+/** 触发告警巡检：逐节点判定四段式阶段，幂等登记（中间指标披露防「零告警」假阳性）。 */
+export function scanPlanAlerts(payload: PlanAlertScanPayload, token: string) {
+  return postJson<PlanAlertScanData>('/api/v1/plans/alerts/scan', payload, { token })
 }

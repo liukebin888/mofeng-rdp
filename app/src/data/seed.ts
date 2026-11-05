@@ -2,6 +2,7 @@
  * 种子数据（首次启动写入 localStorage；可重置）
  * 对齐 SRS 附录 B 字段命名；规模：3 项目（L1/L3/L4）、32 个 WBS 节点、25 条需求、4 类断链样本
  */
+import { CUSTOMER_CODES, VEHICLE_CODES } from '@/domain/productCodeData'
 import { appendAudit } from '@/domain/audit'
 import { buildBaseline } from '@/domain/baseline'
 import { grade } from '@/domain/grading'
@@ -65,6 +66,9 @@ import type { ComplianceItem } from '@/domain/compliance'
 import type { PolarityRisk } from '@/domain/riskOpportunity'
 import type { DocAnnotation } from '@/domain/docAnnotation'
 import type { AiCorpusItem, AiSwitchConfig, AiCallLog } from '@/domain/aiAssist'
+import type { HumanReview } from '@/domain/projectReview'
+import type { InterfacePlan } from '@/domain/interfacePlan'
+import type { ProjectGateDecl } from '@/domain/gateConsistency'
 import type { VulnerabilityItem, Issue8D } from '@/domain/defect'
 import type { Sci, CompatibilityRecord, ReleaseSignoff } from '@/domain/softwareVersion'
 import type { Space } from '@/domain/spaceEngine'
@@ -72,8 +76,10 @@ import { buildApprovalChain, DEFAULT_APPROVAL_ROLES, type ApprovalBinding } from
 import type { DeliverableApprovalBinding } from '@/domain/deliverableApproval'
 import { appendRecord, manifestHashOf, type ArchiveLayer, type ArchiveVolume } from '@/domain/archiveLayer'
 import { DEFAULT_REJECTION_POLICIES, type RejectionPolicyItem } from '@/domain/rejectionPolicy'
+import type { QuoteCostSheet, QuoteCostLine } from '@/domain/quoteCost'
+import type { DesignArchiveTable, SampleReviewReport, DvTestReport } from '@/domain/otsApproval'
 
-export const SEED_VERSION = 'mofeng.rdp.v1.0.26'
+export const SEED_VERSION = 'mofeng.rdp.v1.0.32'
 const TENANT = 'T-1001'
 
 export interface SeedUser {
@@ -260,18 +266,23 @@ function buildOrgMemberships(users: SeedUser[]): OrgMembership[] {
 
 /** 客户（车厂）主数据：名称 + 编号 + 车型 */
 function buildCustomers(): Customer[] {
-  return [
-    { id: 'CUST-1', code: 'CUST-SGMW', name: '上汽通用五菱', shortName: '五菱', vehicleModels: ['E15', 'B30', 'N300'] },
-    { id: 'CUST-2', code: 'CUST-CHERY', name: '奇瑞汽车', shortName: '奇瑞', vehicleModels: ['瑞虎 8', '艾瑞泽 5'] },
-    { id: 'CUST-3', code: 'CUST-GAC', name: '广汽埃安', shortName: '埃安', vehicleModels: ['AION S', 'AION Y'] },
-    { id: 'CUST-4', code: 'CUST-BYD', name: '比亚迪', shortName: '比亚迪', vehicleModels: ['汉', '海豹'] },
-    { id: 'CUST-5', code: 'CUST-GEELY', name: '吉利汽车', shortName: '吉利', vehicleModels: ['星越 L', '银河 E8'] },
-    { id: 'CUST-6', code: 'CUST-GWM', name: '长城汽车', shortName: '长城', vehicleModels: ['哈弗 H6', '坦克 300'] },
-    { id: 'CUST-7', code: 'CUST-CHANGAN', name: '长安汽车', shortName: '长安', vehicleModels: ['深蓝 SL03', 'UNI-K'] },
-    { id: 'CUST-8', code: 'CUST-NIO', name: '蔚来汽车', shortName: '蔚来', vehicleModels: ['ES6', 'ET5'] },
-    { id: 'CUST-9', code: 'CUST-XPENG', name: '小鹏汽车', shortName: '小鹏', vehicleModels: ['G6', 'P7'] },
-    { id: 'CUST-10', code: 'CUST-LI', name: '理想汽车', shortName: '理想', vehicleModels: ['L7', 'L8'] }
-  ]
+  // 客户主数据与《产品型号编制办法》(CJQW0106 B1) 完全同步：
+  // 客户编号取自附表1 顾客编码（全部 77 条），车型取自附表2 车型代码（按顾客编码联动）。
+  // 每个客户带出其名下前 2 款车型代码作为初始示例，其余车型仍可在客户管理中从附表2 选择。
+  const hostCodeOf = (host: string): string | null => {
+    const m = /\(([0-9A-Z]{2})\)\s*$/.exec(host ?? '')
+    return m ? m[1] : null
+  }
+  return CUSTOMER_CODES.map((c, i) => {
+    const models = VEHICLE_CODES.filter((v) => hostCodeOf(v.host) === c.code).slice(0, 2).map((v) => v.code)
+    return {
+      id: `CUST-${i + 1}`,
+      code: c.code,
+      name: c.name,
+      shortName: c.short,
+      vehicleModels: models,
+    }
+  })
 }
 
 /** 产品三级分类：产品类别 → 产品线 → 产品 */
@@ -347,8 +358,8 @@ function buildNamingRules(): NamingRule[] {
     // 客户
     r('NM-1', 'customer', 'naming', '客户全称规范', '车厂工商注册全称，不含「有限公司」缩写以外的简称', '上汽通用五菱汽车股份有限公司', true, undefined, { minLength: 4, maxLength: 30 }),
     r('NM-2', 'customer', 'naming', '客户简称规范', '2~4 字通用简称，用于台账与报表展示', '五菱 / 奇瑞 / 埃安', true, undefined, { minLength: 2, maxLength: 4 }),
-    r('NM-3', 'customer', 'coding', '客户编号规则', '前缀 CUST- + 车厂英文/拼音缩写大写，全局唯一', 'CUST-SGMW、CUST-CHERY', true, pat([lit('CUST'), varr('abbr')])),
-    r('NM-4', 'customer', 'coding', '车型编号规则', '车型名称 + 平台代码，避免使用特殊符号', 'E15、B30、瑞虎 8', true, pat([lit('MODEL'), seq(3)])),
+    r('NM-3', 'customer', 'coding', '客户编号规则', '已统一为《产品型号编制办法》(CJQW0106 B1) 附表1 顾客编码（2 位，0A~0Z 或 AA~AT，ES 为前瞻输出），不再使用 CUST- 前缀', '0A、0U、AB', false, pat([lit('CUST'), varr('abbr')])),
+    r('NM-4', 'customer', 'coding', '车型编号规则', '已统一为《产品型号编制办法》(CJQW0106 B1) 附表2 车型代码（2 位数字+大写字母，O/I/J/V 除外），不再使用 MODEL- 前缀', '0A、1A', false, pat([lit('MODEL'), seq(3)])),
     // 产品
     r('NM-5', 'product', 'naming', '产品名称规范', '功能 + 型号/规格，中文优先，同类产品命名风格统一', '12.3 寸中控屏、双区自动空调', true, undefined, { maxLength: 24 }),
     r('NM-6', 'product', 'coding', '产品编码规则', '产品线代码 + 两位流水号（如 ECC-01），产品线代码 3~4 位大写字母', 'ECC-01、BCM-01', true, pat([varr('lineCode'), seq(2)])),
@@ -587,6 +598,103 @@ function buildHandoffs(): HandoffPoint[] {
   ]
 }
 
+/**
+ * 界面（接口）计划 seed（SCH-022 跨项目接口，四要素齐备）。
+ * 与 handoffs（项目内跨专业）互补：此处为 A 项目 → B 项目的跨项目交付接口。
+ */
+function buildInterfacePlans(): InterfacePlan[] {
+  return [
+    // P-001 → P-002：车身域控制器交付给座舱域控平台（数模接口）
+    {
+      id: 'IFP-1',
+      code: 'IFP-P001-P002-01',
+      sourceProjectId: 'P-001',
+      targetProjectId: 'P-002',
+      deliverable: 'E15 车身域控制器结构总成数模 V2.0',
+      deliverableKind: '数模',
+      sourceRole: '结构工程师',
+      targetRole: '硬件工程师',
+      dueDate: '2026-11-20',
+      acceptanceCriteria: '数模通过 GD&T 尺寸校核且与座舱域控安装面无干涉'
+    },
+    // P-001 → P-002：CAN 接口协议定义（软件接口，已逾期未验收 → 下游标红样例）
+    {
+      id: 'IFP-2',
+      code: 'IFP-P001-P002-02',
+      sourceProjectId: 'P-001',
+      targetProjectId: 'P-002',
+      deliverable: 'CAN 通信矩阵 DBC 文件',
+      deliverableKind: '数据',
+      sourceRole: '软件工程师',
+      targetRole: '软件工程师',
+      dueDate: '2026-10-25',
+      acceptanceCriteria: '信号定义与整车网络架构一致，报文周期/优先级经网络管理评审确认'
+    },
+    // P-002 → P-001：座舱域控电源需求（已验收闭环样例）
+    {
+      id: 'IFP-3',
+      code: 'IFP-P002-P001-01',
+      sourceProjectId: 'P-002',
+      targetProjectId: 'P-001',
+      deliverable: '座舱域控供电需求规格书',
+      deliverableKind: '报告',
+      sourceRole: '硬件工程师',
+      targetRole: '硬件工程师',
+      dueDate: '2026-10-15',
+      acceptanceCriteria: '供电电压范围/功耗/上电时序满足车身域控整机集成要求',
+      deliveredAt: '2026-10-12',
+      acceptedAt: '2026-10-14'
+    },
+    // P-001 → P-003：线束接口（缺验收标准 → 四要素不齐备样例）
+    {
+      id: 'IFP-4',
+      code: 'IFP-P001-P003-01',
+      sourceProjectId: 'P-001',
+      targetProjectId: 'P-003',
+      deliverable: '高压连接器选型推荐表',
+      deliverableKind: 'BOM',
+      sourceRole: '结构工程师',
+      targetRole: '结构工程师',
+      dueDate: '2026-12-10',
+      acceptanceCriteria: ''
+    }
+  ]
+}
+
+/**
+ * 组合闸门一致性 seed（PFM-011）：各项目对 G1~G5 的判据集声明。
+ * 演示「谁的项目松」：P-001 全合规、P-002 豁免已登记（合规）、
+ * P-003 存在版本偏离 + 未登记豁免（违规）。
+ */
+function buildGateDecls(): ProjectGateDecl[] {
+  const base = (projectId: string, projectName: string) =>
+    (['G1', 'G2', 'G3', 'G4', 'G5'] as const).map((gate) => ({
+      projectId,
+      projectName,
+      gate,
+      templateVersion: 'GATE-2026.11',
+      exemptItems: [] as string[],
+      registeredExemptions: [] as string[]
+    }))
+
+  const p1 = base('P-001', 'E15 车身域控制器开发')
+  const p2 = base('P-002', 'B30 智能座舱域控平台')
+  const p3 = base('P-003', 'C11 电池管理线束改型')
+
+  // P-002：G4 豁免「资源超分配已裁决」（G4-06，非必填项），已登记 → 合规
+  const p2g4 = p2.find((d) => d.gate === 'G4')!
+  p2g4.exemptItems = ['G4-06']
+  p2g4.registeredExemptions = ['G4-06']
+
+  // P-003：G3 豁免「安全链路追溯覆盖率」但未登记 → 违规；G2 引用旧版本 → 违规
+  const p3g3 = p3.find((d) => d.gate === 'G3')!
+  p3g3.exemptItems = ['G3-01']
+  const p3g2 = p3.find((d) => d.gate === 'G2')!
+  p3g2.templateVersion = 'GATE-2025.01'
+
+  return [...p1, ...p2, ...p3]
+}
+
 /** 需求：25 条，覆盖 SG→FSR→TSR/HSR/SSSR/SEC→TC→VER */
 function buildRequirements(): { reqs: Requirement[]; links: TraceLink[] } {
   const r = (
@@ -722,7 +830,7 @@ function buildSampleArchive(): ArchiveLayer {
     archivedAt: '2026-11-03T10:01:00+08:00', archivedBy: '系统'
   })
   vol = appendRecord(vol, {
-    id: 'AR-1003', volumeId: vol.id, kind: '审批', objType: 'Flow', objId: 'PRE-3-001', title: '立项申请审批链（八部门会签+总经理批准）',
+    id: 'AR-1003', volumeId: vol.id, kind: '审批', objType: 'Flow', objId: 'PRE-3-001', title: '立项申请审批链（三中心总监会签+总经理批准）',
     stageCode: 'S1', projectId: 'P-001', snapshot: { flow: 'FLOW-PRE-3', status: '已完成', approvedBy: '总经理' },
     archivedAt: '2026-11-03T10:02:00+08:00', archivedBy: '系统'
   })
@@ -735,6 +843,8 @@ export function buildSeed() {
   const projects = buildProjects(users)
   const wbs = buildWbs()
   const handoffs = buildHandoffs()
+  const interfacePlans = buildInterfacePlans()
+  const gateDecls = buildGateDecls()
   const { reqs, links } = buildRequirements()
   const suppliers = buildSuppliers()
   const boms = buildBom()
@@ -854,6 +964,96 @@ export function buildSeed() {
     { id: 'CD6', projectId: 'P-001', type: '人工时', code: 'TS-002', costCode: 'C-400', amount: 18, currency: 'CNY', date: '2026-09-05', note: 'PV 试验人工' }
   ]
 
+  /**
+   * 报价费用明细（单一数据源）：八类费用的明细行，由「报价费用明细表单」填报，
+   * 报价单自动汇总引入。source='form' 表示来自费用表单（权威），报价单可在此基础上手工补行。
+   * 演示数据对齐参考报价单基准值（材料 233.69 / 制造 157.25 / NRE 5705200 / 包装 18.15）。
+   */
+  const quoteCosts: QuoteCostSheet = {
+    // 01 材料成本（单件，含损耗率）
+    material: [
+      { id: 'QC-M1', name: '6061-T6 铝型材', spec: '6系 / 壁厚2.5mm', qty: 4.8, unit: 'kg', unitPrice: 26.5, lossRate: 0.03, source: 'form', projectId: 'P-001', remark: '铝锭价+加工费，季度联动调价' },
+      { id: 'QC-M2', name: '5052-H32 铝板', spec: 't=2.0mm', qty: 1.6, unit: 'kg', unitPrice: 24, lossRate: 0.05, source: 'form', projectId: 'P-001' },
+      { id: 'QC-M3', name: 'M6 拉铆螺母', spec: '304不锈钢', qty: 16, unit: '件', unitPrice: 1.85, lossRate: 0.01, source: 'form', projectId: 'P-001' },
+      { id: 'QC-M4', name: '双组分结构胶', spec: '导热型 1.8W/m·K', qty: 0.12, unit: 'kg', unitPrice: 68, lossRate: 0.08, source: 'form', projectId: 'P-001' },
+      { id: 'QC-M5', name: 'EPDM 密封胶条', spec: '邵氏A 55', qty: 3.5, unit: 'm', unitPrice: 3.2, lossRate: 0.04, source: 'form', projectId: 'P-001' },
+      { id: 'QC-M6', name: '阳极氧化处理', spec: '膜厚 15μm', qty: 1, unit: '件', unitPrice: 12, lossRate: 0, source: 'form', projectId: 'P-001', remark: '外协加工费' }
+    ],
+    // 02 制造费用（单件，工时×费率）
+    manufacturing: [
+      { id: 'QC-F1', name: '挤压成型', spec: '挤压线 1#', qty: 0.18, unit: '小时', unitPrice: 85, source: 'form', projectId: 'P-001' },
+      { id: 'QC-F2', name: 'CNC 精加工', spec: '五轴加工中心', qty: 0.35, unit: '小时', unitPrice: 120, source: 'form', projectId: 'P-001' },
+      { id: 'QC-F3', name: 'FSW 搅拌摩擦焊', spec: '龙门焊机', qty: 0.22, unit: '小时', unitPrice: 180, source: 'form', projectId: 'P-001' },
+      { id: 'QC-F4', name: '清洗烘干', spec: '通过式清洗机', qty: 0.05, unit: '小时', unitPrice: 60, source: 'form', projectId: 'P-001' },
+      { id: 'QC-F5', name: '气密检测', spec: '氦检工位', qty: 0.08, unit: '小时', unitPrice: 75, source: 'form', projectId: 'P-001' },
+      { id: 'QC-F6', name: '总装', spec: '装配线 3#', qty: 0.15, unit: '小时', unitPrice: 65, source: 'form', projectId: 'P-001' },
+      { id: 'QC-F7', name: '辅料与耗材', spec: '切削液/焊丝/砂带', qty: 1, unit: '件', unitPrice: 8.5, source: 'form', projectId: 'P-001' },
+      { id: 'QC-F8', name: '设备折旧分摊', spec: '专用设备原值', qty: 0.9, unit: '小时', unitPrice: 22, source: 'form', projectId: 'P-001' },
+      { id: 'QC-F9', name: '能耗', spec: '电/气/水', qty: 1, unit: '件', unitPrice: 6.4, source: 'form', projectId: 'P-001' },
+      { id: 'QC-F10', name: '废品与返工损失', spec: '综合废品率 2%', qty: 1, unit: '件', unitPrice: 6.9, source: 'form', projectId: 'P-001' }
+    ],
+    // 08 包装物流（单件）
+    packaging: [
+      { id: 'QC-P1', name: '专用周转架（摊销）', spec: '金属骨架+EPE定位，寿命3年', qty: 1, unit: '件', unitPrice: 0.35, source: 'form', projectId: 'P-001' },
+      { id: 'QC-P2', name: 'EPE 内衬', spec: '定制成型', qty: 1, unit: '件', unitPrice: 2.8, source: 'form', projectId: 'P-001' },
+      { id: 'QC-P3', name: '外包装纸箱', spec: '五层瓦楞，5件/箱', qty: 1, unit: '件', unitPrice: 1.6, source: 'form', projectId: 'P-001' },
+      { id: 'QC-P4', name: '厂内物流与仓储', spec: '叉车/AGV/库位占用', qty: 1, unit: '件', unitPrice: 0.9, source: 'form', projectId: 'P-001' },
+      { id: 'QC-P5', name: '干线运输', spec: '工厂至客户装配厂320km', qty: 1, unit: '件', unitPrice: 12.5, source: 'form', projectId: 'P-001' }
+    ],
+    // 03 研发费用（NRE）
+    development: [
+      { id: 'QC-D1', name: '结构设计与 3D 建模', spec: '总成三维模型、二维图纸、GD&T', qty: 1, unit: '项', unitPrice: 86000, source: 'form', projectId: 'P-001' },
+      { id: 'QC-D2', name: 'CAE 强度/模态/疲劳仿真', spec: '静强度、一阶模态≥45Hz', qty: 1, unit: '项', unitPrice: 52000, source: 'form', projectId: 'P-001' },
+      { id: 'QC-D3', name: '热管理与密封仿真', spec: '热流耦合、密封压缩变形', qty: 1, unit: '项', unitPrice: 28000, source: 'form', projectId: 'P-001', remark: '外委，含2轮优化' },
+      { id: 'QC-D4', name: 'DFMEA / DVP&R 编制', spec: 'DFMEA、控制计划、DVP&R文件包', qty: 1, unit: '项', unitPrice: 18000, source: 'form', projectId: 'P-001' },
+      { id: 'QC-D5', name: '手工样件试制（3轮）', spec: '快速原型、手工装配', qty: 3, unit: '套', unitPrice: 26000, source: 'form', projectId: 'P-001' },
+      { id: 'QC-D6', name: '软模样件（CNC 铝块）', spec: '6件软模件', qty: 6, unit: '件', unitPrice: 8500, source: 'form', projectId: 'P-001' },
+      { id: 'QC-D7', name: '工装夹具设计', spec: '焊接/加工/检测夹具设计', qty: 1, unit: '项', unitPrice: 35000, source: 'form', projectId: 'P-001' },
+      { id: 'QC-D8', name: '工艺文件与作业指导书', spec: '工艺流程图、PFMEA、SOP', qty: 1, unit: '项', unitPrice: 16000, source: 'form', projectId: 'P-001' },
+      { id: 'QC-D9', name: '项目管理与客户对接', spec: 'APQP节点管理', qty: 1, unit: '项', unitPrice: 42000, source: 'form', projectId: 'P-001' }
+    ],
+    // 04 工装模具（NRE）
+    tooling: [
+      { id: 'QC-T1', name: 'FSW 焊接夹具', spec: '焊接夹具', qty: 1, unit: '套', unitPrice: 285000, source: 'form', projectId: 'P-001' },
+      { id: 'QC-T2', name: 'CNC 加工夹具（双工位）', spec: '加工夹具', qty: 1, unit: '套', unitPrice: 96000, source: 'form', projectId: 'P-001' },
+      { id: 'QC-T3', name: '气密检测工装', spec: '检具', qty: 1, unit: '套', unitPrice: 68000, source: 'form', projectId: 'P-001' },
+      { id: 'QC-T4', name: '综合检具', spec: '检具', qty: 1, unit: '套', unitPrice: 145000, source: 'form', projectId: 'P-001', remark: '客户要求产权归客户' },
+      { id: 'QC-T5', name: '包装内衬吸塑模', spec: '包装模具', qty: 1, unit: '套', unitPrice: 32000, source: 'form', projectId: 'P-001' },
+      { id: 'QC-T6', name: 'PCD 专用铣刀', spec: '专用刀具', qty: 4, unit: '把', unitPrice: 3800, source: 'form', projectId: 'P-001' }
+    ],
+    // 05 产线设备（NRE）
+    equipment: [
+      { id: 'QC-E1', name: 'FSW 搅拌摩擦焊机（龙门式）', spec: '焊接', qty: 1, unit: '台', unitPrice: 1850000, source: 'form', projectId: 'P-001' },
+      { id: 'QC-E2', name: '五轴加工中心', spec: '机加工', qty: 1, unit: '台', unitPrice: 1260000, source: 'form', projectId: 'P-001' },
+      { id: 'QC-E3', name: '气密检测线（含氦检）', spec: '检测', qty: 1, unit: '条', unitPrice: 480000, source: 'form', projectId: 'P-001' },
+      { id: 'QC-E4', name: '自动化上下料单元', spec: '物流/搬运', qty: 1, unit: '套', unitPrice: 320000, source: 'form', projectId: 'P-001' },
+      { id: 'QC-E5', name: '现有产线改造', spec: '输送/电气/气路', qty: 1, unit: '项', unitPrice: 180000, source: 'form', projectId: 'P-001', remark: '通用部分按折旧分摊' }
+    ],
+    // 06 试验验证（NRE）
+    testing: [
+      { id: 'QC-S1', name: '随机振动耐久', spec: 'GB/T 28046.3 / ISO 16750-3', qty: 3, unit: '次', unitPrice: 8500, source: 'form', projectId: 'P-001' },
+      { id: 'QC-S2', name: '机械冲击', spec: 'GB/T 28046.2', qty: 1, unit: '次', unitPrice: 12000, source: 'form', projectId: 'P-001' },
+      { id: 'QC-S3', name: 'IP67 浸水试验', spec: 'GB/T 4208', qty: 1, unit: '次', unitPrice: 6800, source: 'form', projectId: 'P-001' },
+      { id: 'QC-S4', name: '中性盐雾 480h', spec: 'GB/T 10125', qty: 1, unit: '次', unitPrice: 9600, source: 'form', projectId: 'P-001' },
+      { id: 'QC-S5', name: '高低温循环', spec: '-40℃~85℃，50循环', qty: 1, unit: '次', unitPrice: 18500, source: 'form', projectId: 'P-001' },
+      { id: 'QC-S6', name: '温度冲击', spec: '-40℃⇄125℃，100循环', qty: 1, unit: '次', unitPrice: 15000, source: 'form', projectId: 'P-001' },
+      { id: 'QC-S7', name: '材料拉伸/硬度/金相', spec: 'GB/T 228.1 / GB/T 4340.1', qty: 1, unit: '次', unitPrice: 4200, source: 'form', projectId: 'P-001' },
+      { id: 'QC-S8', name: '焊接接头强度', spec: '拉剪/正弯，ISO 4136', qty: 1, unit: '次', unitPrice: 7800, source: 'form', projectId: 'P-001' },
+      { id: 'QC-S9', name: '整车道路耐久', spec: '客户规范（20万km）', qty: 1, unit: '次', unitPrice: 260000, source: 'form', projectId: 'P-001' },
+      { id: 'QC-S10', name: '第三方 CNAS 报告', spec: '报告出具与备案', qty: 1, unit: '次', unitPrice: 22000, source: 'form', projectId: 'P-001' }
+    ],
+    // 07 合规认证（NRE）
+    compliance: [
+      { id: 'QC-C1', name: 'IATF 16949 体系监督审核', spec: 'IATF 16949:2016', qty: 1, unit: '项', unitPrice: 68000, source: 'form', projectId: 'P-001' },
+      { id: 'QC-C2', name: 'PPAP 文件包编制与提交', spec: 'AIAG PPAP 第4版 Level 3', qty: 1, unit: '项', unitPrice: 36000, source: 'form', projectId: 'P-001' },
+      { id: 'QC-C3', name: 'IMDS 材料数据申报', spec: 'IMDS 国际材料数据系统', qty: 1, unit: '项', unitPrice: 12000, source: 'form', projectId: 'P-001' },
+      { id: 'QC-C4', name: 'ELV / RoHS / REACH 检测', spec: 'RoHS 2.0、REACH SVHC', qty: 1, unit: '项', unitPrice: 15600, source: 'form', projectId: 'P-001' },
+      { id: 'QC-C5', name: '产品 3C / 法规准入', spec: 'GB 38031 等适用法规', qty: 1, unit: '项', unitPrice: 28000, source: 'form', projectId: 'P-001' },
+      { id: 'QC-C6', name: '碳足迹核算与报告', spec: 'ISO 14067', qty: 1, unit: '项', unitPrice: 18000, source: 'form', projectId: 'P-001' },
+      { id: 'QC-C7', name: '客户特殊要求（CSR）审核', spec: '客户 CSR 清单', qty: 1, unit: '项', unitPrice: 9000, source: 'form', projectId: 'P-001' }
+    ]
+  }
+
 
   const docs: DocItem[] = ([
     { id: 'DC1', projectId: 'P-001', code: 'DOC-SYS-001', name: '系统需求规格书', discipline: '系统', version: 'V1.4', status: '已发布', required: true, signoffs: [{ role: '系统工程师', signed: true }, { role: '功能安全经理', signed: true }, { role: '质量工程师', signed: true }], mdrSet: 'MDR-A' },
@@ -865,6 +1065,79 @@ export function buildSeed() {
     { id: 'DC7', projectId: 'P-001', code: 'DOC-SW-031', name: '刷写与标定指导书', discipline: '软件', version: 'V1.2', status: '会签中', required: false, signoffs: [{ role: '软件工程师', signed: true }, { role: '工艺工程师', signed: false }], mdrSet: 'TDR-SW' },
     { id: 'DC8', projectId: 'P-001', code: 'DOC-SUP-002', name: '供应商 PPAP 提交包', discipline: '供应链', version: 'V1.0', status: '已发布', required: true, signoffs: [{ role: 'SQE', signed: true }], mdrSet: 'MDR-SUP' }
   ] as Omit<DocItem, 'comments' | 'versionChain' | 'effectiveFlag' | 'hash'>[]).map((d) => normalizeDoc(d))
+
+  /**
+   * OTS 认可三大条件附件（单一数据源）。
+   * 三大条件结果只由这些附件数据自动导出（domain/otsApproval），视图不可手填。
+   * 演示数据：三中心归档齐全 + 样件评审合格 + DV 试验合格 → 判定 L1。
+   */
+  const otsAttachments: {
+    archiveTable: DesignArchiveTable
+    sampleReview: SampleReviewReport
+    dvReport: DvTestReport
+  } = {
+    // 附件 A《设计文件归档汇总表》：A-1 电子 / A-2 结构 / A-3 工艺
+    archiveTable: {
+      projectId: 'P-001',
+      parts: [
+        {
+          center: '电子研发中心',
+          items: [
+            { code: 'E-001', name: '硬件原理图', archived: true, archivedBy: '赵启明', archivedAt: '2026-11-01' },
+            { code: 'E-002', name: 'PCB 版图', archived: true, archivedBy: '赵启明', archivedAt: '2026-11-01' },
+            { code: 'E-003', name: '软件发布包与版本说明', archived: true, archivedBy: '吴敏', archivedAt: '2026-11-01' },
+            { code: 'E-004', name: 'HARA/功能安全分析', archived: true, archivedBy: '功能安全经理', archivedAt: '2026-11-01' }
+          ]
+        },
+        {
+          center: '结构研发中心',
+          items: [
+            { code: 'S-001', name: '结构总成 3D 模型', archived: true, archivedBy: '郑昊', archivedAt: '2026-11-01' },
+            { code: 'S-002', name: '二维工程图（含 GD&T）', archived: true, archivedBy: '郑昊', archivedAt: '2026-11-01' },
+            { code: 'S-003', name: 'DFMEA', archived: true, archivedBy: '郑昊', archivedAt: '2026-11-01' }
+          ]
+        },
+        {
+          center: '工艺技术中心',
+          items: [
+            { code: 'P-001', name: '工艺流程图', archived: true, archivedBy: '顾晨', archivedAt: '2026-11-01' },
+            { code: 'P-002', name: 'PFMEA', archived: true, archivedBy: '顾晨', archivedAt: '2026-11-01' },
+            { code: 'P-003', name: '控制计划 CP', archived: true, archivedBy: '顾晨', archivedAt: '2026-11-01' },
+            { code: 'P-004', name: '作业指导书 SOP', archived: true, archivedBy: '顾晨', archivedAt: '2026-11-01' }
+          ]
+        }
+      ]
+    },
+    // 附件 B《OTS 样件评审报告》
+    sampleReview: {
+      projectId: 'P-001',
+      sampleNo: 'SMP-OTS-01',
+      reviewer: '质量工程师',
+      reviewedAt: '2026-11-03',
+      items: [
+        { code: 'B-01', name: '全尺寸检验（CMM）', result: '合格' },
+        { code: 'B-02', name: '材料性能（拉伸/硬度/金相）', result: '合格' },
+        { code: 'B-03', name: '外观与标识', result: '合格' },
+        { code: 'B-04', name: '功能与装配', result: '合格' }
+      ]
+    },
+    // 附件 C《DV 试验报告》
+    dvReport: {
+      projectId: 'P-001',
+      reportNo: 'DV-2026-001',
+      hasMajorIssue: false,
+      testBy: '试验中心',
+      testedAt: '2026-11-02',
+      items: [
+        { code: 'DV-01', name: '随机振动耐久', result: '合格', critical: true },
+        { code: 'DV-02', name: '机械冲击', result: '合格', critical: true },
+        { code: 'DV-03', name: 'IP67 浸水', result: '合格', critical: true },
+        { code: 'DV-04', name: '中性盐雾 480h', result: '合格', critical: false },
+        { code: 'DV-05', name: '高低温循环', result: '合格', critical: false },
+        { code: 'DV-06', name: '温度冲击', result: '合格', critical: true }
+      ]
+    }
+  }
 
   /** 图文档在线批注（空间锚定，对标 Oracle 图文档批注 P2） */
   const docAnnotations: DocAnnotation[] = [
@@ -1312,6 +1585,8 @@ export function buildSeed() {
     projects: projects.map((p) => ({ ...p, schemeLinked, quoteLinked }) as Project),
     wbs,
     handoffs,
+    interfacePlans,
+    gateDecls,
     reqs,
     links,
     suppliers,
@@ -1322,9 +1597,11 @@ export function buildSeed() {
     deliverables,
     costSubjects,
     costDocs,
+    quoteCosts,
     docs,
     docAnnotations,
     samples,
+    otsAttachments,
     defects,
     softwareVersions,
     hours,
@@ -1360,6 +1637,7 @@ export function buildSeed() {
     aiCorpus,
     aiSwitch,
     aiCallLogs,
+    projectReviews: [] as HumanReview[],
     flowDefinitions: [
       // ① 含「条件分支 + 超时升级」的 ECR 审批流程（FUN-017 验收样例：不发版生效）
       {
@@ -1430,11 +1708,11 @@ export function buildSeed() {
         enabled: true,
         version: 1
       },
-      // ⑤ 项目前期 · 前期交申请（市场客户经理发起 → 市场总监审核 → 三中心总监会签 → 总经理批准）
+      // ⑤ 项目前期 · 前期交流申请（市场客户经理发起 → 市场总监审核 → 三中心总监会签 → 总经理批准）
       {
         id: 'DEF-PRE-1',
         code: 'FLOW-PRE-1',
-        name: '前期交申请',
+        name: '前期交流申请',
         formFields: [
           { key: 'customer', label: '客户' },
           { key: 'productLine', label: '产品线' },
@@ -1457,12 +1735,16 @@ export function buildSeed() {
         code: 'FLOW-PRE-2',
         name: '项目/产品报价',
         formFields: [
+          { key: 'customer', label: '客户名称' },
+          { key: 'projectName', label: '项目名称' },
           { key: 'productLine', label: '产品线' },
-          { key: 'electronBom', label: '电子BOM金额' },
-          { key: 'structureBom', label: '结构BOM金额' },
-          { key: 'processQuote', label: '过程报价' },
-          { key: 'procurementPrice', label: '采购价格' },
-          { key: 'financeSummary', label: '财务汇总' }
+          { key: 'annualVolume', label: '年需求量(件/年)' },
+          { key: 'lifecycle', label: '生命周期(年)' },
+          { key: 'unitCostSubtotal', label: '单件成本小计' },
+          { key: 'nreTotal', label: 'NRE 合计' },
+          { key: 'fullCost', label: '完全成本' },
+          { key: 'unitPriceExVat', label: '建议单价(未税)' },
+          { key: 'unitPriceInVat', label: '建议单价(含税)' }
         ],
         startNodeId: 'q1',
         nodes: [
@@ -1475,7 +1757,27 @@ export function buildSeed() {
         enabled: true,
         version: 1
       },
-      // ⑦ 项目前期 · 立项申请（市场客户经理发起 → 市场总监审核 → 八部门会签 → 总经理批准）
+      // ⑥a 项目前期 · 技术方案（TR）（报价前置技术输入，C-02：评审委员会评审 → 总经理批准）
+      {
+        id: 'DEF-PRE-5',
+        code: 'FLOW-PRE-5',
+        name: '技术方案（TR）',
+        formFields: [
+          { key: 'name', label: '方案名称' },
+          { key: 'version', label: '方案版本' },
+          { key: 'trResult', label: 'TR 评审结论' }
+        ],
+        startNodeId: 'tr1',
+        nodes: [
+          { id: 'tr1', name: '发起（技术负责人）', type: 'start' },
+          { id: 'tr2', name: 'TR 技术评审', type: 'approve', approverRole: '评审委员会', slaHours: 72, escalateToRole: '总经理' },
+          { id: 'tr3', name: '总经理批准', type: 'approve', approverRole: '总经理', slaHours: 24 },
+          { id: 'tr4', name: '结束', type: 'end' }
+        ],
+        enabled: true,
+        version: 1
+      },
+      // ⑦ 项目前期 · 立项申请（市场客户经理发起 → 市场总监审核 → 三中心总监会签 → 总经理批准，与前期交流申请同审批链）
       {
         id: 'DEF-PRE-3',
         code: 'FLOW-PRE-3',
@@ -1494,14 +1796,33 @@ export function buildSeed() {
         nodes: [
           { id: 'b1', name: '发起', type: 'start' },
           { id: 'b2', name: '市场总监审核', type: 'approve', approverRole: '市场总监', slaHours: 24, escalateToRole: '总经理' },
-          { id: 'b3', name: '八部门会签', type: 'sign', signMode: 'all', signRoles: ['电子研发中心', '结构研发中心', '工艺技术中心', '模具中心', '项目管理中心', '制造中心', '计划物流中心', '质量中心'], slaHours: 72, escalateToRole: '总经理' },
+          { id: 'b3', name: '三中心总监会签', type: 'sign', signMode: 'all', signRoles: ['电子研发中心总监', '结构研发中心总监', '工艺技术中心总监'], slaHours: 48, escalateToRole: '总经理' },
           { id: 'b4', name: '总经理批准', type: 'approve', approverRole: '总经理', slaHours: 24 },
           { id: 'b5', name: '结束', type: 'end' }
         ],
         enabled: true,
         version: 2
       },
-      // ⑦b 项目正式启动后主要工作流（项目任务书 → 项目主计划 → OTS 认可 → PPAP 提交 → SOP）
+      // ⑦a 项目前期 · 立项评审（立项申请勾选「是」时自动触发：评审人评估 → 总经理确认）
+      {
+        id: 'DEF-PRE-4',
+        code: 'FLOW-PRE-4',
+        name: '立项评审',
+        formFields: [
+          { key: 'name', label: '项目名称' },
+          { key: 'level', label: '分级判定' },
+          { key: 'reviewConclusion', label: '评审结论' }
+        ],
+        startNodeId: 'r1',
+        nodes: [
+          { id: 'r1', name: '发起', type: 'start' },
+          { id: 'r2', name: '立项评审（四维度评估）', type: 'approve', approverRole: '评审委员会', slaHours: 72, escalateToRole: '总经理' },
+          { id: 'r3', name: '总经理确认', type: 'approve', approverRole: '总经理', slaHours: 24 },
+          { id: 'r4', name: '结束', type: 'end' }
+        ],
+        enabled: true,
+        version: 1
+      },
       {
         id: 'DEF-PRJ-TASK',
         code: 'FLOW-PRJ-TASK',
@@ -1552,7 +1873,9 @@ export function buildSeed() {
           { key: 'name', label: '项目名称' },
           { key: 'sampleNo', label: '样件编号' },
           { key: 'reportNo', label: 'OTS 报告编号' },
-          { key: 'conclusion', label: '认可结论' }
+          { key: 'level', label: '认可等级' },
+          { key: 'conclusion', label: '认可结论' },
+          { key: 'dueDate', label: '临时认可到期日期' }
         ],
         startNodeId: 'o1',
         nodes: [
@@ -1622,7 +1945,30 @@ export function buildSeed() {
       buildApprovalChain('DEF-DEL-D7', 'FLOW-DEL-7', 'DEL-007 OTS 样件认可报告审批', { ...DEFAULT_APPROVAL_ROLES, signRoles: ['质量中心', '试验中心', '制造中心'] }, [{ key: 'deliverable', label: '交付物' }]),
       buildApprovalChain('DEF-DEL-D8', 'FLOW-DEL-8', 'DEL-008 PPAP 文件包审批', { ...DEFAULT_APPROVAL_ROLES, signRoles: ['供应链', '质量中心', '工艺技术中心'] }, [{ key: 'deliverable', label: '交付物' }]),
       buildApprovalChain('DEF-DEL-D9', 'FLOW-DEL-9', 'DEL-009 追溯矩阵审批', { ...DEFAULT_APPROVAL_ROLES, signRoles: ['系统', '软件', '质量中心'] }, [{ key: 'deliverable', label: '交付物' }]),
-      buildApprovalChain('DEF-DEL-D10', 'FLOW-DEL-10', 'DEL-010 交付清单与签收单审批', { ...DEFAULT_APPROVAL_ROLES, signRoles: ['计划物流中心', '质量中心'] }, [{ key: 'deliverable', label: '交付物' }])
+      buildApprovalChain('DEF-DEL-D10', 'FLOW-DEL-10', 'DEL-010 交付清单与签收单审批', { ...DEFAULT_APPROVAL_ROLES, signRoles: ['计划物流中心', '质量中心'] }, [{ key: 'deliverable', label: '交付物' }]),
+      // ⑩ 零件号申请命名（CJQW0106 B1 附表5：发起 → 产品总监审核 → 项目号管理专员编号确认 → 标准化批准）
+      {
+        id: 'DEF-PN',
+        code: 'FLOW-PN',
+        name: '零件号申请',
+        formFields: [
+          { key: 'customer', label: '客户名称' },
+          { key: 'vehicleModel', label: '车型' },
+          { key: 'applyType', label: '发起类型' },
+          { key: 'productName', label: '产品名称' },
+          { key: 'generatedCode', label: '最终内部型号' }
+        ],
+        startNodeId: 'pn1',
+        nodes: [
+          { id: 'pn1', name: '发起（项目经理/分项目经理/电子/结构/工艺技术管理部）', type: 'start' },
+          { id: 'pn2', name: '产品总监审核', type: 'approve', approverRole: '产品总监', slaHours: 48, escalateToRole: '总经理' },
+          { id: 'pn3', name: '项目号管理专员编号确认', type: 'approve', approverRole: '项目号管理专员', slaHours: 24, escalateToRole: '产品总监' },
+          { id: 'pn4', name: '标准化批准', type: 'approve', approverRole: '标准化专员', slaHours: 24, escalateToRole: '产品总监' },
+          { id: 'pn5', name: '结束', type: 'end' }
+        ],
+        enabled: true,
+        version: 1
+      }
     ] as FlowDefinition[],
     /** 审批链—阶段绑定（APR-002：每个阶段走一条标准四步审批链，作为闸门放行的审批证据） */
     approvalBindings: [
@@ -1667,16 +2013,49 @@ export function buildSeed() {
         form: { week: 'W43' }, currentNodeId: 'h2', status: '运行中', passedNodeIds: ['h1'], history: [],
         nodeEnteredAt: '2026-11-01T09:00:00+08:00', escalated: false, addedSigners: [], createdAt: '2026-11-01T09:00:00+08:00'
       },
-      // 项目前期三流程实例（演示）
+      // 项目前期审批实例（演示，按项目聚合监视）
+      // P-001 E15 车身域控制器：五条流程齐全，其中前期交流/TR/报价进行中，立项/立项评审已完成
       {
-        id: 'PRE-1-001', defId: 'DEF-PRE-1', defCode: 'FLOW-PRE-1', title: 'XX 客户电驱控制器项目前期交申请', submitter: '市场客户经理 王芳',
-        form: { customer: 'XX 新能源', productLine: '电驱控制器', budget: 1280000 }, currentNodeId: 'p2', status: '运行中', passedNodeIds: ['p1'], history: [],
-        nodeEnteredAt: '2026-11-01T08:30:00+08:00', escalated: false, addedSigners: [], createdAt: '2026-11-01T08:30:00+08:00'
+        id: 'PRE-1-001', defId: 'DEF-PRE-1', defCode: 'FLOW-PRE-1', title: 'E15 车身域控制器项目前期交流申请', submitter: '市场客户经理 王芳', projectId: 'P-001',
+        form: { customer: '奇瑞汽车', productLine: '车身域控制器', budget: 1280000 }, currentNodeId: 'p3', status: '运行中', passedNodeIds: ['p1', 'p2'], history: [],
+        nodeEnteredAt: '2026-11-03T08:30:00+08:00', escalated: false, addedSigners: [], createdAt: '2026-10-28T08:30:00+08:00'
       },
       {
-        id: 'PRE-2-001', defId: 'DEF-PRE-2', defCode: 'FLOW-PRE-2', title: 'XX 客户电驱控制器报价', submitter: '市场客户经理 王芳',
-        form: { productLine: '电驱控制器' }, currentNodeId: 'q2', status: '运行中', passedNodeIds: ['q1'], history: [],
-        nodeEnteredAt: '2026-11-01T09:00:00+08:00', escalated: false, addedSigners: [], createdAt: '2026-11-01T09:00:00+08:00'
+        id: 'PRE-5-001', defId: 'DEF-PRE-5', defCode: 'FLOW-PRE-5', title: 'E15 车身域控制器技术方案（TR）', submitter: '技术负责人 郑昊', projectId: 'P-001',
+        form: { name: '车身域控制器技术方案', version: 'V1.2', trResult: '待评审' }, currentNodeId: 'tr2', status: '运行中', passedNodeIds: ['tr1'], history: [],
+        nodeEnteredAt: '2026-11-03T10:00:00+08:00', escalated: false, addedSigners: [], createdAt: '2026-11-03T10:00:00+08:00'
+      },
+      {
+        id: 'PRE-2-001', defId: 'DEF-PRE-2', defCode: 'FLOW-PRE-2', title: 'E15 车身域控制器报价', submitter: '市场客户经理 王芳', projectId: 'P-001',
+        form: { productLine: '车身域控制器', annualVolume: 120000, unitPriceInVat: 576.85 }, currentNodeId: 'q2', status: '运行中', passedNodeIds: ['q1'], history: [],
+        nodeEnteredAt: '2026-11-04T09:00:00+08:00', escalated: false, addedSigners: [], createdAt: '2026-11-04T09:00:00+08:00'
+      },
+      {
+        id: 'PRE-3-001', defId: 'DEF-PRE-3', defCode: 'FLOW-PRE-3', title: 'E15 车身域控制器立项申请', submitter: '市场客户经理 王芳', projectId: 'P-001',
+        form: { name: 'E15 车身域控制器开发', annualVolume: 150000, lifecycleYears: 5 }, currentNodeId: 'b5', status: '已完成', passedNodeIds: ['b1', 'b2', 'b3', 'b4'], history: [],
+        nodeEnteredAt: '2026-10-20T09:00:00+08:00', escalated: false, addedSigners: [], createdAt: '2026-10-20T09:00:00+08:00', finishedAt: '2026-10-22T18:00:00+08:00'
+      },
+      {
+        id: 'PRE-4-001', defId: 'DEF-PRE-4', defCode: 'FLOW-PRE-4', title: 'E15 车身域控制器立项评审', submitter: '市场客户经理 王芳', projectId: 'P-001',
+        form: { name: 'E15 车身域控制器开发', level: 'L2', reviewConclusion: '通过' }, currentNodeId: 'r4', status: '已完成', passedNodeIds: ['r1', 'r2', 'r3'], history: [],
+        nodeEnteredAt: '2026-10-22T10:00:00+08:00', escalated: false, addedSigners: [], createdAt: '2026-10-22T10:00:00+08:00', finishedAt: '2026-10-24T17:00:00+08:00'
+      },
+      // P-002 B30 智能座舱：前期交流已完成，TR 运行中，其余未启动
+      {
+        id: 'PRE-1-002', defId: 'DEF-PRE-1', defCode: 'FLOW-PRE-1', title: 'B30 智能座舱域控平台前期交流申请', submitter: '市场客户经理 李敏', projectId: 'P-002',
+        form: { customer: '奇瑞汽车', productLine: '智能座舱', budget: 7600000 }, currentNodeId: 'p5', status: '已完成', passedNodeIds: ['p1', 'p2', 'p3', 'p4'], history: [],
+        nodeEnteredAt: '2026-10-15T09:00:00+08:00', escalated: false, addedSigners: [], createdAt: '2026-10-15T09:00:00+08:00', finishedAt: '2026-10-18T16:00:00+08:00'
+      },
+      {
+        id: 'PRE-5-002', defId: 'DEF-PRE-5', defCode: 'FLOW-PRE-5', title: 'B30 智能座舱域控平台技术方案（TR）', submitter: '技术负责人 郑昊', projectId: 'P-002',
+        form: { name: '智能座舱域控平台技术方案', version: 'V1.0', trResult: '待评审' }, currentNodeId: 'tr2', status: '运行中', passedNodeIds: ['tr1'], history: [],
+        nodeEnteredAt: '2026-11-04T14:00:00+08:00', escalated: false, addedSigners: [], createdAt: '2026-11-04T14:00:00+08:00'
+      },
+      // P-003 C11 电池管理线束：仅前期交流申请，被驳回
+      {
+        id: 'PRE-1-003', defId: 'DEF-PRE-1', defCode: 'FLOW-PRE-1', title: 'C11 电池管理线束改型前期交流申请', submitter: '市场客户经理 王芳', projectId: 'P-003',
+        form: { customer: '宁德时代', productLine: '高压电气', budget: 2600000 }, currentNodeId: 'p2', status: '已驳回', passedNodeIds: ['p1'], history: [],
+        nodeEnteredAt: '2026-11-02T09:00:00+08:00', escalated: false, addedSigners: [], createdAt: '2026-11-02T09:00:00+08:00', finishedAt: '2026-11-02T11:00:00+08:00'
       },
       // 交付物审批实例（P3：交付物绑定审批，体现「已批准」与「进行中」两态）
       {

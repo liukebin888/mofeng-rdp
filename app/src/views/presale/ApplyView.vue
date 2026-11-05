@@ -1,11 +1,12 @@
 <template>
   <div>
-    <PageHeader title="立项申请" desc="统一工作流单据（WF-001）：新增打开立项模板 → 编辑中可保存/关闭 → 提交走审批链。五项分级输入必填，缺项即「未定级」并阻断 Gate1（CLS-001/CLS-007）；技术方案与报价未关联不得审批（C-02）">
+    <PageHeader title="立项申请" desc="统一工作流单据（WF-001）：新增打开立项模板 → 编辑中可保存/关闭 → 提交走审批链（与前期交流申请同：市场总监审核 → 三中心总监会签 → 总经理批准）。五项分级输入必填，缺项即「未定级」并阻断 Gate1（CLS-001/CLS-007）">
       <template #actions>
         <WorkflowFormShell
           :form="wfForm"
           :blockers="wfBlockers"
           :dirty="dirty"
+          v-model:custom-approvers="customApprovers"
           @new="wfNew"
           @save="wfSave"
           @close="wfClose"
@@ -98,11 +99,16 @@
         </el-form>
 
         <div class="hr" />
-        <div class="panel-title">技术方案与报价关联（C-02）</div>
-        <div class="row wrap">
-          <el-checkbox v-model="schemeLinked" @change="markDirty">技术方案已关联（TS-E15-V2.1）</el-checkbox>
-          <el-checkbox v-model="quoteLinked" @change="markDirty">报价单已关联（QT-2026-0087）</el-checkbox>
-        </div>
+        <div class="panel-title">是否进行立项评审</div>
+        <el-form label-width="140px" size="small">
+          <el-form-item label="立项评审" required>
+            <el-radio-group v-model="form.needReview" @change="markDirty">
+              <el-radio label="yes">是（自动触发立项评审）</el-radio>
+              <el-radio label="no">否（不进行立项评审）</el-radio>
+            </el-radio-group>
+            <div class="muted" style="font-size: 12px; margin-top: 4px">选「是」时，立项申请审批通过后自动触发立项评审（人工+AI 四维度评估）流程。</div>
+          </el-form-item>
+        </el-form>
       </div>
 
       <div class="grid" style="gap: 12px">
@@ -167,17 +173,16 @@ const store = useAppStore()
 const { te } = useI18n()
 
 // 空白表单默认值：新增打开的是空白模板，所有字段由用户新填写，不带入任何已有项目数据。
-const EMPTY_FORM = { code: '', name: '', customer: '', category: '', productLine: '', platform: '', owner: '', start: '', end: '', otsDate: '', sopDate: '', annualVolume: 0, lifecycleYears: 0 }
+const EMPTY_FORM = { code: '', name: '', customer: '', category: '', productLine: '', platform: '', owner: '', start: '', end: '', otsDate: '', sopDate: '', annualVolume: 0, lifecycleYears: 0, needReview: '' }
 const EMPTY_INPUT: GradingInput = { asil: '', cal: -1, selfDev: '', newArch: null, customerSafety: null }
 const form = reactive({ ...EMPTY_FORM })
 const input = reactive<GradingInput>({ ...EMPTY_INPUT })
-const schemeLinked = ref(false)
-const quoteLinked = ref(false)
 
 // —— 统一工作流单据（WF-001 四按钮）——
 const wfForm = ref<WorkflowForm | null>(null)
 const dirty = ref(false)
 const wfBlockers = ref<string[]>([])
+const customApprovers = ref<Array<import('@/domain/flowEngine').CustomApproverAddition & { signRoles: string[] }>>([])
 
 /** 立项模板 id（seed 中 DEF-PRE-3 立项申请） */
 const INITIATION_DEF_ID = 'DEF-PRE-3'
@@ -214,7 +219,8 @@ const REQUIRED_FIELDS: Array<{ label: string; empty: () => boolean }> = [
   { label: 'OTS 期', empty: () => !form.otsDate },
   { label: 'SOP 日期', empty: () => !form.sopDate },
   { label: '车型年产量', empty: () => !form.annualVolume || form.annualVolume <= 0 },
-  { label: '生命周期（年）', empty: () => !form.lifecycleYears || form.lifecycleYears <= 0 }
+  { label: '生命周期（年）', empty: () => !form.lifecycleYears || form.lifecycleYears <= 0 },
+  { label: '是否进行立项评审', empty: () => !form.needReview }
 ]
 
 /** 收集所有未填的必填项 */
@@ -233,7 +239,7 @@ function onOwnerSelect(person: PersonCandidate) {
 
 /** 序列化当前编辑内容为草稿 JSON */
 function serializeContent(): string {
-  return JSON.stringify({ form: { ...form }, input: { ...input }, schemeLinked: schemeLinked.value, quoteLinked: quoteLinked.value })
+  return JSON.stringify({ form: { ...form }, input: { ...input }, customApprovers: customApprovers.value })
 }
 
 /** 从草稿内容反序列化回表单（续编） */
@@ -242,8 +248,7 @@ function hydrateContent(content: string) {
     const obj = JSON.parse(content)
     if (obj.form) Object.assign(form, obj.form)
     if (obj.input) Object.assign(input, obj.input)
-    if (typeof obj.schemeLinked === 'boolean') schemeLinked.value = obj.schemeLinked
-    if (typeof obj.quoteLinked === 'boolean') quoteLinked.value = obj.quoteLinked
+    if (Array.isArray(obj.customApprovers)) customApprovers.value = obj.customApprovers
   } catch {
     /* 草稿损坏则忽略，从空白开始 */
   }
@@ -263,8 +268,7 @@ function wfNew() {
   // 空白模板：先清空表单，再决定是否续编草稿
   Object.assign(form, EMPTY_FORM)
   Object.assign(input, EMPTY_INPUT)
-  schemeLinked.value = false
-  quoteLinked.value = false
+  customApprovers.value = []
   if (draft?.content) hydrateContent(draft.content)
   wfForm.value = f
   dirty.value = false
@@ -294,7 +298,7 @@ function wfClose() {
 }
 
 /** 提交：校验 → 走审批链（立项申请为独立新单据，不修改任何已有项目） */
-function wfSubmit() {
+function wfSubmit(customApprovers: import('@/domain/flowEngine').CustomApproverAddition[] = []) {
   if (!wfForm.value) return
   const blockers: string[] = []
   // 必填项强制校验：红色 * 标注项未填，不允许提交进入下一步
@@ -304,9 +308,6 @@ function wfSubmit() {
   }
   if (!result.value.level) {
     blockers.push('CLS-001：五项分级输入不齐，未定级')
-  }
-  if (!schemeLinked.value || !quoteLinked.value) {
-    blockers.push('C-02：技术方案与报价必须已关联')
   }
   if (blockers.length) {
     wfBlockers.value = blockers
@@ -327,11 +328,22 @@ function wfSubmit() {
     otsDate: form.otsDate,
     sopDate: form.sopDate,
     annualVolume: form.annualVolume,
-    lifecycleYears: form.lifecycleYears
+    lifecycleYears: form.lifecycleYears,
+    needReview: form.needReview
   }
-  const ok = store.submitWorkflowForm(wfForm.value, `${wfForm.value.title}：${form.name}`, formData)
+  const ok = store.submitWorkflowForm(wfForm.value, `${wfForm.value.title}：${form.name}`, formData, customApprovers, store.projectId)
   if (ok) {
-    store.notify('success', `立项申请已提交审批：判定 ${result.value.level}（命中第 ${result.value.hitRowNo} 行）`)
+    // 选「是」→ 自动触发立项评审流程（DEF-PRE-4）；选「否」→ 不触发
+    if (form.needReview === 'yes') {
+      store.launchFlow('DEF-PRE-4', `立项评审：${form.name}`, {
+        name: form.name,
+        level: result.value.level ?? '',
+        reviewConclusion: ''
+      }, undefined, store.projectId)
+      store.notify('success', `立项申请已提交审批：判定 ${result.value.level}（命中第 ${result.value.hitRowNo} 行）；已自动触发立项评审`)
+    } else {
+      store.notify('success', `立项申请已提交审批：判定 ${result.value.level}（命中第 ${result.value.hitRowNo} 行）`)
+    }
     dirty.value = false
     wfBlockers.value = []
   }
