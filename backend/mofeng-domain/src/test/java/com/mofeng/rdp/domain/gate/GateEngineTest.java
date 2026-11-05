@@ -119,4 +119,28 @@ class GateEngineTest {
         assertNull(GateEngine.slaState("G9",
             Instant.parse("2026-11-01T00:00:00Z"), Instant.parse("2026-11-02T00:00:00Z")));
     }
+
+    @Test
+    void 门禁运行结果携带模板版本与快照哈希() {
+        GateEngine.Submit submit = new GateEngine.Submit("G1", "P-1", List.of(), "pm", false, false, List.of());
+        GateEngine.Run r = GateEngine.runGate(submit);
+        assertEquals(GateEngine.GATE_TEMPLATE_VERSION, r.templateVersion());
+        assertEquals(GateEngine.templateHash(), r.templateHash());
+        assertFalse(r.templateHash().isEmpty());
+    }
+
+    @Test
+    void 非权威门禁拒绝也携带模板版本与快照哈希() {
+        GateEngine.Run r = GateEngine.rejectUnknownGate("G9", "P-1", "pm");
+        assertEquals(GateEngine.GATE_TEMPLATE_VERSION, r.templateVersion());
+        assertEquals(GateEngine.templateHash(), r.templateHash());
+    }
+
+    @Test
+    void 模板快照哈希确定性且非空() {
+        String h1 = GateEngine.templateHash();
+        String h2 = GateEngine.templateHash();
+        assertEquals(h1, h2);
+        assertEquals(64, h1.length()); // SHA-256 hex
+    }
 }

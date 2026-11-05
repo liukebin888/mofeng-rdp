@@ -149,6 +149,24 @@ public final class FlowEngine {
         }
     }
 
+    /** 发起人自定义追加的一个审批节点（审核/会签）。 */
+    public static final class CustomApproverAddition {
+        public final String name;          // 节点名（如「法务审核」「财务会签」）
+        public final String kind;          // approve（单人审核）/ sign（并行会签，全部通过才过）
+        public final String approverRole;  // approve 必填
+        public final List<String> signRoles; // sign 必填（并行、全部通过才过）
+        public final Integer slaHours;     // 缺省 48h
+
+        public CustomApproverAddition(String name, String kind, String approverRole,
+                                      List<String> signRoles, Integer slaHours) {
+            this.name = name;
+            this.kind = kind;
+            this.approverRole = approverRole;
+            this.signRoles = signRoles == null ? List.of() : signRoles;
+            this.slaHours = slaHours;
+        }
+    }
+
     /** 会签单个签署人结论。 */
     public static final class Signature {
         public final String role;
@@ -204,6 +222,7 @@ public final class FlowEngine {
         public final boolean escalated;
         public final String escalatedToRole; // 可为 null
         public final List<String> addedSigners;
+        public final List<CustomApproverAddition> customNodes; // 发起人自定义追加的审批节点（留痕，可为空）
         public final String createdAt;
         public final String finishedAt; // 可为 null
 
@@ -211,7 +230,8 @@ public final class FlowEngine {
                             Map<String, Object> form, String currentNodeId, String status,
                             List<String> passedNodeIds, List<ApprovalRecord> history,
                             String nodeEnteredAt, boolean escalated, String escalatedToRole,
-                            List<String> addedSigners, String createdAt, String finishedAt) {
+                            List<String> addedSigners, List<CustomApproverAddition> customNodes,
+                            String createdAt, String finishedAt) {
             this.id = id;
             this.defId = defId;
             this.defCode = defCode;
@@ -226,6 +246,7 @@ public final class FlowEngine {
             this.escalated = escalated;
             this.escalatedToRole = escalatedToRole;
             this.addedSigners = addedSigners == null ? new ArrayList<>() : addedSigners;
+            this.customNodes = customNodes == null ? new ArrayList<>() : customNodes;
             this.createdAt = createdAt;
             this.finishedAt = finishedAt;
         }
@@ -243,6 +264,7 @@ public final class FlowEngine {
                     escalated,
                     escalatedToRole == null ? this.escalatedToRole : escalatedToRole,
                     addedSigners == null ? this.addedSigners : addedSigners,
+                    this.customNodes,
                     createdAt,
                     finishedAt == null ? this.finishedAt : finishedAt);
         }
@@ -331,6 +353,13 @@ public final class FlowEngine {
     /** 从定义启动一个流程实例。 */
     public static FlowInstance startFlow(FlowDefinition def, String title, String submitter,
                                          Map<String, Object> form, String id, Instant now) {
+        return startFlow(def, title, submitter, form, id, now, null);
+    }
+
+    /** 从定义启动一个流程实例（可携带发起人自定义追加的审批节点留痕）。 */
+    public static FlowInstance startFlow(FlowDefinition def, String title, String submitter,
+                                         Map<String, Object> form, String id, Instant now,
+                                         List<CustomApproverAddition> customNodes) {
         String at = now.toString();
         String instId = id != null ? id : "F" + System.currentTimeMillis();
         return new FlowInstance(
@@ -338,7 +367,87 @@ public final class FlowEngine {
                 form == null ? new LinkedHashMap<>() : form,
                 def.startNodeId, Status.RUNNING,
                 new ArrayList<>(), new ArrayList<>(),
-                at, false, null, new ArrayList<>(), at, null);
+                at, false, null, new ArrayList<>(), customNodes, at, null);
+    }
+
+    /**
+     * 发起人自定义审批节点合并（FUN-017 扩展）：在固定审批链之外，发起人可自行增加
+     * 「审核（单人）」与「会签（并行、全部通过才过）」节点。
+     *
+     * <p>插入规则（fail-closed，非法输入不改变定义）：</p>
+     * <ul>
+     *   <li>自定义节点统一插入到固定链中「最后一个 approve 批准节点」之前（即会签之后、批准之前）。</li>
+     *   <li>会签节点 signMode 固定为 'all'（并行、全部通过才过）。</li>
+     *   <li>会签至少 1 个角色、审核至少 1 个审批角色，否则该条被忽略。</li>
+     *   <li>节点 id 用前缀 'cxN-' 生成，避免与固定节点 id 冲突。</li>
+     * </ul>
+     *
+     * <p>返回新的 FlowDefinition（原 def 不可变）；additions 为空或全非法则原样返回。</p>
+     */
+    public static FlowDefinition applyCustomApprovers(FlowDefinition def,
+                                                      List<CustomApproverAddition> additions) {
+        if (additions == null || additions.isEmpty()) {
+            return def;
+        }
+        List<CustomApproverAddition> valid = new ArrayList<>();
+        for (CustomApproverAddition a : additions) {
+            boolean nameOk = a.name != null && !a.name.trim().isEmpty();
+            if (!nameOk) {
+                continue;
+            }
+            if ("sign".equals(a.kind)) {
+                if (a.signRoles != null && !a.signRoles.isEmpty()) {
+                    valid.add(a);
+                }
+            } else if (a.approverRole != null && !a.approverRole.trim().isEmpty()) {
+                valid.add(a);
+            }
+        }
+        if (valid.isEmpty()) {
+            return def;
+        }
+
+        List<FlowNode> nodes = new ArrayList<>(def.nodes);
+        // 定位固定链最后一个 approve 批准节点（插入锚点）；无则退化为 end 节点之前
+        int anchorIdx = -1;
+        for (int i = 0; i < nodes.size(); i++) {
+            if (NodeType.APPROVE.equals(nodes.get(i).type)) {
+                anchorIdx = i;
+            }
+        }
+        int insertIdx = anchorIdx >= 0 ? anchorIdx : indexOfType(nodes, NodeType.END);
+
+        List<FlowNode> customNodes = new ArrayList<>();
+        for (int i = 0; i < valid.size(); i++) {
+            CustomApproverAddition a = valid.get(i);
+            String name = a.name.trim();
+            Integer sla = a.slaHours != null ? a.slaHours : 48;
+            if ("sign".equals(a.kind)) {
+                List<String> roles = new ArrayList<>();
+                for (String r : a.signRoles) {
+                    if (r != null && !r.trim().isEmpty()) {
+                        roles.add(r.trim());
+                    }
+                }
+                customNodes.add(new FlowNode("cxN-" + i, name, NodeType.SIGN, null, SignMode.ALL,
+                        roles, sla, null, false, List.of(), null));
+            } else {
+                customNodes.add(new FlowNode("cxN-" + i, name, NodeType.APPROVE, a.approverRole.trim(),
+                        null, List.of(), sla, null, false, List.of(), null));
+            }
+        }
+
+        List<FlowNode> nextNodes = new ArrayList<>();
+        if (insertIdx >= 0) {
+            nextNodes.addAll(nodes.subList(0, insertIdx));
+            nextNodes.addAll(customNodes);
+            nextNodes.addAll(nodes.subList(insertIdx, nodes.size()));
+        } else {
+            nextNodes.addAll(nodes);
+            nextNodes.addAll(customNodes);
+        }
+        return new FlowDefinition(def.id, def.code, def.name, def.formFields, nextNodes,
+                def.startNodeId, def.enabled, def.version);
     }
 
     /** 分支跳转：branch 节点进入后立即解析并推进到目标节点。 */
@@ -372,8 +481,15 @@ public final class FlowEngine {
             return new SignResult(inst, false, false);
         }
         String at = now.toString();
-        List<String> roles = !node.signRoles.isEmpty() ? node.signRoles
-                : (node.approverRole != null ? List.of(node.approverRole) : List.of());
+        // 会签范围 = 定义中的 signRoles + 审批中加签(addedSigners)的角色（并行，全部通过才过）
+        List<String> roles = new ArrayList<>(
+                !node.signRoles.isEmpty() ? node.signRoles
+                        : (node.approverRole != null ? List.of(node.approverRole) : List.of()));
+        for (String r : inst.addedSigners) {
+            if (!roles.contains(r)) {
+                roles.add(r);
+            }
+        }
         // 找到本节点已有的签署记录（同一角色不可重复签）
         ApprovalRecord existing = findCounterSign(inst.history, node.id);
         List<Signature> sigs = existing != null ? new ArrayList<>(existing.signatures) : new ArrayList<>();
@@ -528,6 +644,15 @@ public final class FlowEngine {
     private static int indexOf(FlowDefinition def, String nodeId) {
         for (int i = 0; i < def.nodes.size(); i++) {
             if (def.nodes.get(i).id.equals(nodeId)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static int indexOfType(List<FlowNode> nodes, String type) {
+        for (int i = 0; i < nodes.size(); i++) {
+            if (type.equals(nodes.get(i).type)) {
                 return i;
             }
         }

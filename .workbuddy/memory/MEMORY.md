@@ -94,4 +94,7 @@
 - RES 资源域剩余 10 项 ✅（RES-001/002/008/009/010/011/013/014/015/016：resourcePool + resourcePlan 2 引擎，三层资源池/技能/派工/工时回填/外部产能/效率系数/费率/情景；PoolView 加面板）
 - EXA 报表与互操作 10 项 ✅（EXA-001~010：reportLibrary + interop + dataQuality 3 引擎，报表库/自助分析/订阅/导出/互操作/集成网关/事件订阅/财务人力/数据质量/三处同值；DashboardView 加面板）
 - NFR-017 可访问性 + ARC-020 扩展点 ✅（extensionPoint + accessibility 2 引擎，四类扩展点/钩子失败不阻断/WCAG对比度/键盘可达/表单标签；DictView 加标签页）
-- R3 六门禁当前基线：vitest 472/472、隔离面脚本 12/12、smoke 73/73（placeholder 0/bad 0）、e2e 31/0
+- 界面（接口）计划 ✅（SCH-022：interfacePlan 引擎 + 跨项目四要素/下游延误传播/清单导出；InterfacePlanView 独立页 + /plan/interface 路由）
+- 组合闸门一致性 ✅（PFM-011：gateConsistency 引擎 + 跨项目判据集版本统一/例外登记/合规率复算；GateConsistencyView 独立页 + /portfolio/gate-consistency 路由）
+- OpenAPI 契约 + 统一错误码表 ✅（INT-005：补 FORBIDDEN code 分离 403/422 + 重写 REST-CONTRACT.md=CONTRACT-002 覆盖 16 端点/6 传输层 code/14 领域语义码；后端 app 测试 88→90）
+- R3 六门禁当前基线：前端 vitest 1002/1002、smoke 91/91（placeholder 0/bad 0）、build 成功；后端 mvn test domain 375 + application 90；e2e 56 PASS / 5 FAIL（5 处为既有历史失败：分级判定留痕文案 + 研发阶段推进探针，与本次无关）

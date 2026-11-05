@@ -29,7 +29,9 @@
         <!-- 框架版本锁定（SRS ARC-021：Spring Boot 3.2.x，与 JDK 17 匹配） -->
         <spring-boot.version>3.2.5</spring-boot.version>
         <mybatis-plus.version>3.5.5</mybatis-plus.version>
-        <flowable.version>7.0.1</flowable.version>
+        <!-- 注：流程引擎采用自研 FlowEngine（domain/flow），不引入 Flowable。
+             方案 §12.5 原列 Flowable 7.x，但加签/转签/会签/超时升级语义需深度定制，
+             自研成本低于 Flowable 二次开发，故移除其版本声明，避免「清单有、实现无」的扫描隐患。 -->
 
         <!-- 测试与架构守护 -->
         <junit.version>5.10.2</junit.version>

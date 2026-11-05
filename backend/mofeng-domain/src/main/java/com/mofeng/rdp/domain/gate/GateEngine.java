@@ -16,6 +16,11 @@ public final class GateEngine {
     private GateEngine() {
     }
 
+    /** 门禁模板版本（与前端 TS 侧 {@code GATE_TEMPLATE_VERSION} 保持一致）。
+     *  变更门禁判据（item/required/safety/cp/slaHours）时必须递增版本并同步前端，
+     *  判定结果携带该版本，支撑 K1「历史判定可复算」。 */
+    public static final String GATE_TEMPLATE_VERSION = "GATE-2026.11";
+
     /** 控制点裁决结果。 */
     public enum Verdict { PASS, FAIL, CONDITIONAL }
 
@@ -115,10 +120,13 @@ public final class GateEngine {
         private final boolean safetyBlocked;
         private final java.util.List<ItemResult> results;
         private final String submittedBy;
+        private final String templateVersion; // 执行时锁定的模板版本（K1 复算）
+        private final String templateHash;    // 模板快照哈希（判定留痕，防篡改复算）
 
         Run(String gate, String projectId, boolean passed, boolean conditional,
             java.util.List<String> missing, boolean safetyBlocked,
-            java.util.List<ItemResult> results, String submittedBy) {
+            java.util.List<ItemResult> results, String submittedBy,
+            String templateVersion, String templateHash) {
             this.gate = gate;
             this.projectId = projectId;
             this.passed = passed;
@@ -127,6 +135,8 @@ public final class GateEngine {
             this.safetyBlocked = safetyBlocked;
             this.results = java.util.List.copyOf(results);
             this.submittedBy = submittedBy;
+            this.templateVersion = templateVersion;
+            this.templateHash = templateHash;
         }
 
         public String gate() { return gate; }
@@ -137,6 +147,8 @@ public final class GateEngine {
         public boolean safetyBlocked() { return safetyBlocked; }
         public java.util.List<ItemResult> results() { return results; }
         public String submittedBy() { return submittedBy; }
+        public String templateVersion() { return templateVersion; }
+        public String templateHash() { return templateHash; }
     }
 
     /** 门禁提交输入。 */
@@ -232,13 +244,42 @@ public final class GateEngine {
         return GATE_TEMPLATES;
     }
 
+    /**
+     * 门禁模板快照哈希（确定性，供判定留痕 / K1 复算）。
+     * 对全部权威模板序列化后取 SHA-256，判据一改哈希必变，
+     * 可与历史 Run.templateHash 比对判断「是否同一版判据」。
+     */
+    public static String templateHash() {
+        var sb = new StringBuilder();
+        for (GateTemplate t : GATE_TEMPLATES) {
+            sb.append(t.code()).append('|').append(t.name()).append('|')
+              .append(t.stage()).append('|').append(t.slaHours()).append('|');
+            for (GateItem it : t.items()) {
+                sb.append(it.code()).append(':').append(it.name()).append(':')
+                  .append(it.required()).append(':').append(it.safety()).append(':')
+                  .append(it.cp() == null ? "" : it.cp()).append(';');
+            }
+            sb.append('\n');
+        }
+        try {
+            var md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] d = md.digest(sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            var hex = new StringBuilder();
+            for (byte b : d) hex.append(String.format("%02x", b));
+            return hex.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 不可用", e);
+        }
+    }
+
     /** 非权威 gate 拒绝（D-15：项目自建判据一律拒绝）。 */
     public static Run rejectUnknownGate(String gate, String projectId, String submitter) {
         var note = gate + " 非权威闸门模板";
         var item = new ItemResult(gate, "非权威闸门模板", false, null,
             "该闸门不在 PMO 统一维护的权威模板集内（GAT-001 / D-15），项目不得自建判据，拒绝执行");
         return new Run(gate, projectId, false, false,
-            java.util.List.of(note), false, java.util.List.of(item), submitter);
+            java.util.List.of(note), false, java.util.List.of(item), submitter,
+            GATE_TEMPLATE_VERSION, templateHash());
     }
 
     /** Gate 准入校验：L4 阻断、L3 条件放行、安全项不可豁免；非权威 gate 直接拒绝。 */
@@ -305,7 +346,8 @@ public final class GateEngine {
         boolean passed = !requiredMissing && !safetyBlocked;
         boolean conditional = !requiredMissing && results.stream().anyMatch(r -> r.note().startsWith("有条件"));
         return new Run(input.gate(), input.projectId(), passed, conditional,
-            missing, safetyBlocked, results, input.submitter());
+            missing, safetyBlocked, results, input.submitter(),
+            GATE_TEMPLATE_VERSION, templateHash());
     }
 
     /** SOD-01：提交人与放行人不得为同一人。 */

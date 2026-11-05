@@ -192,4 +192,17 @@ class StageTemplateEngineTest {
         assertFalse(v.allowed());
         assertEquals("BLOCKED_PREREQ", v.code());
     }
+
+    @Test
+    void 模板快照哈希确定性且变更后变化() {
+        StageTemplateEngine.StageTemplate tpl = StageTemplateEngine.AUTOMOTIVE;
+        String h1 = tpl.snapshotHash();
+        assertEquals(h1, StageTemplateEngine.AUTOMOTIVE.snapshotHash());
+        assertEquals(64, h1.length()); // SHA-256 hex
+
+        // 变更阶段名 → 哈希必变（版本也随之 +1）
+        StageTemplateEngine.TemplateOp op = StageTemplateEngine.updateStage(tpl, "S1", "立项与策划V2", null, null, null);
+        assertTrue(op.ok());
+        assertFalse(op.tpl().snapshotHash().equals(h1));
+    }
 }

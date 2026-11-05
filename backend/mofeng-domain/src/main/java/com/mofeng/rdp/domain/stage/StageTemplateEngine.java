@@ -73,6 +73,30 @@ public final class StageTemplateEngine {
         StageTemplate withStages(List<StageDef> next) {
             return new StageTemplate(id, name, tag, next, version + 1);
         }
+
+        /**
+         * 模板快照哈希（确定性，供判定留痕 / K1 复算）。
+         * 阶段/次序/前置/闸门任一变更哈希必变，可与历史快照比对判断是否同一版。
+         */
+        public String snapshotHash() {
+            var sb = new StringBuilder();
+            sb.append(id).append('|').append(name).append('|').append(tag)
+              .append('|').append(version).append('|');
+            for (StageDef s : orderedStages(this)) {
+                sb.append(s.code()).append(':').append(s.order()).append(':')
+                  .append(s.gateCode() == null ? "" : s.gateCode()).append(':')
+                  .append(String.join(",", s.prerequisites())).append(';');
+            }
+            try {
+                var md = java.security.MessageDigest.getInstance("SHA-256");
+                byte[] d = md.digest(sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                var hex = new StringBuilder();
+                for (byte b : d) hex.append(String.format("%02x", b));
+                return hex.toString();
+            } catch (java.security.NoSuchAlgorithmException e) {
+                throw new IllegalStateException("SHA-256 不可用", e);
+            }
+        }
     }
 
     /** 阶段推进判定结果。 */

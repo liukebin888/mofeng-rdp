@@ -57,6 +57,26 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void 未认证映射401() {
+        ResponseEntity<ApiResponse<Object>> resp =
+            handler.handleUnauthorized(new UnauthorizedException("未认证"));
+
+        assertEquals(HttpStatus.UNAUTHORIZED, resp.getStatusCode());
+        assertApiCode(resp, ApiResponse.UNAUTHORIZED);
+    }
+
+    @Test
+    void 权限不足映射403且code为FORBIDDEN() {
+        ResponseEntity<ApiResponse<Object>> resp =
+            handler.handlePermissionDenied(new PermissionDeniedException("无 create 权限"));
+
+        assertEquals(HttpStatus.FORBIDDEN, resp.getStatusCode());
+        assertApiCode(resp, ApiResponse.FORBIDDEN);
+        // 403 权限不足与 422 规则阻断在 code 层必须分离，不得复用 BLOCKED
+        assertFalse(ApiResponse.BLOCKED.equals(resp.getBody().getCode()));
+    }
+
+    @Test
     void 未预期异常映射500不泄漏堆栈() {
         ResponseEntity<ApiResponse<Object>> resp =
             handler.handleUnexpected(new RuntimeException("数据库连接泄漏细节"));

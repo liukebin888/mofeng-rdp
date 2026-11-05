@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>魔程化解 · 研发项目管理工具 — 功能说明</title>
+<style>
+  :root{
+    --bg:#0b1220; --bg2:#0f1a2e; --card:#141f33; --card2:#1a2942;
+    --line:#22344f; --txt:#e8eef8; --muted:#94a3b8; --dim:#64748b;
+    --brand:#3b82f6; --brand2:#60a5fa; --cyan:#22d3ee; --violet:#8b5cf6;
+    --green:#34d399; --amber:#f59e0b; --red:#f87171;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    background:radial-gradient(1200px 600px at 50% -200px,#1b2c4a 0%,var(--bg) 60%);
+    color:var(--txt); line-height:1.7; overflow-x:hidden;
+  }
+  a{color:var(--brand2);text-decoration:none}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+
+  /* ---------- 顶栏 ---------- */
+  header{
+    position:sticky;top:0;z-index:50;
+    background:rgba(11,18,32,.82);backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--line);
+  }
+  .nav{height:64px;display:flex;align-items:center;justify-content:space-between}
+  .brand{display:flex;align-items:center;gap:12px;font-weight:700;font-size:17px}
+  .logo{
+    width:38px;height:38px;border-radius:10px;flex:0 0 auto;
+    background:linear-gradient(135deg,var(--brand),var(--violet));
+    display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;
+    box-shadow:0 4px 16px rgba(59,130,246,.4);
+  }
+  .brand small{display:block;font-weight:400;font-size:11px;color:var(--muted);letter-spacing:.5px}
+  .nav-links{display:flex;gap:26px;font-size:14px;color:var(--muted)}
+  .nav-links a{color:var(--muted)} .nav-links a:hover{color:var(--txt)}
+  .nav-cta{
+    background:linear-gradient(135deg,var(--brand),var(--violet));color:#fff;
+    padding:9px 20px;border-radius:9px;font-size:14px;font-weight:600;
+    box-shadow:0 4px 18px rgba(59,130,246,.35);transition:.2s;
+  }
+  .nav-cta:hover{transform:translateY(-1px);color:#fff}
+
+  /* ---------- Hero ---------- */
+  .hero{padding:84px 0 64px;text-align:center;position:relative}
+  .hero .tag{
+    display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:999px;
+    background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.35);
+    color:var(--brand2);font-size:13px;margin-bottom:22px;
+  }
+  .hero h1{font-size:46px;line-height:1.25;font-weight:800;letter-spacing:-.5px}
+  .hero h1 .grad{
+    background:linear-gradient(120deg,var(--brand2),var(--cyan),var(--violet));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .hero p.sub{max-width:720px;margin:22px auto 0;color:var(--muted);font-size:17px}
+  .hero .cta-row{margin-top:34px;display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+  .btn{
+    display:inline-flex;align-items:center;gap:8px;padding:13px 28px;border-radius:11px;
+    font-size:15px;font-weight:600;cursor:pointer;border:none;transition:.2s;
+  }
+  .btn-primary{background:linear-gradient(135deg,var(--brand),var(--violet));color:#fff;box-shadow:0 6px 24px rgba(59,130,246,.4)}
+  .btn-primary:hover{transform:translateY(-2px)}
+  .btn-ghost{background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--txt)}
+  .btn-ghost:hover{border-color:var(--brand2)}
+  .hero .stats{margin-top:56px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 16px}
+  .stat b{font-size:30px;display:block;background:linear-gradient(120deg,var(--brand2),var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .stat span{font-size:13px;color:var(--muted)}
+
+  /* ---------- 通用区块 ---------- */
+  section{padding:64px 0}
+  .sec-head{text-align:center;margin-bottom:48px}
+  .sec-head h2{font-size:32px;font-weight:800;letter-spacing:-.3px}
+  .sec-head p{color:var(--muted);margin-top:12px;font-size:15px}
+  .kicker{color:var(--brand2);font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase}
+
+  /* ---------- 核心能力卡片 ---------- */
+  .grid{display:grid;gap:20px}
+  .grid-3{grid-template-columns:repeat(3,1fr)}
+  .grid-4{grid-template-columns:repeat(4,1fr)}
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:16px;padding:26px 24px;
+    transition:.25s;position:relative;overflow:hidden;
+  }
+  .card:hover{transform:translateY(-4px);border-color:var(--brand2);box-shadow:0 12px 32px rgba(0,0,0,.3)}
+  .card .ic{
+    width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+    font-size:22px;margin-bottom:16px;background:rgba(59,130,246,.14);color:var(--brand2);
+  }
+  .card h3{font-size:17px;margin-bottom:8px}
+  .card p{font-size:14px;color:var(--muted)}
+
+  /* ---------- 功能模块 ---------- */
+  .modules{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+  .module{
+    background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 24px;
+    display:flex;gap:16px;align-items:flex-start;transition:.2s;
+  }
+  .module:hover{border-color:var(--brand2)}
+  .module .m-ic{
+    width:42px;height:42px;border-radius:11px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+    font-size:20px;background:linear-gradient(135deg,rgba(59,130,246,.2),rgba(139,92,246,.2));color:var(--brand2);
+  }
+  .module h4{font-size:15px;margin-bottom:4px}
+  .module p{font-size:13px;color:var(--muted);line-height:1.6}
+  .module .tag-s{display:inline-block;font-size:11px;color:var(--cyan);margin-top:6px;font-weight:600}
+
+  /* ---------- 技术亮点 ---------- */
+  .tech{background:var(--bg2);border:1px solid var(--line);border-radius:20px;padding:40px}
+  .tech-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:8px}
+  .tech-item{display:flex;gap:14px;align-items:flex-start}
+  .tech-item .t-ic{font-size:22px;width:44px;height:44px;border-radius:11px;background:rgba(34,211,238,.12);color:var(--cyan);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .tech-item b{display:block;font-size:15px;margin-bottom:4px}
+  .tech-item p{font-size:13px;color:var(--muted)}
+
+  /* ---------- 下载区 ---------- */
+  .download{
+    background:linear-gradient(135deg,#13203a,#1a1635);border:1px solid var(--line);
+    border-radius:24px;padding:56px 40px;text-align:center;position:relative;overflow:hidden;
+  }
+  .download::before{content:"";position:absolute;inset:0;background:radial-gradient(600px 300px at 50% -50%,rgba(59,130,246,.25),transparent)}
+  .download>*{position:relative}
+  .download h2{font-size:30px;font-weight:800}
+  .download p{color:var(--muted);margin:14px auto 0;max-width:640px}
+  .dl-options{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:36px}
+  .dl-card{
+    background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:14px;padding:24px;
+    cursor:pointer;transition:.2s;text-align:left;color:var(--txt);display:block;
+  }
+  .dl-card:hover{border-color:var(--brand2);background:rgba(59,130,246,.08);color:var(--txt)}
+  .dl-card b{display:flex;align-items:center;gap:8px;font-size:15px;margin-bottom:8px;color:var(--txt)}
+  .dl-card .arrow{color:var(--brand2)}
+  .dl-card p{font-size:12px;color:var(--muted);line-height:1.6;margin:0}
+  .dl-note{margin-top:24px;font-size:12px;color:var(--dim)}
+
+  /* ---------- 页脚 ---------- */
+  footer{border-top:1px solid var(--line);padding:36px 0;color:var(--dim);font-size:13px;text-align:center}
+
+  /* ---------- 响应式 ---------- */
+  @media(max-width:900px){
+    .nav-links{display:none}
+    .hero h1{font-size:34px}
+    .grid-3,.grid-4,.tech-grid,.dl-options{grid-template-columns:1fr 1fr}
+    .modules{grid-template-columns:1fr}
+    .hero .stats{grid-template-columns:repeat(2,1fr)}
+  }
+  @media(max-width:560px){
+    .grid-3,.grid-4,.tech-grid,.dl-options{grid-template-columns:1fr}
+    .hero h1{font-size:28px}
+    .hero p.sub{font-size:15px}
+    section{padding:44px 0}
+  }
+</style>
+</head>
+<body>
+
+<!-- 顶栏 -->
+<header>
+  <div class="wrap nav">
+    <div class="brand">
+      <div class="logo">魔</div>
+      <div>魔程化解<small>MOFENG · 研发项目管理工具</small></div>
+    </div>
+    <nav class="nav-links">
+      <a href="#features">核心能力</a>
+      <a href="#modules">功能全景</a>
+      <a href="#tech">技术亮点</a>
+      <a href="#download">下载体验</a>
+    </nav>
+    <a class="nav-cta" href="#download">立即体验</a>
+  </div>
+</header>
+
+<!-- Hero -->
+<div class="hero wrap">
+  <div class="tag">✦ 审批驱动的阶段门禁 · 全流程留痕 · 15 年合规档案</div>
+  <h1>让研发管理<br><span class="grad">能算、能查、能留痕</span></h1>
+  <p class="sub">
+    一套面向研发项目全生命周期的管控工具。以「审批驱动的阶段门禁」为核心，
+    把「该谁、在哪个阶段、按什么次序、审核批准什么、留什么证据」做成结构化、可执行、可追溯、可审计的闭环。
+  </p>
+  <div class="cta-row">
+    <a class="btn btn-primary" href="#download">⬇ 下载体验</a>
+    <a class="btn btn-ghost" href="#features">查看功能说明 →</a>
+  </div>
+  <div class="stats">
+    <div class="stat"><b>19</b><span>一级功能模块</span></div>
+    <div class="stat"><b>96</b><span>业务功能页面</span></div>
+    <div class="stat"><b>60+</b><span>纯函数领域引擎</span></div>
+    <div class="stat"><b>1000+</b><span>自动化测试用例</span></div>
+  </div>
+</div>
+
+<!-- 核心能力 -->
+<section id="features" class="wrap">
+  <div class="sec-head">
+    <div class="kicker">为什么选择魔程化解</div>
+    <h2>六大核心能力</h2>
+    <p>不是任务看板，不是甘特图 —— 是研发流程的「合规级管控闭环」</p>
+  </div>
+  <div class="grid grid-3">
+    <div class="card">
+      <div class="ic">🔒</div>
+      <h3>审批驱动的阶段门禁</h3>
+      <p>48 个控制点逐点判定，每个申请、计划、任务、输出物都需审核批准，只有批准了才能实施下一阶段。</p>
+    </div>
+    <div class="card">
+      <div class="ic">🔗</div>
+      <h3>四段式审批链</h3>
+      <p>「发起 → 审核 → 会签（并行）→ 批准」贯穿每个阶段不断重复，决议条目化、缺责任人拒保存。</p>
+    </div>
+    <div class="card">
+      <div class="ic">🧾</div>
+      <h3>全留痕可追溯</h3>
+      <p>每次审核批准都存档，审计日志以 prev_hash 串成哈希链，防篡改、可复算，满足等保与审计要求。</p>
+    </div>
+    <div class="card">
+      <div class="ic">📊</div>
+      <h3>真算不造假</h3>
+      <p>分级判定查真值表逐行留痕，进度用 CPM 正逆推真算，覆盖率分子分母同源 —— 数字都能复算出来。</p>
+    </div>
+    <div class="card">
+      <div class="ic">⚙️</div>
+      <h3>配置驱动可扩展</h3>
+      <p>流程引擎、规则表、状态机全部配置化 + 版本快照，不发版即可生效，扩展点挂钩失败不阻断。</p>
+    </div>
+    <div class="card">
+      <div class="ic">🏢</div>
+      <h3>多租户强隔离</h3>
+      <p>租户数据强隔离 + 配额降级 + 集团视图按权限下钻，越权访问 fail-closed 拒绝。</p>
+    </div>
+  </div>
+</section>
+
+<!-- 功能全景 -->
+<section id="modules" class="wrap">
+  <div class="sec-head">
+    <div class="kicker">功能全景</div>
+    <h2>覆盖研发项目全生命周期</h2>
+    <p>从前期立项到交付归档，19 个一级模块贯穿「前期 → 执行 → 交付 → 合规」</p>
+  </div>
+  <div class="modules">
+    <div class="module"><div class="m-ic">🎯</div><div><h4>项目前期</h4><p>前期交流申请 → 技术方案 TR → 项目/产品报价 → 立项申请 → 立项评审。五项分级输入 + AI 四维度评估。</p><span class="tag-s">K1 K2</span></div></div>
+    <div class="module"><div class="m-ic">🚩</div><div><h4>项目执行</h4><p>项目任务书、主计划、OTS 认可、PPAP 提交、SOP —— 里程碑全程审批驱动。</p><span class="tag-s">K3 K9 K10 K12</span></div></div>
+    <div class="module"><div class="m-ic">📅</div><div><h4>项目计划与进度</h4><p>WBS 四类依赖 + CPM 关键路径、权重体系、里程碑、进度偏差 S 曲线、资源负荷、计划告警、界面计划。</p><span class="tag-s">K3 K15 K16</span></div></div>
+    <div class="module"><div class="m-ic">🧠</div><div><h4>研发过程</h4><p>需求追溯、分级判定、EBOM、ECR 变更、基线冻结、版本管理、闸门判定 —— 覆盖四线开发。</p><span class="tag-s">K4-K7</span></div></div>
+    <div class="module"><div class="m-ic">📦</div><div><h4>样件试制与 OTS</h4><p>工单下达、齐套检查、检验放行、OTS 认可 —— 先 BOM 后样件的硬约束闭环。</p><span class="tag-s">K8-K11</span></div></div>
+    <div class="module"><div class="m-ic">🚚</div><div><h4>交付管理</h4><p>交付物齐套、软硬件交付清单、SOP 爬坡 —— 交付物绑定控制点 C-19。</p><span class="tag-s">K12 K13</span></div></div>
+    <div class="module"><div class="m-ic">✅</div><div><h4>质量管理</h4><p>风险量化（三点估算/蒙特卡洛）、PDCA、判据库、经验教训、13 项质量检查。</p><span class="tag-s">K14 C-07</span></div></div>
+    <div class="module"><div class="m-ic">💰</div><div><h4>成本管理</h4><p>成本清单、NPV/IRR/回收期可复算、What-if 模拟、预算与汇率快照。</p><span class="tag-s">C-10~C-12</span></div></div>
+    <div class="module"><div class="m-ic">👥</div><div><h4>资源与成本</h4><p>资源池三层管理、供需分析、超分配三级识别、工时回填、EV 挣值分析、跨节点共享。</p><span class="tag-s">K17 C-22~C-24</span></div></div>
+    <div class="module"><div class="m-ic">💬</div><div><h4>门户与协同</h4><p>会议决议条目化、送审件、督办四态、消息中心、门户区块可配置。</p><span class="tag-s">C-19 C-21 C-29</span></div></div>
+    <div class="module"><div class="m-ic">📁</div><div><h4>文档中心</h4><p>受控文档四态状态机、检入检出、全文检索、版本链、文件外链 7 天失效、下载审计。</p><span class="tag-s">C-45</span></div></div>
+    <div class="module"><div class="m-ic">⚙️</div><div><h4>流程中心</h4><p>可配置流程引擎：节点/条件分支/会签或签/加签转签/超时升级，配置驱动。</p><span class="tag-s">全阶段</span></div></div>
+    <div class="module"><div class="m-ic">🔗</div><div><h4>供应链协同</h4><p>供应商管理、状态机流转、门户协同 —— 覆盖采购与 SQE 场景。</p><span class="tag-s">K8</span></div></div>
+    <div class="module"><div class="m-ic">📈</div><div><h4>报表与看板</h4><p>组合看板、项目看板、标准报表、订阅分发、数据质量三处同值校验。</p><span class="tag-s">C-47</span></div></div>
+    <div class="module"><div class="m-ic">✨</div><div><h4>AI 智能辅助</h4><p>立项评审 AI 四维评估、经验知识检索、智能辅助决策 —— 辅助不替代人工审批。</p><span class="tag-s">C-30</span></div></div>
+    <div class="module"><div class="m-ic">📇</div><div><h4>基础数据</h4><p>客户、产品、命名规范、字典、日历（企业/项目/资源三层继承）、多语言。</p><span class="tag-s">全阶段</span></div></div>
+    <div class="module"><div class="m-ic">🛡️</div><div><h4>系统管理</h4><p>角色矩阵（18 角色）、组织、审计日志、拒绝策略、运维监控、一致性探针。</p><span class="tag-s">C-29 C-36</span></div></div>
+    <div class="module"><div class="m-ic">🏠</div><div><h4>我的工作中心</h4><p>今日必办、我的任务/待办/消息、工时单 —— 四类事项聚合 + 逾期置顶。</p><span class="tag-s">全员</span></div></div>
+  </div>
+</section>
+
+<!-- 技术亮点 -->
+<section id="tech" class="wrap">
+  <div class="tech">
+    <div class="sec-head" style="margin-bottom:32px">
+      <div class="kicker">技术亮点</div>
+      <h2>为合规与可靠性而生的工程底座</h2>
+    </div>
+    <div class="tech-grid">
+      <div class="tech-item"><div class="t-ic">🧮</div><div><b>纯函数领域引擎</b><p>60+ 引擎零 DOM、零依赖，判定逻辑单一权威，可被测试直接调用复算。</p></div></div>
+      <div class="tech-item"><div class="t-ic">🔐</div><div><b>审计哈希链</b><p>prev_hash 串联的 append-only 日志，服务端权威保证连续性，防篡改可验证。</p></div></div>
+      <div class="tech-item"><div class="t-ic">🧩</div><div><b>四层架构</b><p>views → application → domain ← infra，领域层只依赖 JDK，ArchUnit 规则守护。</p></div></div>
+      <div class="tech-item"><div class="t-ic">🚫</div><div><b>fail-closed 设计</b><p>规则不通过即阻断而非放行，异常不泄漏堆栈，401/403/422 三态语义分离。</p></div></div>
+      <div class="tech-item"><div class="t-ic">🌐</div><div><b>前后端语义同构</b><p>TS 与 Java 引擎同构迁移，OpenAPI 3.1 契约 + 统一错误码表锁定联调。</p></div></div>
+      <div class="tech-item"><div class="t-ic">📱</div><div><b>响应式 + 多语言</b><p>移动端门户三档断点、弱网排队去重、中英文切换，权限判定与展示层硬隔离。</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 下载体验 -->
+<section id="download" class="wrap">
+  <div class="download">
+    <div class="kicker">开始体验</div>
+    <h2>立即下载体验</h2>
+    <p>魔程化解研发项目管理工具提供多种体验方式，从在线预览到本地部署，任你选择。</p>
+    <div class="dl-options">
+      <a class="dl-card" href="https://mofeng-rdp.app.workbuddy.host/?sharecode=BAAA6Z7AY3" target="_blank" rel="noopener">
+        <b>🌐 在线体验 <span class="arrow">→</span></b>
+        <p>无需安装，浏览器直接访问本功能说明页（在线版）。</p>
+      </a>
+      <a class="dl-card" href="魔程化解研发项目管理工具-源码包.zip" download>
+        <b>📦 源码包下载 <span class="arrow">→</span></b>
+        <p>完整源码打包（4.4MB，已排除依赖），解压后 npm install 即可本地运行。</p>
+      </a>
+      <div class="dl-card" onclick="alert('请运行：docker compose up -d --build，一键编排前端 nginx + 后端 Node。')">
+        <b>🐳 Docker 部署 <span class="arrow">→</span></b>
+        <p>容器化一键编排，前端 nginx + 后端 Node，数据卷持久化。</p>
+      </div>
+    </div>
+    <p class="dl-note">* 源码包为本地交付物，随本网页同目录提供；完整部署见包内 docs/DEPLOYMENT.md。如需演示账号请联系产品团队。</p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">魔程化解 · 研发项目管理工具 MOFENG-RDP · 功能说明页 · © 2026</div>
+</footer>
+
+</body>
+</html>

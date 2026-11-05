@@ -316,7 +316,7 @@ public class StageApplicationService {
                 d.getId(), d.getDefId(), d.getDefCode(), d.getTitle(), d.getSubmitter(),
                 d.getForm(), d.getCurrentNodeId(), d.getStatus(), d.getPassedNodeIds(),
                 null, d.getNodeEnteredAt(), d.isEscalated(), d.getEscalatedToRole(),
-                d.getAddedSigners(), d.getCreatedAt(), d.getFinishedAt()));
+                d.getAddedSigners(), List.of(), d.getCreatedAt(), d.getFinishedAt()));
         }
         return out;
     }

@@ -11,6 +11,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -198,5 +199,80 @@ class FlowEngineTest {
         FlowEngine.FlowDefinition def = ecrFlowDef();
         assertEquals(List.of("n2"), FlowEngine.staticNext(def, "n1"));
         assertTrue(FlowEngine.staticNext(def, "n6").isEmpty());
+    }
+
+    // ---------------------------------------------------------------------------
+    // 发起人自定义审批节点（FUN-017 扩展）+ 加签纳入会签范围
+    // ---------------------------------------------------------------------------
+
+    @Test
+    void 加签角色纳入会签范围全通过才过() {
+        FlowEngine.FlowDefinition def = ecrFlowDef();
+        FlowEngine.FlowInstance inst = start(def, "Fca", null);
+        inst = inst.copy("n4", null, null, null, null, inst.escalated, null, null, null);
+        // 会签 n4 原有 2 角色；加签「工艺工程师」后，3 角色须全通过
+        inst = FlowEngine.addSigner(inst, def, "工艺工程师", T0);
+        FlowEngine.SignResult r1 = FlowEngine.signNode(inst, def, "结构工程师", "王工", "结构工程师", T0);
+        assertFalse(r1.nodePassed);
+        FlowEngine.SignResult r2 = FlowEngine.signNode(r1.inst, def, "硬件工程师", "李工", "硬件工程师", T0);
+        assertFalse(r2.nodePassed); // 加签角色尚未签署，仍不通过
+        FlowEngine.SignResult r3 = FlowEngine.signNode(r2.inst, def, "工艺工程师", "赵工", "工艺工程师", T0);
+        assertTrue(r3.nodePassed);
+        assertTrue(r3.allPassed);
+    }
+
+    @Test
+    void applyCustomApprovers插入到最后一个批准节点之前() {
+        FlowEngine.FlowDefinition def = ecrFlowDef();
+        List<FlowEngine.CustomApproverAddition> adds = List.of(
+                new FlowEngine.CustomApproverAddition("法务审核", "approve", "法务部", List.of(), 48),
+                new FlowEngine.CustomApproverAddition("财务会签", "sign", null, List.of("财务部", "审计部"), 48));
+        FlowEngine.FlowDefinition merged = FlowEngine.applyCustomApprovers(def, adds);
+        // 固定链最后一个 approve 为 n5（审批/研发副总），自定义节点应插到 n5 之前
+        int n5 = -1, cxFirst = -1, n4 = -1;
+        for (int i = 0; i < merged.nodes.size(); i++) {
+            String id = merged.nodes.get(i).id;
+            if ("n5".equals(id)) n5 = i;
+            if ("n4".equals(id)) n4 = i;
+            if ("cxN-0".equals(id)) cxFirst = i;
+        }
+        assertTrue(cxFirst >= 0 && n5 >= 0);
+        assertTrue(cxFirst > n4);       // 会签 n4 之后
+        assertTrue(cxFirst < n5);       // 批准 n5 之前
+        // 会签节点 signMode 固定 all
+        FlowEngine.FlowNode signNode = FlowEngine.getNode(merged, "cxN-1");
+        assertEquals("sign", signNode.type);
+        assertEquals("all", signNode.signMode);
+    }
+
+    @Test
+    void applyCustomApprovers空或非法输入原样返回() {
+        FlowEngine.FlowDefinition def = ecrFlowDef();
+        assertSame(def, FlowEngine.applyCustomApprovers(def, List.of()));
+        assertSame(def, FlowEngine.applyCustomApprovers(def, null));
+        // 非法：会签无角色、审核无审批角色
+        List<FlowEngine.CustomApproverAddition> bad = List.of(
+                new FlowEngine.CustomApproverAddition("空会签", "sign", null, List.of(), 48),
+                new FlowEngine.CustomApproverAddition("空审核", "approve", "", List.of(), 48));
+        assertSame(def, FlowEngine.applyCustomApprovers(def, bad));
+        // 原定义不可变
+        assertEquals(6, def.nodes.size());
+    }
+
+    @Test
+    void startFlow留痕自定义节点() {
+        FlowEngine.FlowDefinition def = ecrFlowDef();
+        List<FlowEngine.CustomApproverAddition> adds = List.of(
+                new FlowEngine.CustomApproverAddition("法务审核", "approve", "法务部", List.of(), 48));
+        FlowEngine.FlowInstance inst = FlowEngine.startFlow(def, "ECR-1", "周立群", null, "Fcu", T0, adds);
+        assertEquals(1, inst.customNodes.size());
+        assertEquals("法务审核", inst.customNodes.get(0).name);
+    }
+
+    @Test
+    void startFlow无自定义节点时留痕为空() {
+        FlowEngine.FlowDefinition def = ecrFlowDef();
+        FlowEngine.FlowInstance inst = FlowEngine.startFlow(def, "ECR-1", "周立群", null, "Fc2", T0);
+        assertTrue(inst.customNodes.isEmpty());
     }
 }

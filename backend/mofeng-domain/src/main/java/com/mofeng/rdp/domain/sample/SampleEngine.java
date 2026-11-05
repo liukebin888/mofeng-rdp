@@ -57,40 +57,36 @@ public final class SampleEngine {
     }
 
     // ------------------------------------------------------------------
-    // HW-002 样件状态机
+    // HW-002 样件状态机（ARC-005：五元组配置表驱动，与前端 SAMPLE_TRANSITIONS 同构）
     // ------------------------------------------------------------------
 
+    /** 状态迁移配置表：from -> (event -> to)。非法迁移在表中无记录，统一拒绝。 */
+    private static final Map<String, Map<String, String>> SAMPLE_TRANSITIONS = buildSampleTransitions();
+
+    private static Map<String, Map<String, String>> buildSampleTransitions() {
+        Map<String, Map<String, String>> t = new HashMap<>();
+        put(t, "草稿", "submit", "待下达");
+        put(t, "待下达", "start", "试制中");
+        put(t, "待下达", "close", "已关闭");
+        put(t, "试制中", "finish", "检验中");
+        put(t, "试制中", "rework", "试制中");
+        put(t, "检验中", "inspectPass", "已交付");
+        put(t, "检验中", "rework", "试制中");
+        put(t, "检验中", "reject", "已拒收");
+        put(t, "已交付", "close", "已关闭");
+        put(t, "已拒收", "rework", "试制中");
+        put(t, "已拒收", "close", "已关闭");
+        return t;
+    }
+
+    private static void put(Map<String, Map<String, String>> t, String from, String event, String to) {
+        t.computeIfAbsent(from, k -> new HashMap<>()).put(event, to);
+    }
+
+    /** 状态迁移（HW-002），五元组查表执行器；非法迁移返回 reason。 */
     public static Transition transitionSample(String status, String event) {
-        String next = null;
-        switch (status) {
-            case "草稿":
-                if ("submit".equals(event)) next = "待下达";
-                break;
-            case "待下达":
-                if ("start".equals(event)) next = "试制中";
-                else if ("close".equals(event)) next = "已关闭";
-                break;
-            case "试制中":
-                if ("finish".equals(event)) next = "检验中";
-                else if ("rework".equals(event)) next = "试制中";
-                break;
-            case "检验中":
-                if ("inspectPass".equals(event)) next = "已交付";
-                else if ("rework".equals(event)) next = "试制中";
-                else if ("reject".equals(event)) next = "已拒收";
-                break;
-            case "已交付":
-                if ("close".equals(event)) next = "已关闭";
-                break;
-            case "已拒收":
-                if ("rework".equals(event)) next = "试制中";
-                else if ("close".equals(event)) next = "已关闭";
-                break;
-            case "已关闭":
-                break;
-            default:
-                break;
-        }
+        Map<String, String> row = SAMPLE_TRANSITIONS.get(status);
+        String next = row == null ? null : row.get(event);
         if (next == null) {
             return new Transition(false, null, "状态「" + status + "」不接受事件「" + event + "」");
         }

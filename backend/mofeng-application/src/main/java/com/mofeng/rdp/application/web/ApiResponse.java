@@ -12,6 +12,8 @@ import java.util.Objects;
  * <ul>
  *   <li>{@code OK} —— 成功；</li>
  *   <li>{@code BAD_REQUEST} —— 入参缺失/非法（HTTP 400）；</li>
+ *   <li>{@code UNAUTHORIZED} —— 未认证（HTTP 401）；</li>
+ *   <li>{@code FORBIDDEN} —— 已认证但权限不足（HTTP 403，与 422 规则阻断区分）；</li>
  *   <li>{@code BLOCKED} —— 领域规则阻断（HTTP 422，fail-closed）；</li>
  *   <li>{@code INTERNAL_ERROR} —— 未预期内部错误（HTTP 500）。</li>
  * </ul>
@@ -23,6 +25,7 @@ public final class ApiResponse<T> {
     public static final String OK = "OK";
     public static final String BAD_REQUEST = "BAD_REQUEST";
     public static final String UNAUTHORIZED = "UNAUTHORIZED";
+    public static final String FORBIDDEN = "FORBIDDEN";
     public static final String BLOCKED = "BLOCKED";
     public static final String INTERNAL_ERROR = "INTERNAL_ERROR";
 
@@ -50,6 +53,10 @@ public final class ApiResponse<T> {
 
     public static <T> ApiResponse<T> unauthorized(String message) {
         return new ApiResponse<>(UNAUTHORIZED, message, null);
+    }
+
+    public static <T> ApiResponse<T> forbidden(String message) {
+        return new ApiResponse<>(FORBIDDEN, message, null);
     }
 
     public static <T> ApiResponse<T> blocked(String message, T data) {

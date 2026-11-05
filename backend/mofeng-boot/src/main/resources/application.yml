@@ -70,6 +70,12 @@ mofeng:
   kafka:
     event-topic: mofeng-events
     task-topic: mofeng-tasks
+  # —— 四级计划告警定时巡检（PLN-ALERT）——
+  plan-alert:
+    # 是否启用定时巡检（每天按 cron 遍历有落表计划的项目做四段式告警扫描）
+    schedule-enabled: true
+    # cron 表达式（默认每天 02:00）
+    cron: "0 0 2 * * ?"
 
 # —— 日志 ——
 logging:

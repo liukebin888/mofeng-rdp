@@ -67,11 +67,11 @@ public class GlobalExceptionHandler {
             .body(ApiResponse.unauthorized(ex.getMessage() == null ? "未认证" : ex.getMessage()));
     }
 
-    /** 权限不足 → 403 FORBIDDEN（与领域规则阻断 422 区分）。 */
+    /** 权限不足 → 403 FORBIDDEN（与领域规则阻断 422 区分，code 层亦分离为 FORBIDDEN）。 */
     @ExceptionHandler(PermissionDeniedException.class)
     public ResponseEntity<ApiResponse<Object>> handlePermissionDenied(PermissionDeniedException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-            .body(ApiResponse.blocked(ex.getMessage() == null ? "权限不足" : ex.getMessage(), null));
+            .body(ApiResponse.forbidden(ex.getMessage() == null ? "权限不足" : ex.getMessage()));
     }
 
     /** 领域规则阻断（fail-closed）→ 422。 */

@@ -113,9 +113,11 @@ function wfSubmit() {
 
 | 工作流 | 模板 | 状态 |
 |--------|------|------|
-| 立项申请 | DEF-PRE-3 | ✅ 范例已接入（`views/presale/ApplyView.vue`） |
-| 前期交申请 | DEF-PRE-1 | ⏸ 待接入 |
-| 项目/产品报价 | DEF-PRE-2 | ⏸ 待接入 |
+| 立项申请 | DEF-PRE-3 | ✅ 已接入（`views/presale/ApplyView.vue`） |
+| 前期交流申请 | DEF-PRE-1 | ✅ 已接入（`views/presale/PresaleApplyView.vue`） |
+| 项目/产品报价 | DEF-PRE-2 | ✅ 已接入（`views/presale/QuoteApplyView.vue`） |
+| 技术方案（TR） | DEF-PRE-5 | ✅ 已接入（`views/presale/SchemeView.vue`） |
+| 立项评审 | DEF-PRE-4 | ✅ 已接入（自动触发，`views/presale/ProjectReviewView.vue`） |
 | ECR 审批 | DEF-ECR | ⏸ 待接入 |
 | Gate 放行 | DEF-GATE | ⏸ 待接入 |
 | 豁免申请 | DEF-EXEMPT | ⏸ 待接入 |

@@ -26,38 +26,35 @@ public final class SupplierEngine {
     public static final List<String> SUPPLIER_EVENTS = List.of(
         "提交准入", "准入通过", "准入驳回", "提交定点", "定点确认", "定点驳回", "暂停", "恢复", "淘汰");
 
-    /** 状态迁移（SUP-002）：暂停可恢复，淘汰不可逆。 */
+    /** 状态迁移配置表：from -> (event -> to)，与前端 SUPPLIER_TRANSITIONS 同构（ARC-005）。 */
+    private static final java.util.Map<String, java.util.Map<String, String>> SUPPLIER_TRANSITIONS =
+        buildSupplierTransitions();
+
+    private static java.util.Map<String, java.util.Map<String, String>> buildSupplierTransitions() {
+        java.util.Map<String, java.util.Map<String, String>> t = new java.util.HashMap<>();
+        put(t, "潜在", "提交准入", "准入评审中");
+        put(t, "准入评审中", "准入通过", "准入通过");
+        put(t, "准入评审中", "准入驳回", "潜在");
+        put(t, "准入通过", "提交定点", "定点评审中");
+        put(t, "准入通过", "淘汰", "淘汰");
+        put(t, "定点评审中", "定点确认", "定点确认");
+        put(t, "定点评审中", "定点驳回", "准入通过");
+        put(t, "定点确认", "暂停", "暂停");
+        put(t, "定点确认", "淘汰", "淘汰");
+        put(t, "暂停", "恢复", "定点确认");
+        put(t, "暂停", "淘汰", "淘汰");
+        return t;
+    }
+
+    private static void put(java.util.Map<String, java.util.Map<String, String>> t,
+                            String from, String event, String to) {
+        t.computeIfAbsent(from, k -> new java.util.HashMap<>()).put(event, to);
+    }
+
+    /** 状态迁移（SUP-002），五元组查表执行器；暂停可恢复，淘汰不可逆（无反向记录）。 */
     public static Transition transitionSupplier(String status, String event) {
-        String next = null;
-        switch (status) {
-            case "潜在":
-                if ("提交准入".equals(event)) next = "准入评审中";
-                break;
-            case "准入评审中":
-                if ("准入通过".equals(event)) next = "准入通过";
-                else if ("准入驳回".equals(event)) next = "潜在";
-                break;
-            case "准入通过":
-                if ("提交定点".equals(event)) next = "定点评审中";
-                else if ("淘汰".equals(event)) next = "淘汰";
-                break;
-            case "定点评审中":
-                if ("定点确认".equals(event)) next = "定点确认";
-                else if ("定点驳回".equals(event)) next = "准入通过";
-                break;
-            case "定点确认":
-                if ("暂停".equals(event)) next = "暂停";
-                else if ("淘汰".equals(event)) next = "淘汰";
-                break;
-            case "暂停":
-                if ("恢复".equals(event)) next = "定点确认";
-                else if ("淘汰".equals(event)) next = "淘汰";
-                break;
-            case "淘汰":
-                break; // 淘汰不可逆
-            default:
-                break;
-        }
+        java.util.Map<String, String> row = SUPPLIER_TRANSITIONS.get(status);
+        String next = row == null ? null : row.get(event);
         if (next == null) {
             return new Transition(false, null, "状态「" + status + "」不接受事件「" + event + "」");
         }
