@@ -39,7 +39,6 @@
       <el-empty description="项目主计划是适用于任何项目的通用计划模板。点击「新增主计划」用模板引导编制：里程碑 CG1–CG7 与结构/硬件/软件/测试/过程五类分计划时间轴，编制完成后提交审批。" :image-size="90" />
       <div class="row center">
         <el-button type="primary" size="small" @click="wfNew">新增主计划</el-button>
-        <el-button size="small" @click="$router.push('/project/master-plan')">进入编辑模式</el-button>
       </div>
     </div>
 
