@@ -506,6 +506,195 @@ export function computeRag(today: Date = new Date()): RagResult {
   return { cls: 'green', label: '绿 · 总体受控', red, amber, green }
 }
 
+/**
+ * ============================================================================
+ * 真数据驱动映射层（把四级计划 PlanNode[] 投影为 RMP 集成视图所需结构）
+ *
+ * 语义（MPS-001 单一权威）：
+ *   - 主计划泳道 ← L1（客户计划节点，PPAP/SOP/量产爬坡等里程碑）+ L2/L3 控制节点
+ *   - 5 个分计划泳道 ← L4 前五类专项（结构/硬件/软件/测试/过程），按 line 字段识别
+ *   - 时间轴节点状态 ← actualDate（已达成）/ 到期未达成（逾期）/ 进行中 / 未开始
+ *   - 里程碑矩阵窗口 ← L1 里程碑节点作为窗口边界
+ *
+ * 红线：纯函数、零 DOM、零 vue/pinia；判定逻辑单一权威，禁止调用方自造状态判定。
+ * ============================================================================
+ */
+
+import type { PlanNode, PlanLevel } from './fourLevelPlan'
+import { L4_SPECIALTIES } from './fourLevelPlan'
+
+/** L4 专项 line → 分计划 key 映射（前五类，与 RMP SUB_ORDER 对应） */
+export const LINE_TO_SUBPLAN: Record<string, SubPlanKey> = {
+  结构线: 'st',
+  硬件线: 'hw',
+  软件线: 'sw',
+  测试线: 'tv',
+  '过程/体系线': 'pr'
+}
+
+/** 分计划 key → L4 专项 line 反向映射（供按 line 归集节点） */
+export const SUBPLAN_TO_LINE: Record<SubPlanKey, string> = {
+  st: '结构线',
+  hw: '硬件线',
+  sw: '软件线',
+  tv: '测试线',
+  pr: '过程/体系线'
+}
+
+/** 分计划 key → L4 专项 code 前缀（templatePrefix，单一权威取自 L4_SPECIALTIES） */
+export const SUBPLAN_PREFIX: Record<SubPlanKey, string> = {
+  st: 'PLT-STR-',
+  hw: 'PLT-HDW-',
+  sw: 'PLT-SW-',
+  tv: 'PLT-TST-',
+  pr: 'PLT-PRC-'
+}
+
+/** 分计划 key → 名称关键词（用于无 code 前缀时的名称兜底匹配） */
+export const SUBPLAN_KEYWORDS: Record<SubPlanKey, string[]> = {
+  st: ['结构'],
+  hw: ['硬件'],
+  sw: ['软件'],
+  tv: ['测试', '试验', '验证'],
+  pr: ['过程', '工艺', '量产', '体系', 'PFMEA', '控制计划']
+}
+
+/**
+ * 识别某 L4 节点所属分计划（单一权威，MPS-001）。
+ * 优先级：code 前缀 > 名称关键词 > line 字段（若未来落表补充）> 未识别（返回 null）。
+ */
+export function resolveSubPlanKey(node: PlanNode): SubPlanKey | null {
+  const code = (node.code || '').toUpperCase()
+  for (const k of SUB_ORDER) {
+    if (code.startsWith(SUBPLAN_PREFIX[k].toUpperCase())) return k
+  }
+  const name = node.name || ''
+  for (const k of SUB_ORDER) {
+    if (SUBPLAN_KEYWORDS[k].some((kw) => name.includes(kw))) return k
+  }
+  // 兼容未来 line 字段
+  const line = (node as PlanNode & { line?: string }).line
+  if (line && LINE_TO_SUBPLAN[line]) return LINE_TO_SUBPLAN[line]
+  return null
+}
+
+/** 由节点实际达成/到期状态推导时间轴状态（单一权威，禁止调用方自造） */
+export function nodeTimelineStatus(node: PlanNode, today: Date = new Date()): TimelineStatus {
+  if (node.actualDate) return 'done'
+  const due = node.baselineDate || node.date
+  if (!due) return 'todo'
+  const d = new Date(due)
+  if (Number.isNaN(d.getTime())) return 'todo'
+  if (d < today) return 'overdue'
+  return 'todo'
+}
+
+/** 把一条 PlanNode 转为时间轴节点 */
+export function toTimelineNode(node: PlanNode): PlanTimelineNode {
+  return {
+    name: node.name,
+    date: node.baselineDate || node.date,
+    owner: node.ownerName || node.ownerRole || '—',
+    status: nodeTimelineStatus(node),
+    desc: node.code ? `编码 ${node.code}${node.milestone ? ' · 里程碑' : ''}` : undefined
+  }
+}
+
+/** 主计划泳道节点：L1/L2/L3（客户/公司/项目控制节点），L1 里程碑为窗口边界 */
+export function masterTimelineNodes(nodes: PlanNode[]): PlanTimelineNode[] {
+  return nodes
+    .filter((n) => n.level === 'L1' || n.level === 'L2' || n.level === 'L3')
+    .sort((a, b) => (a.baselineDate || a.date).localeCompare(b.baselineDate || b.date))
+    .map(toTimelineNode)
+}
+
+/** 某分计划泳道节点：L4 且按 code 前缀/名称关键词识别归属该分计划 */
+export function subPlanTimelineNodes(nodes: PlanNode[], key: SubPlanKey): PlanTimelineNode[] {
+  return nodes
+    .filter((n) => n.level === 'L4' && resolveSubPlanKey(n) === key)
+    .sort((a, b) => (a.baselineDate || a.date).localeCompare(b.baselineDate || b.date))
+    .map(toTimelineNode)
+}
+
+/** 里程碑窗口边界节点（L1 客户里程碑，按日期升序） */
+export function milestoneBoundaryNodes(nodes: PlanNode[]): PlanNode[] {
+  return nodes
+    .filter((n) => n.level === 'L1')
+    .sort((a, b) => (a.baselineDate || a.date).localeCompare(b.baselineDate || b.date))
+}
+
+/**
+ * 真数据驱动的 KPI 汇总（MPS-001）。
+ * 计划总数 = 1 主 + 5 分；关键里程碑 = L1 节点数；已完成 = L1 已达成数。
+ */
+export function masterPlanKpisFrom(nodes: PlanNode[], today: Date = new Date()) {
+  const l1 = milestoneBoundaryNodes(nodes)
+  const doneN = l1.filter((n) => nodeTimelineStatus(n, today) === 'done').length
+  const syncedN = SUB_ORDER.filter((k) => subPlanTimelineNodes(nodes, k).length > 0).length
+  return {
+    total: 6,
+    milestone: l1.length,
+    done: doneN,
+    synced: syncedN,
+    risk: l1.filter((n) => nodeTimelineStatus(n, today) === 'overdue').length
+  }
+}
+
+/**
+ * 真数据驱动的里程碑 × 分计划支撑矩阵。
+ * 窗口 = 上一 L1 里程碑 → 本 L1 里程碑；归集各分计划 L4 活动。
+ * 无 L1 里程碑时返回空数组（视图据此降级展示提示）。
+ */
+export function milestoneMatrixFrom(nodes: PlanNode[]): MilestoneWindow[] {
+  const l1 = milestoneBoundaryNodes(nodes)
+  if (!l1.length) return []
+  return l1.map((m, i) => {
+    const isLast = i === l1.length - 1
+    const lo = i > 0 ? (l1[i - 1].baselineDate || l1[i - 1].date) : (l1[i].baselineDate || l1[i].date).slice(0, 4) + '-01-01'
+    const up = isLast ? '2099-12-31' : (m.baselineDate || m.date)
+    const milestone: PlanTimelineNode = toTimelineNode(m)
+    const subs = SUB_ORDER.map((k) => {
+      const acts = nodes
+        .filter((n) => n.level === 'L4' && resolveSubPlanKey(n) === k)
+        .filter((nn) => (nn.baselineDate || nn.date) > lo && (nn.baselineDate || nn.date) <= up)
+        .map((nn) => ({ node: toTimelineNode(nn) }))
+      if (!acts.length) return null
+      const p = DEV_PLANS.find((x) => x.key === k)!
+      return { plan: p, acts }
+    }).filter((x): x is NonNullable<typeof x> => !!x)
+    return { milestone, lo, up, isLast, subs }
+  })
+}
+
+/** 真数据驱动的统一时间轴：主计划 + 各分计划（仅含有节点的泳道） */
+export function unifiedTimelinePlansFrom(nodes: PlanNode[]): Array<{ key: SubPlanKey | 'mp'; name: string; hue: string; timeline: PlanTimelineNode[] }> {
+  const master = masterTimelineNodes(nodes)
+  const lanes: Array<{ key: SubPlanKey | 'mp'; name: string; hue: string; timeline: PlanTimelineNode[] }> = []
+  if (master.length) lanes.push({ key: 'mp', name: MASTER_PLAN.name, hue: MASTER_PLAN.hue, timeline: master })
+  for (const k of SUB_ORDER) {
+    const tl = subPlanTimelineNodes(nodes, k)
+    if (tl.length) {
+      const p = DEV_PLANS.find((x) => x.key === k)!
+      lanes.push({ key: k, name: p.name, hue: p.hue, timeline: tl })
+    }
+  }
+  return lanes
+}
+
+/**
+ * 真数据驱动的 RAG 健康度（MPS-001）。
+ * 存在逾期未达成 L1 → 红；无 L1 数据 → 灰（未录入）；否则绿/黄。
+ */
+export function computeRagFrom(nodes: PlanNode[], today: Date = new Date()): RagResult {
+  const l1 = milestoneBoundaryNodes(nodes)
+  if (!l1.length) return { cls: 'green', label: '未录入里程碑', red: 0, amber: 0, green: 0 }
+  const overdue = l1.filter((n) => nodeTimelineStatus(n, today) === 'overdue').length
+  const done = l1.filter((n) => nodeTimelineStatus(n, today) === 'done').length
+  if (overdue > 0) return { cls: 'red', label: `红 · 存在延期里程碑 ${overdue}`, red: overdue, amber: 0, green: done }
+  if (done === l1.length) return { cls: 'green', label: '绿 · 全部达成', red: 0, amber: 0, green: done }
+  return { cls: 'amber', label: `黄 · 进行中 ${l1.length - done}`, red: 0, amber: l1.length - done, green: done }
+}
+
 /** 产品等级工时估算汇总（复刻 RMP renderMpGrades 的合计逻辑） */
 export interface GradeEstimate {
   grade: number

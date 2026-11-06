@@ -16,8 +16,23 @@ import {
   planName,
   planHue,
   outputStateOf,
-  TL_ST
+  TL_ST,
+  nodeTimelineStatus,
+  toTimelineNode,
+  masterTimelineNodes,
+  subPlanTimelineNodes,
+  milestoneBoundaryNodes,
+  masterPlanKpisFrom,
+  milestoneMatrixFrom,
+  unifiedTimelinePlansFrom,
+  computeRagFrom,
+  resolveSubPlanKey,
+  LINE_TO_SUBPLAN,
+  SUBPLAN_TO_LINE,
+  SUBPLAN_PREFIX,
+  SUBPLAN_KEYWORDS
 } from '@/domain/projectMasterPlan'
+import type { PlanNode } from '@/domain/fourLevelPlan'
 
 describe('projectMasterPlan 主计划数据（忠实复刻 RMP pgplan）', () => {
   it('主计划含 7 个 CG 里程碑（CG1–CG7）', () => {
@@ -158,5 +173,122 @@ describe('统一时间轴', () => {
     expect(planName('mp')).toBe('项目主计划')
     expect(planName('sw')).toBe('软件开发计划')
     expect(planHue('mp')).toBe('#dc2626')
+  })
+})
+
+describe('真数据驱动映射层（MPS-001：四级计划 PlanNode[] → RMP 集成视图）', () => {
+  /** 构造一组四级计划节点：L1 里程碑 + L4 前五类专项（用 code 前缀区分分计划） */
+  function sampleNodes(): PlanNode[] {
+    const nodes: PlanNode[] = []
+    // L1 客户里程碑
+    nodes.push({ id: 'L1-1', level: 'L1', code: 'CG1', name: '项目启动', date: '2026-01-10', milestone: true, actualDate: '2026-01-10' })
+    nodes.push({ id: 'L1-2', level: 'L1', code: 'CG7', name: 'SOP 量产', date: '2026-12-30', milestone: true })
+    // L4 五类专项（code 前缀 PLT-STR-/PLT-HDW-/PLT-SW-/PLT-TST-/PLT-PRC-）
+    const specs: Array<[string, string, string]> = [
+      ['PLT-STR-001', '结构线', '结构详细设计'],
+      ['PLT-HDW-001', '硬件线', '硬件 PCB 设计'],
+      ['PLT-SW-001', '软件线', '软件架构设计'],
+      ['PLT-TST-001', '测试线', '测试方案设计'],
+      ['PLT-PRC-001', '过程/体系线', 'PFMEA 编制']
+    ]
+    specs.forEach(([code, , name]) => {
+      nodes.push({ id: code, level: 'L4', code, name, date: '2026-06-15' })
+    })
+    return nodes
+  }
+
+  it('LINE_TO_SUBPLAN 映射：结构/硬件/软件/测试/过程线 → st/hw/sw/tv/pr', () => {
+    expect(LINE_TO_SUBPLAN['结构线']).toBe('st')
+    expect(LINE_TO_SUBPLAN['硬件线']).toBe('hw')
+    expect(LINE_TO_SUBPLAN['软件线']).toBe('sw')
+    expect(LINE_TO_SUBPLAN['测试线']).toBe('tv')
+    expect(LINE_TO_SUBPLAN['过程/体系线']).toBe('pr')
+    expect(SUBPLAN_TO_LINE.st).toBe('结构线')
+  })
+
+  it('SUBPLAN_PREFIX 与 L4_SPECIALTIES templatePrefix 一致', () => {
+    expect(SUBPLAN_PREFIX.st).toBe('PLT-STR-')
+    expect(SUBPLAN_PREFIX.hw).toBe('PLT-HDW-')
+    expect(SUBPLAN_PREFIX.sw).toBe('PLT-SW-')
+    expect(SUBPLAN_PREFIX.tv).toBe('PLT-TST-')
+    expect(SUBPLAN_PREFIX.pr).toBe('PLT-PRC-')
+  })
+
+  it('resolveSubPlanKey：code 前缀优先，名称关键词兜底，未识别返回 null', () => {
+    expect(resolveSubPlanKey({ id: '1', level: 'L4', code: 'PLT-HDW-9', name: 'x', date: '2026-01-01' })).toBe('hw')
+    expect(resolveSubPlanKey({ id: '2', level: 'L4', code: 'ANY', name: '软件单元测试', date: '2026-01-01' })).toBe('sw')
+    expect(resolveSubPlanKey({ id: '3', level: 'L4', code: 'X', name: '结构CAE', date: '2026-01-01' })).toBe('st')
+    expect(resolveSubPlanKey({ id: '4', level: 'L4', code: 'Y', name: '不明活动', date: '2026-01-01' })).toBeNull()
+  })
+
+  it('nodeTimelineStatus：有 actualDate→done；到期未达成→overdue；未到期→todo', () => {
+    const done = { id: 'a', level: 'L1', code: '1', name: 'x', date: '2026-01-01', actualDate: '2026-01-01' } as PlanNode
+    const overdue = { id: 'b', level: 'L1', code: '2', name: 'y', date: '2025-01-01' } as PlanNode
+    const todo = { id: 'c', level: 'L1', code: '3', name: 'z', date: '2030-01-01' } as PlanNode
+    expect(nodeTimelineStatus(done, new Date('2026-06-01'))).toBe('done')
+    expect(nodeTimelineStatus(overdue, new Date('2026-06-01'))).toBe('overdue')
+    expect(nodeTimelineStatus(todo, new Date('2026-06-01'))).toBe('todo')
+  })
+
+  it('masterTimelineNodes：仅含 L1/L2/L3，按日期升序', () => {
+    const nodes = sampleNodes()
+    const tl = masterTimelineNodes(nodes)
+    expect(tl.length).toBe(2) // 两个 L1
+    expect(tl[0].name).toBe('项目启动')
+    expect(tl[1].name).toBe('SOP 量产')
+  })
+
+  it('subPlanTimelineNodes：按 code 前缀归集 L4 节点到对应分计划', () => {
+    const nodes = sampleNodes()
+    expect(subPlanTimelineNodes(nodes, 'st')).toHaveLength(1)
+    expect(subPlanTimelineNodes(nodes, 'hw')[0].name).toBe('硬件 PCB 设计')
+    expect(subPlanTimelineNodes(nodes, 'pr')[0].name).toBe('PFMEA 编制')
+  })
+
+  it('milestoneBoundaryNodes：仅 L1，按日期升序', () => {
+    const nodes = sampleNodes()
+    const l1 = milestoneBoundaryNodes(nodes)
+    expect(l1.map((n) => n.code)).toEqual(['CG1', 'CG7'])
+  })
+
+  it('masterPlanKpisFrom：里程碑=L1 数，已完成=L1 达成数，风险=逾期 L1 数', () => {
+    const k = masterPlanKpisFrom(sampleNodes(), new Date('2026-06-01'))
+    expect(k.total).toBe(6)
+    expect(k.milestone).toBe(2)
+    expect(k.done).toBe(1) // CG1 已达成
+    expect(k.risk).toBe(0)
+  })
+
+  it('milestoneMatrixFrom：窗口 = L1 里程碑边界，归集分计划活动', () => {
+    const m = milestoneMatrixFrom(sampleNodes())
+    expect(m).toHaveLength(2)
+    expect(m[0].milestone.name).toBe('项目启动')
+    expect(m[1].isLast).toBe(true)
+    expect(m[1].up).toBe('2099-12-31')
+    // CG1 窗口 (2026-01-01, 2026-01-10] 内无 6 月活动；CG7 窗口收 6 月活动
+    const actCount = m.reduce((s, w) => s + w.subs.reduce((a, x) => a + x.acts.length, 0), 0)
+    expect(actCount).toBe(5)
+  })
+
+  it('unifiedTimelinePlansFrom：主计划 + 有节点的分计划泳道', () => {
+    const lanes = unifiedTimelinePlansFrom(sampleNodes())
+    expect(lanes[0].key).toBe('mp')
+    expect(lanes[0].timeline).toHaveLength(2)
+    expect(lanes.slice(1).map((l) => l.key)).toEqual(SUB_ORDER) // 5 个分计划均有节点
+  })
+
+  it('computeRagFrom：无 L1→未录入；有逾期 L1→红；全达成→绿', () => {
+    expect(computeRagFrom([], new Date('2026-06-01')).label).toBe('未录入里程碑')
+    const nodes = sampleNodes()
+    expect(computeRagFrom(nodes, new Date('2027-01-01')).cls).toBe('red') // CG7 已逾期
+    expect(computeRagFrom(nodes, new Date('2026-01-15')).cls).toBe('amber') // CG7 未到期
+  })
+
+  it('SUBPLAN_KEYWORDS 覆盖五个分计划识别关键词', () => {
+    expect(SUBPLAN_KEYWORDS.st).toContain('结构')
+    expect(SUBPLAN_KEYWORDS.hw).toContain('硬件')
+    expect(SUBPLAN_KEYWORDS.sw).toContain('软件')
+    expect(SUBPLAN_KEYWORDS.tv).toContain('测试')
+    expect(SUBPLAN_KEYWORDS.pr).toContain('过程')
   })
 })

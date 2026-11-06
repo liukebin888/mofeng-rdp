@@ -2,7 +2,7 @@
   <div>
     <PageHeader title="项目主计划" desc="统一工作流单据（WF-001）：新增打开主计划模板 → 编辑中可保存/关闭 → 提交走审批链（项目经理发起 → PMO 审核 → 部门会签 → 总经理批准）。深度参考汽车零部件主计划模板：客户端信息 + 十大专业线活动 + 四级计划 + 变更履历 + 报警项。红色 * 为必填项">
       <template #actions>
-        <el-button size="small" @click="$router.push('/project/master-plan')">集成视图（RMP）</el-button>
+        <el-button size="small" @click="$router.push('/project/plan')">集成视图（RMP）</el-button>
         <WorkflowFormShell
           :form="wfForm"
           :blockers="wfBlockers"

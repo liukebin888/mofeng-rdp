@@ -50,8 +50,8 @@ export const MENUS: MenuGroup[] = [
     key: 'project', title: '项目执行', icon: 'Flag', stage: 'P3–P6', role: '项目经理 / 质量', cp: 'K3 K9 K10 K12',
     items: [
       { path: '/project/task', title: '项目任务书', desc: '任务目标/交付物/里程碑，项目经理发起→研发副总审核→总经理批准', comp: v('project/ProjectTaskView') },
-      { path: '/project/plan', title: '项目主计划', desc: '计划周期/里程碑/资源，PMO审核→部门会签→总经理批准', comp: v('project/ProjectPlanView') },
-      { path: '/project/master-plan', title: '项目主计划·集成视图', desc: 'RMP 式集成整体视图：CG1-CG7 × 分计划统一时间轴 + 产品等级工时估算', comp: v('project/ProjectMasterPlanView') },
+      { path: '/project/plan', title: '项目主计划', desc: 'RMP 式主计划表达：项目上下文 + RAG + 5 KPI + 等级工时 + 集成整体视图（统一时间轴/里程碑矩阵/分计划投影），数据实时映射四级计划', comp: v('project/ProjectMasterPlanView') },
+      { path: '/project/master-plan', title: '项目主计划·编辑', desc: '主计划编辑表单（基本信息/客户端信息/四级计划/变更履历/报警项），PMO审核→部门会签→总经理批准', comp: v('project/ProjectPlanView') },
       { path: '/project/ots', title: 'OTS 认可', desc: '三大条件附件驱动 + L1-L4 等级自动判定，部门会签→客户认可→总经理批准', comp: v('project/OtsApprovalView') },
       { path: '/project/ots-attachment-a', title: '附件 A 设计文件归档', desc: '设计文件归档汇总表（A-1 电子 / A-2 结构 / A-3 工艺），只读', comp: v('project/OtsAttachmentA') },
       { path: '/project/ots-attachment-b', title: '附件 B 样件评审报告', desc: 'OTS 样件评审报告，只读', comp: v('project/OtsAttachmentB') },
