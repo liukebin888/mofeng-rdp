@@ -101,7 +101,7 @@ import { useAppStore } from '@/store/app'
 import type { FlowInstance } from '@/domain/flowEngine'
 
 const store = useAppStore()
-const selectedProjectId = ref<string>('P-001')
+const selectedProjectId = ref<string>('')
 
 // 五条前期流程（次序固定）
 const presaleDefs = computed(() => {

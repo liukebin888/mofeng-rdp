@@ -17,7 +17,8 @@ import { computeEvm } from '../src/domain/evm'
 import { plannedValue } from '../src/domain/schedule'
 import { hashOf, shortHash, stableStringify } from '../src/domain/hash'
 import { buildSeed } from '../src/data/seed'
-import type { AuditRow, GradingInput, Requirement, TraceLink, WbsNode } from '../src/domain/types'
+import type { AuditRow, GradingInput, Requirement, TraceLink, WbsNode, RiskItem, DeviationItem, RetroItem, EcrItem, Baseline, Supplier, SampleReq, BomNode, DocItem, Deliverable, HourRecord, LessonItem } from '../src/domain/types'
+import type { ComplianceItem } from '../src/domain/compliance'
 
 const ACT = {
   userId: 'U-QA',
@@ -51,6 +52,98 @@ function node(
     weight: 10,
     deps,
     ...extra
+  }
+}
+
+/**
+ * 合成种子数据源（QA 专用）：平台为通用研发管理工具，seed 不预置演示项目。
+ * 引擎回归测试用合成数据验证「同源判定 / CPM / 组合评分 / 追溯 / PV」等逻辑，
+ * 不依赖任何演示项目数据。
+ */
+function qaSeed() {
+  const mkProject = (id: string, code: string, strategic: number, financial: number, technology: number, tenantId?: string) => ({
+    id, code, name: `项目${id}`, customer: '示例客户', productLine: '车身电子', platform: 'E 平台', owner: '周立群',
+    start: '2026-03-02', end: '2027-06-30', status: '进行中' as const, level: 'L2' as const,
+    budget: 1280, spent: 800, strategic, financial, technology, health: '黄' as const, resourceRatio: 1.1, planFrozen: true,
+    ...(tenantId ? { tenantId } : {})
+  })
+  const projects = [
+    mkProject('P-001', 'PRJ-001', 5, 4, 5),
+    mkProject('P-002', 'PRJ-002', 4, 4, 4),
+    mkProject('P-003', 'PRJ-003', 3, 3, 3),
+    mkProject('P-004', 'PRJ-004', 2, 2, 2, 'T-1002'),
+    mkProject('P-005', 'PRJ-005', 1, 1, 1, 'T-1003')
+  ]
+  // 合成 WBS：1 个根 + 2 个叶子，权重合计 100，projectId='P-001'（供 plannedValue/weightedCompletion）
+  const wbs: WbsNode[] = [
+    { id: 'w01', projectId: 'P-001', code: '1', name: '项目管理', level: 1, deliverable: '—', ownerRole: '项目管理', duration: 60, planStart: 0, planFinish: 60, percent: 100, weight: 0, deps: [] },
+    { id: 'w02', projectId: 'P-001', code: '1.1', name: '启动', parentId: 'w01', level: 2, deliverable: '输出物', ownerRole: '项目管理', duration: 10, planStart: 0, planFinish: 10, percent: 100, weight: 60, deps: [] },
+    { id: 'w03', projectId: 'P-001', code: '1.2', name: '收尾', parentId: 'w01', level: 2, deliverable: '输出物', ownerRole: '项目管理', duration: 10, planStart: 10, planFinish: 20, percent: 0, weight: 40, deps: [{ predId: 'w02', type: 'FS', lag: 0 }] }
+  ]
+  // 合成需求 + 链接：含四类断链样本（缺失下游 / 孤儿需求 / 跨基线漂移 / 版本错配）
+  const reqs: Requirement[] = [
+    { id: 'R01', code: 'SG-001', projectId: 'P-001', type: 'SG', title: '安全目标', asil: 'B', cal: 2, status: '已批准', version: 2, owner: '吴敏', verifyMethod: '评审', createdAt: '2026-03-20' },
+    { id: 'R02', code: 'FSR-001', projectId: 'P-001', type: 'FSR', title: '功能需求', asil: 'B', cal: 2, status: '已批准', version: 1, parentId: 'R01', owner: '吴敏', verifyMethod: '评审', createdAt: '2026-03-20' },
+    { id: 'R03', code: 'TSR-001', projectId: 'P-001', type: 'TSR', title: '技术需求（缺失下游）', asil: 'B', cal: 2, status: '已批准', version: 1, parentId: 'R02', owner: '吴敏', verifyMethod: '评审', createdAt: '2026-03-20' },
+    { id: 'R04', code: 'HSR-001', projectId: 'P-001', type: 'HSR', title: '孤儿需求', asil: 'B', cal: 2, status: '已批准', version: 1, owner: '吴敏', verifyMethod: '评审', createdAt: '2026-03-20' },
+    { id: 'R05', code: 'SEC-001', projectId: 'P-001', type: 'SEC', title: '安全需求', asil: 'QM', cal: 2, status: '已批准', version: 1, baselineId: 'BL-01', owner: '吴敏', verifyMethod: '评审', createdAt: '2026-03-20' }
+  ]
+  const links: TraceLink[] = [
+    // L1 挂 BL-01 且 R01(v2)→R02(v1) 版本不同 → 版本错配
+    { id: 'L1', srcType: 'REQ', srcId: 'R01', dstType: 'REQ', dstId: 'R02', linkType: 'derive', baselineId: 'BL-01', status: 1 },
+    { id: 'L2', srcType: 'REQ', srcId: 'R02', dstType: 'REQ', dstId: 'R03', linkType: 'derive', baselineId: 'BL-02', status: 1 },
+    // L3 挂 BL-02 而下游 R05 属 BL-01 → 跨基线漂移
+    { id: 'L3', srcType: 'REQ', srcId: 'R01', dstType: 'REQ', dstId: 'R05', linkType: 'derive', baselineId: 'BL-02', status: 1 }
+  ]
+  const risks: RiskItem[] = [
+    { id: 'RK1', projectId: 'P-001', code: 'RSK-001', title: '风险1', failureMode: 'f', cause: 'c', consequence: 'c', trigger: 't', severity: 3, occurrence: 2, detection: 5, strategy: 's', owner: 'o', status: '已关闭', residual: 30, signatures: ['甲', '乙'] }
+  ]
+  const ecrs: EcrItem[] = [
+    { id: 'E1', projectId: 'P-001', code: 'ECR-001', title: '变更1', sourceObjType: '需求', sourceObjId: 'R02', stage: 'ECN验证', highRisk: false, impacts: [], closure: [] }
+  ]
+  const retros: RetroItem[] = [
+    { id: 'RT1', projectId: 'P-001', stage: 'P3', goalMet: '达标', deviationReason: '—', improvement: '—' },
+    { id: 'RT2', projectId: 'P-001', stage: 'P4', goalMet: '达标', deviationReason: '', improvement: '' }
+  ]
+  const deviations: DeviationItem[] = [
+    { id: 'DV1', projectId: 'P-001', code: 'DEV-001', measure: 'm', planUpdated: false, deviationRecomputed: false, status: '开放' }
+  ]
+  const flags: Record<string, { ok: boolean; note: string }> = {
+    'C-31': { ok: true, note: '安全评审独立签署' }
+  }
+  const complianceItems: ComplianceItem[] = []
+  // 合成交付物：含一条「必交未交付」，供 C-19 产出缺件证据（否则 PASS 时证据为空）
+  const deliverables: Deliverable[] = [
+    { id: 'DL1', projectId: 'P-001', code: 'DLV-001', name: '方案评审记录', category: '评审', required: true, provided: false, gate: 'G2' },
+    { id: 'DL2', projectId: 'P-001', code: 'DLV-002', name: '样件确认单', category: '交付', required: true, provided: true, gate: 'G3' }
+  ]
+  // 合成供应商：一家未准入/已过期 + PPAP 未批准，供 C-25/C-26 产出证据
+  const suppliers: Supplier[] = [
+    { id: 'SP1', code: 'SUP-001', name: '示例供应商A', type: '结构件', qualified: false, qualifyExpire: '2025-12-31', nominated: true, ppapStatus: '未提交', ppapElements: 0, riskLevel: '中', sqe: '李工' },
+    { id: 'SP2', code: 'SUP-002', name: '示例供应商B', type: '电子件', qualified: true, qualifyExpire: '2027-12-31', nominated: true, ppapStatus: '审核中', ppapElements: 12, riskLevel: '低', sqe: '王工' }
+  ]
+  // 合成文档：一份必交且会签未齐备，供 C-45 产出证据
+  const docs: DocItem[] = [
+    {
+      id: 'DOC1', projectId: 'P-001', code: 'DOC-001', name: '结构总图', discipline: '结构', version: 'A1', status: '会签中',
+      required: true, signoffs: [{ role: '软件', signed: false }], mdrSet: 'MDR-1', comments: [], versionChain: [{ version: 'A1', status: '草稿', author: '张三' }]
+    }
+  ]
+  // 合成经验条目（未打标签），供 C-35 产出证据
+  const lessons: LessonItem[] = [
+    { id: 'LS1', projectId: 'P-001', code: 'LSN-001', title: 'EMC 整改经验', content: '……', tags: [], stage: 'P3', category: '硬件', pushedTo: [], pushLog: [], reusedBy: [], createdAt: '2026-09-30' }
+  ]
+
+  return {
+    projects, wbs, reqs, links, risks, ecrs, retros, deviations, flags, complianceItems,
+    baselines: [] as Baseline[],
+    suppliers,
+    samples: [] as SampleReq[],
+    boms: [] as BomNode[],
+    docs,
+    deliverables,
+    hours: [] as HourRecord[],
+    lessons
   }
 }
 
@@ -197,7 +290,7 @@ describe('QA-c 48 个控制点：编号连续 / 强度分布 / 五要素与证�
   })
 
   it('种子上下文实跑：48 条结论、每条带证据、结论三态合法', () => {
-    const seed = buildSeed()
+    const seed = qaSeed()
     const p = seed.projects[0]
     const results = evaluateControlPoints({
       project: p,
@@ -234,7 +327,7 @@ describe('QA-c 48 个控制点：编号连续 / 强度分布 / 五要素与证�
   })
 
   it('C-18 同源判定：ECR 未验证 → FAIL（不读静态 flag，与真实数据一致）', () => {
-    const seed = buildSeed()
+    const seed = qaSeed()
     const p = seed.projects[0]
     const ctx = () => ({
       project: p, wbs: seed.wbs, reqs: seed.reqs, links: seed.links, risks: seed.risks,
@@ -254,7 +347,7 @@ describe('QA-c 48 个控制点：编号连续 / 强度分布 / 五要素与证�
   })
 
   it('C-15 同源判定：关闭风险缺双签 → FAIL；补足签名 → PASS', () => {
-    const seed = buildSeed()
+    const seed = qaSeed()
     const p = seed.projects[0]
     const ctx = () => ({
       project: p, wbs: seed.wbs, reqs: seed.reqs, links: seed.links, risks: seed.risks,
@@ -280,7 +373,7 @@ describe('QA-c 48 个控制点：编号连续 / 强度分布 / 五要素与证�
   })
 
   it('C-34 同源判定：复盘三要素缺一 → CONDITIONAL；补齐 → PASS', () => {
-    const seed = buildSeed()
+    const seed = qaSeed()
     const p = seed.projects[0]
     const base = {
       project: p, wbs: seed.wbs, reqs: seed.reqs, links: seed.links, risks: seed.risks,
@@ -298,7 +391,7 @@ describe('QA-c 48 个控制点：编号连续 / 强度分布 / 五要素与证�
   })
 
   it('C-46 同源判定：开放纠偏未回写 → CONDITIONAL；回写后 → PASS', () => {
-    const seed = buildSeed()
+    const seed = qaSeed()
     const p = seed.projects[0]
     const base = {
       project: p, wbs: seed.wbs, reqs: seed.reqs, links: seed.links, risks: seed.risks,
@@ -339,8 +432,9 @@ describe('QA-d CPM：成环拒绝、四类依赖 + 滞后、关键路径与零�
   })
 
   it('种子 WBS 注入回边 → 拒绝保存（PRJ-004 回归）', () => {
-    const nodes = buildSeed().wbs.map((n) => ({ ...n, deps: [...n.deps] }))
-    nodes.find((n) => n.code === '1.1')!.deps.push({ predId: 'w26', type: 'FS', lag: 0 })
+    const nodes = qaSeed().wbs.map((n) => ({ ...n, deps: [...n.deps] }))
+    // 合成 WBS 中 w03 依赖 w02；让 w02(code '1.1') 回依赖 w03，形成 w02→w03→w02 环
+    nodes.find((n) => n.code === '1.1')!.deps.push({ predId: 'w03', type: 'FS', lag: 0 })
     expect(() => computeCpm(nodes)).toThrow(CyclicDependencyError)
   })
 
@@ -390,7 +484,7 @@ describe('QA-d CPM：成环拒绝、四类依赖 + 滞后、关键路径与零�
   })
 
   it('种子数据：13 项质量检查齐备、健康度在 0~100、权重合计 100（SCH-024 回归）', () => {
-    const seed = buildSeed()
+    const seed = qaSeed()
     const q = planQualityChecks(seed.wbs)
     expect(q.checks.length).toBe(13)
     expect(q.checks.map((c) => c.no)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13])
@@ -645,7 +739,7 @@ describe('QA-g 追溯：闭包 ≤6 跳截断 + 断链分类', () => {
   })
 
   it('种子数据：四类断链样本齐全（含跨基线漂移与版本错配）', () => {
-    const seed = buildSeed()
+    const seed = qaSeed()
     const kinds = new Set(detectBreaks(seed.reqs, seed.links).map((b) => b.kind))
     expect(kinds.has('缺失下游')).toBe(true)
     expect(kinds.has('孤儿需求')).toBe(true)
@@ -669,7 +763,7 @@ describe('QA-h 组合评分：区间 20~100、同分先战略后财务、容量�
   })
 
   it('所有种子项目总分必须落在 [20,100] 区间（×20 归一）', () => {
-    const list = rankProjects(buildSeed().projects)
+    const list = rankProjects(qaSeed().projects)
     for (const p of list) {
       expect(p.score).toBeGreaterThanOrEqual(20)
       expect(p.score).toBeLessThanOrEqual(100)
@@ -679,7 +773,7 @@ describe('QA-h 组合评分：区间 20~100、同分先战略后财务、容量�
   })
 
   it('同分排序：先比战略契合（5/5/1 与 4/4/4 同为 80 分 → 战略高者在前）', () => {
-    const seedProject = buildSeed().projects[0]
+    const seedProject = qaSeed().projects[0]
     const a = { ...seedProject, id: 'a', code: 'PRJ-A', strategic: 5, financial: 5, technology: 1 }
     const b = { ...seedProject, id: 'b', code: 'PRJ-B', strategic: 4, financial: 4, technology: 4 }
     expect(scoreProject(a).score).toBe(80)
@@ -690,7 +784,7 @@ describe('QA-h 组合评分：区间 20~100、同分先战略后财务、容量�
 
   it('同分同战略：再比财务回报（PFM-018 第二顺位）', () => {
     // 0.4s+0.35f+0.25t 相等且战略分相同：a(5,4,4) 与 b(5,3.5,4.7) 同为 84 分，财务高者在前
-    const seedProject = buildSeed().projects[0]
+    const seedProject = qaSeed().projects[0]
     const a = { ...seedProject, id: 'a', code: 'PRJ-C', strategic: 5, financial: 4, technology: 4 }
     const b = { ...seedProject, id: 'b', code: 'PRJ-D', strategic: 5, financial: 3.5, technology: 4.7 }
     expect(scoreProject(a).score).toBe(scoreProject(b).score)
@@ -701,9 +795,9 @@ describe('QA-h 组合评分：区间 20~100、同分先战略后财务、容量�
 
   it('容量超限：缺口 > 0 时给出延后 / 缩减 / 终止三条建议', () => {
     const projects = rankProjects([
-      { ...buildSeed().projects[0] },
-      { ...buildSeed().projects[1] },
-      { ...buildSeed().projects[2] }
+      { ...qaSeed().projects[0] },
+      { ...qaSeed().projects[1] },
+      { ...qaSeed().projects[2] }
     ])
     const gaps = capacityCheck(
       {
@@ -721,7 +815,7 @@ describe('QA-h 组合评分：区间 20~100、同分先战略后财务、容量�
   })
 
   it('容量充足：不越限时不得输出建议（避免噪音告警）', () => {
-    const projects = rankProjects(buildSeed().projects)
+    const projects = rankProjects(qaSeed().projects)
     const g = capacityCheck(
       { capacity: [{ key: 'sw', label: '软件人力', limit: 999, unit: '人月' }], demand: [{ projectId: projects[0].id, key: 'sw', amount: 3 }] },
       projects
@@ -803,7 +897,7 @@ describe('QA-i Gate 门禁与 SOD（供 UI 一致性对照的复算口径）', (
   })
 
   it('种子项目实跑：Gate 通过项数可复算（用于与页面数字比对）', () => {
-    const seed = buildSeed()
+    const seed = qaSeed()
     const p = seed.projects[0]
     const cpResults = evaluateControlPoints({
       project: p,
@@ -841,7 +935,7 @@ describe('QA-i Gate 门禁与 SOD（供 UI 一致性对照的复算口径）', (
 // —— 修复回归（QA-001 / QA-002 / QA-003）：锁定修复后的行为，防止回退 ——
 describe('修复回归', () => {
   const seedCtx = () => {
-    const seed = buildSeed()
+    const seed = qaSeed()
     const p = seed.projects[0]
     return {
       project: p,
@@ -875,7 +969,7 @@ describe('修复回归', () => {
   })
 
   it('QA-003 PV 同源：plannedValue 按 CPM 早时间单调不减，且 ≤ BAC', () => {
-    const seed = buildSeed()
+    const seed = qaSeed()
     const bac = seed.projects[0].budget
     const d0 = plannedValue(seed.wbs.filter((w) => w.projectId === 'P-001'), bac, 0)
     const d42 = plannedValue(seed.wbs.filter((w) => w.projectId === 'P-001'), bac, 42)

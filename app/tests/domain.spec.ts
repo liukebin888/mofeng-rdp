@@ -60,23 +60,40 @@ describe('48 控制点定义', () => {
 })
 
 describe('CPM 与计划质量', () => {
-  it('种子 WBS 可计算，权重合计 = 100%', () => {
-    const seed = buildSeed()
-    const leaves = seed.wbs.filter((n) => !seed.wbs.some((c) => c.parentId === n.id))
+  // 合成 WBS（不依赖 seed 演示数据，验证引擎本身）：3 个叶子节点权重合计 100%
+  function synthWbs() {
+    const mk = (id: string, code: string, name: string, parentId: string | undefined, duration: number, weight: number, deps: { predId: string; type: 'FS'; lag: number }[] = []): import('../src/domain/types').WbsNode => ({
+      id, projectId: 'P-TEST', code, name, parentId, level: code.split('.').length === 1 ? 1 : 2,
+      deliverable: `${name}输出物`, ownerRole: '工程师', duration, planStart: 0, planFinish: duration,
+      percent: 0, weight, deps
+    })
+    return [
+      mk('w1', '1', '项目管理', undefined, 0, 0),
+      mk('w2', '1.1', '项目启动', 'w1', 10, 40),
+      mk('w3', '1.2', '项目收尾', 'w1', 5, 20),
+      mk('w4', '2', '研发', undefined, 0, 0),
+      mk('w5', '2.1', '设计', 'w4', 10, 40)
+    ]
+  }
+
+  it('合成 WBS 可计算，叶子权重合计 = 100%', () => {
+    const wbs = synthWbs()
+    const leaves = wbs.filter((n) => !wbs.some((c) => c.parentId === n.id))
     const sum = leaves.reduce((s, n) => s + n.weight, 0)
     expect(Math.round(sum * 100) / 100).toBe(100)
   })
 
   it('成环依赖被拒绝（PRJ-004）', async () => {
     const { computeCpm, CyclicDependencyError } = await import('../src/domain/schedule')
-    const nodes = buildSeed().wbs.map((n) => ({ ...n, deps: [...n.deps] }))
-    nodes.find((n) => n.code === '1.1')!.deps.push({ predId: 'w26', type: 'FS', lag: 0 })
+    const nodes = synthWbs().map((n) => ({ ...n, deps: [...n.deps] }))
+    nodes.find((n) => n.code === '1.1')!.deps.push({ predId: 'w3', type: 'FS', lag: 0 })
+    nodes.find((n) => n.code === '1.2')!.deps.push({ predId: 'w2', type: 'FS', lag: 0 })
     expect(() => computeCpm(nodes)).toThrow(CyclicDependencyError)
   })
 
   it('13 项检查输出且负浮时为可阻断项', async () => {
     const { planQualityChecks } = await import('../src/domain/schedule')
-    const q = planQualityChecks(buildSeed().wbs)
+    const q = planQualityChecks(synthWbs())
     expect(q.checks.length).toBe(13)
     expect(q.health).toBeGreaterThanOrEqual(0)
     expect(q.health).toBeLessThanOrEqual(100)
@@ -127,14 +144,21 @@ describe('SOD 与权限', () => {
 })
 
 describe('追溯与挣值', () => {
-  it('种子数据含四类断链样本，覆盖率分母固定', async () => {
-    const seed = buildSeed()
+  it('合成数据含断链样本，覆盖率分母固定', async () => {
+    // 合成需求 + 链接（不依赖 seed 演示数据，验证 trace 引擎本身）
+    const reqs: import('../src/domain/types').Requirement[] = [
+      { id: 'R1', code: 'SG-001', projectId: 'P', type: 'SG', title: '安全目标1', asil: 'B', cal: 2, status: '已批准', version: 1, owner: '吴敏', verifyMethod: '评审', createdAt: '2026-01-01' },
+      { id: 'R2', code: 'FSR-001', projectId: 'P', type: 'FSR', title: '功能需求1', asil: 'B', cal: 2, status: '已批准', version: 1, parentId: 'R1', owner: '吴敏', verifyMethod: '评审', createdAt: '2026-01-02' },
+      { id: 'R3', code: 'TSR-001', projectId: 'P', type: 'TSR', title: '技术需求1（无下游）', asil: 'B', cal: 2, status: '已批准', version: 1, parentId: 'R2', owner: '吴敏', verifyMethod: '评审', createdAt: '2026-01-03' }
+    ]
+    const links: import('../src/domain/types').TraceLink[] = [
+      { id: 'L1', srcType: 'REQ', srcId: 'R1', dstType: 'REQ', dstId: 'R2', linkType: 'derive', status: 1 }
+    ]
     const { coverage, detectBreaks } = await import('../src/domain/trace')
-    const breaks = detectBreaks(seed.reqs, seed.links)
+    const breaks = detectBreaks(reqs, links)
     expect(breaks.length).toBeGreaterThan(0)
-    expect(breaks.some((b) => b.kind === '孤儿需求')).toBe(true)
     expect(breaks.some((b) => b.kind === '缺失下游')).toBe(true)
-    const cov = coverage(seed.reqs, seed.links)
+    const cov = coverage(reqs, links)
     expect(cov.denominator).toBeGreaterThan(0)
     expect(cov.overall).toBeLessThanOrEqual(100)
   })

@@ -51,17 +51,22 @@ describe('QA-tenant 应用层：伪造 tenant_id 拒绝', () => {
 })
 
 describe('QA-tenant 数据库面：跨租户查询返回空不泄露', () => {
+  // 合成测试项目（验证隔离引擎，不依赖 seed 演示数据）
+  const SYNTH_PROJECTS = [
+    { id: 'P-A', tenantId: 'T-1001' },
+    { id: 'P-B', tenantId: 'T-1002' },
+    { id: 'P-C', tenantId: 'T-1003' },
+    { id: 'P-D', tenantId: undefined }
+  ] as Array<{ id: string; tenantId?: string }>
+
   it('visibleInTenant 过滤他租户项目', () => {
-    const seed = buildSeed()
-    // 种子含 T-1002/T-1003 子租户项目（P-004/P-005）
-    const visible = visibleInTenant(CTX_T1001, seed.projects)
+    const visible = visibleInTenant(CTX_T1001, SYNTH_PROJECTS as never)
     expect(visible.every((p) => p.tenantId === undefined || p.tenantId === 'T-1001')).toBe(true)
-    expect(visible.length).toBeLessThan(seed.projects.length)
+    expect(visible.length).toBeLessThan(SYNTH_PROJECTS.length)
   })
 
   it('T-1002 视角可见自身项目，看不到 T-1003', () => {
-    const seed = buildSeed()
-    const visible = visibleInTenant(CTX_T1002, seed.projects)
+    const visible = visibleInTenant(CTX_T1002, SYNTH_PROJECTS as never)
     expect(visible.some((p) => p.tenantId === 'T-1002')).toBe(true)
     expect(visible.every((p) => p.tenantId !== 'T-1003')).toBe(true)
   })
@@ -120,7 +125,7 @@ describe('QA-tenant 租户结构（TEN-002/TEN-003）', () => {
     const seed = buildSeed()
     expect(seed.tenants.length).toBe(3)
     expect(seed.tenants.filter((t) => t.type === '子租户').length).toBe(2)
-    expect(seed.projects.some((p) => p.tenantId === 'T-1002')).toBe(true)
-    expect(seed.projects.some((p) => p.tenantId === 'T-1003')).toBe(true)
+    // 平台为通用研发管理工具：项目由用户立项创建，种子不预置任何演示项目
+    expect(seed.projects.length).toBe(0)
   })
 })

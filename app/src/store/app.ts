@@ -5,6 +5,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { buildSeed, SEED_VERSION, type SeedData, type SeedUser } from '@/data/seed'
+import { buildDemoSeed } from '@/data/demoSeed'
 import { evaluateControlPoints, type CpContext } from '@/domain/controlPoints'
 import {
   filterByScope,
@@ -165,11 +166,25 @@ function load(): PersistShape | null {
   }
 }
 
+/**
+ * e2e 演示种子开关：e2e 交互回归脚本在浏览器启动前写入该标记，
+ * 使应用以演示数据（buildDemoSeed）初始化，而非空项目种子（buildSeed）。
+ * 该标记仅影响首次播种与重置，不改变生产发布基线（生产 buildSeed 项目台账恒为空）。
+ */
+const E2E_DEMO_KEY = 'mofeng.rdp.e2e-demo.v1'
+function e2eDemoEnabled(): boolean {
+  try {
+    return localStorage.getItem(E2E_DEMO_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
 export const useAppStore = defineStore('app', () => {
   const saved = load()
-  const data = ref<SeedData>(saved?.data ?? buildSeed())
+  const data = ref<SeedData>(saved?.data ?? (e2eDemoEnabled() ? (buildDemoSeed() as SeedData) : buildSeed()))
   const userId = ref<string>(saved?.userId ?? 'U003')
-  const projectId = ref<string>(saved?.projectId ?? 'P-001')
+  const projectId = ref<string>(saved?.projectId ?? '')
   const spaceId = ref<string>(saved?.spaceId ?? 'SP-001')
   const toast = ref<{ type: 'success' | 'warning' | 'error' | 'info'; text: string } | null>(null)
   /** 界面语言（TEN-013）：仅影响展示层，数据权限（tenantContext/rbac）不随语言变化 */
@@ -237,8 +252,19 @@ export const useAppStore = defineStore('app', () => {
   const currentSpace = computed(() => mySpaces.value.find((s) => s.id === spaceId.value) || mySpaces.value[0])
   /** 空间内可见项目 = 租户可见项目 再按空间过滤（叠加层，不改变租户过滤结果） */
   const spaceProjects = computed(() => visibleInSpace(spaceContext.value, visibleProjects.value))
-  /** 当前项目 = 空间内可见项目 中取 projectId，否则空间内首个 */
-  const currentProject = computed(() => spaceProjects.value.find((p) => p.id === projectId.value) || spaceProjects.value[0])
+  /** 当前项目 = 空间内可见项目 中取 projectId，否则空间内首个；无任何项目时返回安全兜底空项目（通用研发管理工具，项目由用户立项创建） */
+  const EMPTY_PROJECT: import('@/domain/types').Project = {
+    id: '', code: '', name: '', customer: '', productLine: '', platform: '', owner: '', start: '', end: '', status: '策划中', level: null,
+    budget: 0, spent: 0, strategic: 0, financial: 0, technology: 0, health: '灰', resourceRatio: 0, planFrozen: false
+  }
+  const currentProject = computed(() => spaceProjects.value.find((p) => p.id === projectId.value) || spaceProjects.value[0] || EMPTY_PROJECT)
+
+  // 启动兜底：projectId 未指定（如无持久化态）时，自动选中当前空间首个项目，
+  // 保证 projectWbs/projectHours/projectEcrs 等按项目过滤的派生数据非空。
+  // 仅在「有项目且 projectId 为空」时生效，空项目台账（通用工具初始态）不受影响。
+  if (!projectId.value && spaceProjects.value.length > 0) {
+    projectId.value = spaceProjects.value[0].id
+  }
 
   /** 跨租户访问守卫：伪造/越界 tenantId 一律拒绝并留审计（应用层面，TEN-004） */
   function guardTenantAccess(targetTenantId?: string): boolean {
@@ -383,12 +409,12 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function reset() {
-    data.value = buildSeed()
+    data.value = e2eDemoEnabled() ? (buildDemoSeed() as SeedData) : buildSeed()
     userId.value = 'U003'
-    projectId.value = 'P-001'
+    projectId.value = ''
     spaceId.value = 'SP-001'
     persist()
-    notify('success', '演示数据已重置为初始种子（3 个项目 / 48 控制点 / 40 条审计）')
+    notify('success', '已重置为初始种子（平台为通用研发管理工具，项目由用户通过立项创建）')
   }
 
   function notify(type: 'success' | 'warning' | 'error' | 'info', text: string) {
@@ -710,10 +736,7 @@ export const useAppStore = defineStore('app', () => {
     { id: 'EXT-2', supplierName: '华测台架', role: '试验', committedCapacity: 100, actualDelivery: 100, week: '2026-W45' }
   ])
   /** RES-016 投入偏差记录 */
-  const effortDeviations = ref<EffortDeviation[]>([
-    { id: 'ED-1', projectId: 'P-001', estimatedHours: 100, actualHours: 118, efficiencyFactor: 1.18, week: '2026-W43' },
-    { id: 'ED-2', projectId: 'P-001', estimatedHours: 100, actualHours: 116, efficiencyFactor: 1.16, week: '2026-W44' }
-  ])
+  const effortDeviations = ref<EffortDeviation[]>([])
   /** RES-011 资源费率 */
   const resourceRates = ref<ResourceRate[]>([
     { id: 'RT-1', resourceId: 'RM1', role: '项目经理', rate: 150, currency: 'CNY', effectiveFrom: '2026-01-01', effectiveTo: '2026-06-30' },

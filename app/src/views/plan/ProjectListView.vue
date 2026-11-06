@@ -1,7 +1,7 @@
 <template>
   <div>
     <PageHeader title="项目台账" desc="项目全景：等级、健康度、Gate 状态、SPI/CPI、控制点阻断数（数据同源，不另存一份）">
-      <template #actions><el-button size="small" @click="store.setProject('P-001'); store.notify('info', '已切至 PRJ-2026-018')">定位主项目</el-button></template>
+      <template #actions><el-button size="small" @click="$router.push('/presale/apply')">立项申请</el-button></template>
     </PageHeader>
 
     <div class="grid grid-4" style="margin-bottom: 12px">

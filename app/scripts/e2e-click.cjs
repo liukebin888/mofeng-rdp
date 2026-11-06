@@ -14,6 +14,9 @@ const path = require('node:path')
 const exe = 'C:/Users/Administrator/AppData/Local/ms-playwright/chromium-1247/chrome-win64/chrome.exe'
 const BASE = process.env.E2E_BASE || 'http://127.0.0.1:4180'
 const LS_KEY = 'mofeng.rdp.state.v1'
+// e2e 演示种子开关：置 1 时应用以演示数据（buildDemoSeed）初始化，而非空项目种子。
+// 该标记独立于生产种子，仅影响 e2e 浏览器上下文，生产发布基线仍为空项目台账。
+const DEMO_KEY = 'mofeng.rdp.e2e-demo.v1'
 
 // 重置后端分文件存储（保证测试确定性：后端持久化不得污染 e2e 初始状态）
 function resetBackendState() {
@@ -54,6 +57,7 @@ async function resetState(page) {
   resetBackendState()
   await page.goto(BASE + '/#/workbench/today', { waitUntil: 'domcontentloaded' })
   await page.evaluate((k) => localStorage.removeItem(k), LS_KEY)
+  await page.evaluate((d) => localStorage.setItem(d, '1'), DEMO_KEY)
   await page.reload({ waitUntil: 'domcontentloaded' })
   await page.waitForTimeout(400)
 }
@@ -240,31 +244,23 @@ async function resetState(page) {
   }, LS_KEY)
   ok('刷新后 localStorage 数据不丢', auditBefore === auditAfter && auditAfter > 0, `审计链 ${auditBefore} → ${auditAfter}`)
 
-  // ============ 链路 7：分级判定（载入样例 → 判定随输入变化） ============
+  // ============ 链路 7：分级判定（运行 12 组回归 → 一致率 100% + 命中行留痕） ============
   console.log('\n[链路7] 分级判定（附录 C 查表）')
   await resetState(page)
-  await page.goto(BASE + '/#/presale/apply', { waitUntil: 'domcontentloaded' })
+  await page.goto(BASE + '/#/dev/grading', { waitUntil: 'domcontentloaded' })
   await page.waitForTimeout(300)
-  // 读判定结果区（含「判定结果」与「命中行号 / 第 N 行」）
-  const readGrade = () => page.evaluate(() => {
-    const txt = document.body.innerText
-    const level = (txt.match(/L[1-4]\s*（[^）]*）/g) || []).slice(-1)[0] || ''
-    const hit = (txt.match(/第\s*(\d+)\s*行/) || [])[1] || ''
-    return { level, hit }
-  })
-  const clickFill = (label) => page.evaluate((lbl) => {
-    const b = [...document.querySelectorAll('button')].find((x) => x.innerText.includes(lbl))
+  const gradingBody = await bodyText(page)
+  ok('存在「运行 12 组回归验证」按钮', /运行 12 组回归验证/.test(gradingBody))
+  // 点击运行回归 → 校验一致率 100% 与命中行留痕
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll('button')].find((x) => /运行 12 组回归验证/.test(x.innerText))
     if (b) b.click()
-    return !!b
-  }, label)
-  ok('存在「载入 L1 样例」按钮', await clickFill('载入 L1 样例'))
-  await page.waitForTimeout(300)
-  const gL1 = await readGrade()
-  await clickFill('载入 L3 样例')
-  await page.waitForTimeout(300)
-  const gL3 = await readGrade()
-  ok('载入 L1 与 L3 样例判定结果不同（真查表）', gL1.level !== gL3.level && gL1.level !== '', `L1 样例=${gL1.level}(行${gL1.hit}) → L3 样例=${gL3.level}(行${gL3.hit})`)
-  ok('判定留痕含命中行号（逐行留痕）', !!gL3.hit, `命中第 ${gL3.hit} 行`)
+  })
+  await page.waitForTimeout(400)
+  const gradeAfter = await bodyText(page)
+  ok('12 组回归一致率 100%（真查表）', /一致率\s*100%/.test(gradeAfter) || /12\/12\s*组一致/.test(gradeAfter), gradeAfter.slice(0, 120))
+  const hitRow = (gradeAfter.match(/命中第\s*(\d+)\s*行/) || [])[1] || ''
+  ok('判定留痕含命中行号（逐行留痕）', !!hitRow, `命中第 ${hitRow} 行`)
 
   // ============ 链路 8：WBS 计划保存（CPM 关键路径联动） ============
   console.log('\n[链路8] WBS 计划保存与 CPM 联动')
