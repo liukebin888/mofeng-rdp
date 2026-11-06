@@ -277,7 +277,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import PersonSelect from '@/components/PersonSelect.vue'
 import WorkflowFormShell from '@/components/WorkflowFormShell.vue'
@@ -289,6 +290,7 @@ import { nextVersion, compareVersion, isValidVersion, INITIAL_PLAN_VERSION } fro
 import { templateNodesOf, templateMetas, isValidTemplateKind, validateTemplatePlan, type PlanTemplateKind } from '@/domain/planTemplate'
 
 const store = useAppStore()
+const route = useRoute()
 
 /** 当前激活的标签页 */
 const activeTab = ref('basic')
@@ -508,6 +510,11 @@ async function wfNew() {
   step.value = 1
   activeTab.value = 'basic'
 }
+
+// 进入编辑视图时，若带 ?new=1（由「新增主计划」按钮跳转而来），自动打开空白主计划模板
+onMounted(() => {
+  if (route.query.new === '1') wfNew()
+})
 
 /**
  * 步骤 1 → 步骤 2：校验基本信息 + 已明确主计划对象 + 已选模板，

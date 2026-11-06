@@ -422,19 +422,8 @@ function markDirty() {
 }
 
 function wfNew() {
-  const def = store.flowDefinitions.find((d) => d.id === INITIATION_DEF_ID)
-  if (!def) {
-    store.notify('error', '项目主计划流程模板不存在，无法新增')
-    return
-  }
-  const objectId = `PLAN-${Date.now()}`
-  const f = newWorkflowForm({ def, objectType: '项目主计划', objectId, content: '' })
-  wfForm.value = f
-  dirty.value = false
-  wfBlockers.value = []
-  // 空白模板：不预填任何项目/计划数据，由用户按模板引导逐步编制
-  planNodes.value = []
-  store.notify('info', '已打开项目主计划空白模板，请前往「编辑模式」按模板引导编制（里程碑 CG1–CG7 + 五类分计划时间轴）')
+  // 新增主计划：跳转到编辑模式，由编辑模式打开空白主计划模板（两步向导引导编制）
+  router.push('/project/master-plan?new=1')
 }
 
 function wfSave() {
