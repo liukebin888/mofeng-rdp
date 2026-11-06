@@ -34,11 +34,11 @@ describe('i18n 引擎（TEN-013）', () => {
 
   describe('UI 词条翻译', () => {
     it('英文命中 en-US 字典', () => {
-      expect(translate('en-US', 'app.brand')).toBe('MOFENG-RDP')
+      expect(translate('en-US', 'app.brand')).toBe('R&D Project Management')
       expect(translate('en-US', 'btn.save')).toBe('Save')
     })
     it('中文命中 zh-CN 字典', () => {
-      expect(translate('zh-CN', 'app.brand')).toBe('魔程化解')
+      expect(translate('zh-CN', 'app.brand')).toBe('研发项目管理平台')
     })
     it('缺键回退中文再回退 key 本身', () => {
       expect(translate('en-US', 'lang.zh')).toBe('中文') // en-US 未覆盖，回退中文

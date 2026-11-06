@@ -87,7 +87,7 @@ const treeRows = computed<EpsNode[]>(() => {
   return [
     {
       id: 'root',
-      label: '魔程科技 集团组合',
+      label: '集团组合',
       level: 1,
       budget: totalBudget,
       projectCount: projects.length,

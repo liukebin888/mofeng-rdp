@@ -118,7 +118,7 @@ function buildUsers(): SeedUser[] {
     roleCode: r.code,
     roleName: r.name,
     dept: ['项目管理部', '研发中心', '质量部', '采购部', '制造部', 'IT'][i % 6],
-    account: `mofeng.${r.code.toLowerCase()}`
+    account: `user.${r.code.toLowerCase()}`
   }))
   // 新增 36 名工程师（U019~U054），对应 9 个事业部 × 4 个小组（硬件一组/二组、软件一组/二组）
   const engNames = [
@@ -140,7 +140,7 @@ function buildUsers(): SeedUser[] {
       roleCode: 'SE',
       roleName: '系统工程师',
       dept: '研发中心',
-      account: `mofeng.eng${String(i + 1).padStart(2, '0')}`
+      account: `user.eng${String(i + 1).padStart(2, '0')}`
     }
   })
   return [...base, ...engs]
@@ -171,8 +171,8 @@ function buildOrgNodes(): OrgNode[] {
     )
   })
   return [
-    { id: 'G', name: '魔程集团', level: 'group', parentId: null, leaderTitle: '总裁', leaderName: '陈志远', system: '集团', order: 1 },
-    { id: 'C', name: '魔程汽车电子有限公司', level: 'company', parentId: 'G', leaderTitle: '总经理', leaderName: '林静', order: 1 },
+    { id: 'G', name: '集团总部', level: 'group', parentId: null, leaderTitle: '总裁', leaderName: '陈志远', system: '集团', order: 1 },
+    { id: 'C', name: '研发制造公司', level: 'company', parentId: 'G', leaderTitle: '总经理', leaderName: '林静', order: 1 },
     // 研发系统（5 中心）
     c('ELEC', '电子研发中心', '研发系统', 1, '周立群'),
     c('STRU', '结构研发中心', '研发系统', 2, '吴敏'),
@@ -356,8 +356,8 @@ function buildNamingRules(): NamingRule[] {
 
   return [
     // 客户
-    r('NM-1', 'customer', 'naming', '客户全称规范', '客户工商注册全称，不含「有限公司」缩写以外的简称', '示例汽车制造股份有限公司', true, undefined, { minLength: 4, maxLength: 30 }),
-    r('NM-2', 'customer', 'naming', '客户简称规范', '2~4 字通用简称，用于台账与报表展示', '示例客户甲 / 示例客户乙 / 示例客户丙', true, undefined, { minLength: 2, maxLength: 4 }),
+    r('NM-1', 'customer', 'naming', '客户全称规范', '客户工商注册全称，不含「有限公司」缩写以外的简称', '客户全称示例', true, undefined, { minLength: 4, maxLength: 30 }),
+    r('NM-2', 'customer', 'naming', '客户简称规范', '2~4 字通用简称，用于台账与报表展示', '客户甲 / 客户乙 / 客户丙', true, undefined, { minLength: 2, maxLength: 4 }),
     r('NM-3', 'customer', 'coding', '客户编号规则', '已统一为《产品型号编制办法》(CJQW0106 B1) 附表1 顾客编码（2 位，0A~0Z 或 AA~AT，ES 为前瞻输出），不再使用 CUST- 前缀', '0A、0U、AB', false, pat([lit('CUST'), varr('abbr')])),
     r('NM-4', 'customer', 'coding', '车型编号规则', '已统一为《产品型号编制办法》(CJQW0106 B1) 附表2 车型代码（2 位数字+大写字母，O/I/J/V 除外），不再使用 MODEL- 前缀', '0A、1A', false, pat([lit('MODEL'), seq(3)])),
     // 产品
@@ -451,9 +451,9 @@ function buildBom(): BomNode[] {
   return []
 }
 
-/** 构造示例合规归档卷（ARC-001：审批 + 输出物条目，保留期 15 年，复用归档引擎） */
+/** 构造合规归档层（ARC-001：审批 + 输出物条目，保留期 15 年，复用归档引擎） */
 function buildSampleArchive(): ArchiveLayer {
-  // 平台为通用研发管理工具，不预置演示归档卷，归档卷随项目归档时产生。
+  // 平台为通用研发管理工具，不预置归档卷，归档卷随项目归档时产生。
   return { volumes: [] }
 }
 
@@ -795,19 +795,19 @@ export function buildSeed() {
     tenantId: TENANT,
     /** 当前项目所用研发阶段模板（STG-001：默认汽车零部件六阶段，可配置切换） */
     stageTemplateId: 'TPL-AUTO',
-    tenant: { code: 'T-1001', name: '魔程科技（集团）', type: '集团租户', isolation: 'SHARED' },
+    tenant: { code: 'T-1001', name: '默认集团租户', type: '集团租户', isolation: 'SHARED' },
     /** 集团—子租户两级结构（TEN-002/TEN-003）：T-1001 集团 + T-1002/T-1003 子租户 */
     tenants: [
-      { code: 'T-1001', name: '魔程科技（集团）', type: '集团租户', isolation: 'SHARED' },
-      { code: 'T-1002', name: '魔程智驾（子公司）', type: '子租户', isolation: 'SHARED', parentCode: 'T-1001', sharedMetrics: ['项目数', '在研项目', 'Gate 通过率'] },
-      { code: 'T-1003', name: '魔程新能源（子公司）', type: '子租户', isolation: 'SCHEMA', parentCode: 'T-1001', sharedMetrics: ['项目数', '风险敞口'] }
+      { code: 'T-1001', name: '默认集团租户', type: '集团租户', isolation: 'SHARED' },
+      { code: 'T-1002', name: '子租户 A', type: '子租户', isolation: 'SHARED', parentCode: 'T-1001', sharedMetrics: ['项目数', '在研项目', 'Gate 通过率'] },
+      { code: 'T-1003', name: '子租户 B', type: '子租户', isolation: 'SCHEMA', parentCode: 'T-1001', sharedMetrics: ['项目数', '风险敞口'] }
     ],
     /** 空间（项目组合，SPA-001）：租户之下的聚合维度，顶部切换器切换 */
     spaces: [
-      { id: 'SP-001', code: 'SP-DEMO', name: '演示科技有限公司', tenantId: 'T-1001', type: '项目组合', roleBoundary: ['PM', 'SYS_ADMIN', 'OPS'], resourcePoolIds: ['NODE-1', 'NODE-2'], costSubjectIds: ['C-100'] },
-      { id: 'SP-002', code: 'SP-SAMPLE', name: '示例电子有限公司', tenantId: 'T-1001', type: '项目组合', roleBoundary: [], resourcePoolIds: ['NODE-3'], costSubjectIds: ['C-200'] },
-      { id: 'SP-003', code: 'SP-ZJ', name: '智驾项目集', tenantId: 'T-1002', type: '项目组合', roleBoundary: [], resourcePoolIds: ['NODE-1'], costSubjectIds: ['C-300'] },
-      { id: 'SP-004', code: 'SP-XNY', name: '新能源项目集', tenantId: 'T-1003', type: '项目组合', roleBoundary: [], resourcePoolIds: ['NODE-2'], costSubjectIds: ['C-400'] }
+      { id: 'SP-001', code: 'SP-DEFAULT', name: '默认项目组合', tenantId: 'T-1001', type: '项目组合', roleBoundary: ['PM', 'SYS_ADMIN', 'OPS'], resourcePoolIds: ['NODE-1', 'NODE-2'], costSubjectIds: ['C-100'] },
+      { id: 'SP-002', code: 'SP-GENERAL', name: '通用项目组合', tenantId: 'T-1001', type: '项目组合', roleBoundary: [], resourcePoolIds: ['NODE-3'], costSubjectIds: ['C-200'] },
+      { id: 'SP-003', code: 'SP-SUB-A', name: '子租户 A 项目集', tenantId: 'T-1002', type: '项目组合', roleBoundary: [], resourcePoolIds: ['NODE-1'], costSubjectIds: ['C-300'] },
+      { id: 'SP-004', code: 'SP-SUB-B', name: '子租户 B 项目集', tenantId: 'T-1003', type: '项目组合', roleBoundary: [], resourcePoolIds: ['NODE-2'], costSubjectIds: ['C-400'] }
     ] as Space[],
     users,
     orgNodes,

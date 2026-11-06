@@ -718,9 +718,9 @@ export const useAppStore = defineStore('app', () => {
   }
 
   // —— RES 资源域剩余项 ——
-  /** RES-001 三层资源池节点（演示数据：企业/部门/项目） */
+  /** RES-001 三层资源池节点（企业/部门/项目） */
   const poolNodes = ref<ResourcePoolNode[]>([
-    { id: 'NODE-1', name: '演示科技有限公司（企业）', level: '企业' },
+    { id: 'NODE-1', name: '集团企业资源池', level: '企业' },
     { id: 'NODE-2', name: '汽车电子研发中心', level: '部门', parentId: 'NODE-1' },
     { id: 'NODE-3', name: 'EPS 转向项目群', level: '项目', parentId: 'NODE-2' }
   ])
