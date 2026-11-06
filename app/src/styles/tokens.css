@@ -1,4 +1,26 @@
+/* ============================================================
+   设计令牌（主题系统）
+   —— 通过 <html data-theme="dark|light" data-accent="blue|..."> 切换。
+   深浅两套配色 + 多套强调色（accent），均在此集中定义。
+   ============================================================ */
+
+/* 强调色（accent）：brand 主色 / brand-2 辅色，供 data-accent 切换 */
 :root {
+  --brand: #3b82f6;
+  --brand-2: #22d3ee;
+  --radius: 10px;
+  --mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+}
+:root[data-accent='blue']   { --brand: #3b82f6; --brand-2: #22d3ee; }
+:root[data-accent='cyan']   { --brand: #06b6d4; --brand-2: #67e8f9; }
+:root[data-accent='purple'] { --brand: #8b5cf6; --brand-2: #c4b5fd; }
+:root[data-accent='green']  { --brand: #10b981; --brand-2: #6ee7b7; }
+:root[data-accent='orange'] { --brand: #f97316; --brand-2: #fdba74; }
+:root[data-accent='rose']   { --brand: #f43f5e; --brand-2: #fda4af; }
+
+/* —— 深色主题（默认）—— */
+:root,
+:root[data-theme='dark'] {
   --bg-0: #070c16;
   --bg-1: #0d1523;
   --bg-2: #121d2e;
@@ -8,15 +30,43 @@
   --text-1: #e8eefb;
   --text-2: #a9bad4;
   --text-3: #6f83a3;
-  --brand: #3b82f6;
-  --brand-2: #22d3ee;
   --ok: #22c55e;
   --warn: #f59e0b;
   --danger: #ef4444;
   --purple: #a78bfa;
-  --radius: 10px;
   --shadow: 0 8px 24px rgba(2, 8, 20, 0.45);
-  --mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  /* 布局级（侧栏/顶栏/工作台） */
+  --side-bg: #080e19;
+  --top-bg: #0a1120;
+  --item-hover: #0e1a2b;
+  --item-active-a: #16305a;
+  --item-active-b: #10223c;
+  --group-active: #10203a;
+}
+
+/* —— 浅色主题 —— */
+:root[data-theme='light'] {
+  --bg-0: #f4f6fa;
+  --bg-1: #ffffff;
+  --bg-2: #eef2f8;
+  --bg-3: #e3e9f2;
+  --line: #d4dce8;
+  --line-soft: #e2e8f2;
+  --text-1: #1b2735;
+  --text-2: #45546a;
+  --text-3: #8593a8;
+  --ok: #16a34a;
+  --warn: #d97706;
+  --danger: #dc2626;
+  --purple: #7c3aed;
+  --shadow: 0 8px 24px rgba(15, 23, 42, 0.10);
+  /* 布局级（浅色侧栏/顶栏，比内容区略深一档以区分） */
+  --side-bg: #ffffff;
+  --top-bg: #ffffff;
+  --item-hover: #eef2f8;
+  --item-active-a: #e0e9ff;
+  --item-active-b: #e6f0ff;
+  --group-active: #e8eefb;
 }
 
 * { box-sizing: border-box; }

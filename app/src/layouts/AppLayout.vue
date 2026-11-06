@@ -27,9 +27,9 @@
             <div class="ghead" :class="{ active: isGroupActive(g.key) }" @click="toggle(g.key)">
               <span class="gtitle">{{ t('menu.group.' + g.key) }}</span>
               <span class="gcp mono">{{ g.cp }}</span>
-              <span class="caret">{{ open.includes(g.key) || isGroupActive(g.key) ? '▾' : '▸' }}</span>
+              <span class="caret">{{ open.includes(g.key) ? '▾' : '▸' }}</span>
             </div>
-            <div v-show="open.includes(g.key) || isGroupActive(g.key)" class="items">
+            <div v-show="open.includes(g.key)" class="items">
               <div
                 v-for="it in g.items"
                 :key="it.path"
@@ -121,6 +121,22 @@
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
+            <el-dropdown trigger="click" @command="onTheme">
+              <el-button size="small">
+                {{ store.themeMode === 'light' ? '☀' : '☾' }}
+                <span style="margin-left: 4px">▾</span>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="dark" :disabled="store.themeMode === 'dark'">☾ 深色</el-dropdown-item>
+                  <el-dropdown-item command="light" :disabled="store.themeMode === 'light'">☀ 浅色</el-dropdown-item>
+                  <el-dropdown-item divided disabled>主题色</el-dropdown-item>
+                  <el-dropdown-item v-for="a in ACCENT_KEYS" :key="a" :command="'accent:' + a" :disabled="store.accent === a">
+                    <span class="accent-dot" :style="{ background: ACCENT_COLORS[a] }" />{{ ACCENT_LABELS[a] }}
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </div>
         </div>
 
@@ -143,9 +159,18 @@ import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import en from 'element-plus/es/locale/lang/en'
 import { MENUS } from '@/router'
 import { useAppStore } from '@/store/app'
+import { ACCENT_KEYS, type AccentKey } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
 import { breakpointOf, sideModeOf, type Breakpoint } from '@/domain/mobilePortal'
 import { CP_DEFINITIONS } from '@/domain/controlPoints'
+
+/** 主题色展示元数据（颜色 + 中文名） */
+const ACCENT_COLORS: Record<AccentKey, string> = {
+  blue: '#3b82f6', cyan: '#06b6d4', purple: '#8b5cf6', green: '#10b981', orange: '#f97316', rose: '#f43f5e'
+}
+const ACCENT_LABELS: Record<AccentKey, string> = {
+  blue: '蓝色', cyan: '青色', purple: '紫色', green: '绿色', orange: '橙色', rose: '玫红'
+}
 
 const store = useAppStore()
 const route = useRoute()
@@ -180,6 +205,8 @@ function onResize() {
 onMounted(() => {
   void store.syncFromBackend()
   window.addEventListener('resize', onResize)
+  // 应用持久化的主题/强调色（深浅色与主题色偏好）
+  store.applyTheme()
 })
 onUnmounted(() => {
   window.removeEventListener('resize', onResize)
@@ -222,42 +249,49 @@ function spaceAccessible(s: { id: string }) {
 function onLocale(l: 'zh-CN' | 'en-US') {
   store.setLocale(l)
 }
+function onTheme(cmd: string) {
+  if (cmd === 'dark' || cmd === 'light') {
+    store.setThemeMode(cmd)
+  } else if (cmd.startsWith('accent:')) {
+    store.setAccent(cmd.slice(7) as AccentKey)
+  }
+}
 </script>
 
 <style scoped>
 .shell { display: grid; grid-template-columns: 244px 1fr; height: 100vh; overflow: hidden; }
-.side { background: #080e19; border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+.side { background: var(--side-bg); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
 .brand { display: flex; gap: 10px; align-items: center; padding: 14px 14px 10px; }
-.logo { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg, #2563eb, #22d3ee); color: #04101f; font-weight: 800; font-size: 12px; display: grid; place-items: center; letter-spacing: 0.5px; }
+.logo { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #fff; font-weight: 800; font-size: 12px; display: grid; place-items: center; letter-spacing: 0.5px; }
 .b1 { font-size: 13.5px; font-weight: 700; }
 .b2 { font-size: 10.5px; color: var(--text-3); }
 .tenant { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 12px 10px; }
 .menus { flex: 1; min-height: 0; padding: 0 8px; }
 .group { margin-bottom: 2px; }
 .ghead { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 7px; cursor: pointer; color: var(--text-2); }
-.ghead:hover { background: #0e1a2b; }
-.ghead.active { background: #10203a; color: var(--text-1); }
+.ghead:hover { background: var(--item-hover); }
+.ghead.active { background: var(--group-active); color: var(--text-1); }
 .gtitle { font-size: 12px; font-weight: 600; flex: 1; }
 .gcp { font-size: 9px; color: var(--text-3); }
 .caret { font-size: 9px; color: var(--text-3); }
 .items { padding: 2px 0 4px 6px; }
 .item { display: flex; align-items: center; gap: 7px; padding: 5px 8px; border-radius: 6px; cursor: pointer; color: var(--text-2); font-size: 11.5px; }
-.item:hover { background: #0d1a2c; color: var(--text-1); }
-.item.on { background: linear-gradient(90deg, #16305a, #10223c); color: #fff; box-shadow: inset 2px 0 0 var(--brand); }
-.dot { width: 4px; height: 4px; border-radius: 50%; background: #2d4666; flex: none; }
+.item:hover { background: var(--item-hover); color: var(--text-1); }
+.item.on { background: linear-gradient(90deg, var(--item-active-a), var(--item-active-b)); color: var(--text-1); box-shadow: inset 2px 0 0 var(--brand); }
+.dot { width: 4px; height: 4px; border-radius: 50%; background: var(--text-3); flex: none; }
 .item.on .dot { background: var(--brand-2); }
 .t { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .badge { font-size: 9px; color: #ffd79a; border: 1px solid #5b3c14; border-radius: 4px; padding: 0 3px; }
 .foot { padding: 8px 14px; border-top: 1px solid var(--line-soft); font-size: 10px; }
 .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg-0); }
-.worktop { display: flex; align-items: center; gap: 16px; padding: 8px 18px; background: #0a1120; border-bottom: 1px solid var(--line-soft); }
+.worktop { display: flex; align-items: center; gap: 16px; padding: 8px 18px; background: var(--top-bg); border-bottom: 1px solid var(--line-soft); }
 .wt-label { flex: none; font-size: 12px; font-weight: 700; color: var(--brand-2); letter-spacing: 0.5px; }
 .wt-items { display: flex; flex-wrap: wrap; gap: 4px; }
 .wt-item { border: none; background: transparent; color: var(--text-2); font-size: 12px; padding: 5px 12px; border-radius: 7px; cursor: pointer; white-space: nowrap; }
-.wt-item:hover { background: #0e1a2b; color: var(--text-1); }
-.wt-item.on { background: linear-gradient(90deg, #16305a, #10223c); color: #fff; box-shadow: inset 0 -2px 0 var(--brand); }
+.wt-item:hover { background: var(--item-hover); color: var(--text-1); }
+.wt-item.on { background: linear-gradient(90deg, var(--item-active-a), var(--item-active-b)); color: var(--text-1); box-shadow: inset 0 -2px 0 var(--brand); }
 .wt-t { display: inline-block; }
-.top { display: flex; align-items: center; justify-content: space-between; padding: 10px 18px; border-bottom: 1px solid var(--line); background: #0a1120; }
+.top { display: flex; align-items: center; justify-content: space-between; padding: 10px 18px; border-bottom: 1px solid var(--line); background: var(--top-bg); }
 .dim { color: var(--text-3); font-size: 11px; }
 .content { flex: 1; overflow: auto; padding: 16px 18px 40px; }
 .toast { position: fixed; right: 22px; bottom: 22px; padding: 10px 14px; border-radius: 8px; font-size: 12px; max-width: 520px; box-shadow: var(--shadow); z-index: 3000; border: 1px solid var(--line); background: var(--bg-2); }
@@ -267,6 +301,7 @@ function onLocale(l: 'zh-CN' | 'en-US') {
 .toast.info { border-color: #1b3d5e; color: #a8d5ff; }
 .fade-enter-active, .fade-leave-active { transition: opacity 0.25s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
+.accent-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
 
 /* —— 响应式（POR-012）—— */
 .hamburger {

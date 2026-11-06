@@ -128,6 +128,19 @@ import { checkContrast, checkKeyboardAccessible, checkFormLabels, accessibilityP
 const KEY = 'mofeng.rdp.state.v1'
 /** 语言偏好独立持久化（UI 偏好 ≠ 业务数据，不进入主文档乐观锁通道） */
 const LOCALE_KEY = 'mofeng.rdp.locale.v1'
+/** 主题外观偏好独立持久化（NFR-017 可访问性：浅色/深色 + 强调色，不影响业务数据） */
+const THEME_KEY = 'mofeng.rdp.theme.v1'
+
+export type ThemeMode = 'dark' | 'light'
+export type AccentKey = 'blue' | 'cyan' | 'purple' | 'green' | 'orange' | 'rose'
+export const ACCENT_KEYS: AccentKey[] = ['blue', 'cyan', 'purple', 'green', 'orange', 'rose']
+
+function normalizeTheme(v: string | null): ThemeMode {
+  return v === 'light' ? 'light' : 'dark'
+}
+function normalizeAccent(v: string | null): AccentKey {
+  return (ACCENT_KEYS as string[]).includes(v ?? '') ? (v as AccentKey) : 'blue'
+}
 
 interface PersistShape {
   version: string
@@ -161,6 +174,10 @@ export const useAppStore = defineStore('app', () => {
   const toast = ref<{ type: 'success' | 'warning' | 'error' | 'info'; text: string } | null>(null)
   /** 界面语言（TEN-013）：仅影响展示层，数据权限（tenantContext/rbac）不随语言变化 */
   const locale = ref<Locale>(normalizeLocale(localStorage.getItem(LOCALE_KEY)))
+  /** 主题模式（dark/light）：仅影响外观，不触碰业务数据与权限 */
+  const themeMode = ref<ThemeMode>(normalizeTheme(localStorage.getItem(THEME_KEY)))
+  /** 强调色（accent）：主题主色，可独立于深浅切换 */
+  const accent = ref<AccentKey>(normalizeAccent(localStorage.getItem(THEME_KEY + '.accent')))
   /** 仓储通道：'local'（localStorage 降级）| 'rest'（后端持久化） */
   const repoMode = ref<'local' | 'rest'>('local')
   /** 服务端乐观锁版本号（REST 通道下维护） */
@@ -2661,6 +2678,32 @@ export const useAppStore = defineStore('app', () => {
     notify('success', locale.value === 'en-US' ? 'Language switched to English（界面语言已切换，数据权限不变）' : '界面语言已切换为中文（数据权限不变）')
   }
 
+  /** 主题切换（深/浅色）。仅外观，不触碰业务数据与权限；持久化到独立偏好键 */
+  function setThemeMode(next: ThemeMode) {
+    themeMode.value = next
+    localStorage.setItem(THEME_KEY, next)
+    applyTheme()
+    notify('success', next === 'light' ? '已切换为浅色主题' : '已切换为深色主题')
+  }
+
+  /** 强调色切换。仅外观，可独立于深浅色 */
+  function setAccent(next: AccentKey) {
+    accent.value = next
+    localStorage.setItem(THEME_KEY + '.accent', next)
+    applyTheme()
+    notify('success', `已切换主题色：${next}`)
+  }
+
+  /** 将当前主题/强调色应用到 <html> 的 data-theme / data-accent / class */
+  function applyTheme() {
+    if (typeof document === 'undefined') return
+    const el = document.documentElement
+    el.setAttribute('data-theme', themeMode.value)
+    el.setAttribute('data-accent', accent.value)
+    // Element Plus 深色变量依赖 .dark 类（main.ts 引入 dark css-vars）
+    el.classList.toggle('dark', themeMode.value === 'dark')
+  }
+
   // —— 通用写操作（P1 页使用）：所有变更走审计链 + 持久化 ——
   /** 样件状态推进（A/B/C/OTS 状态机） */
   function advanceSample(id: string, to: string) {
@@ -3102,6 +3145,8 @@ export const useAppStore = defineStore('app', () => {
     repoMode,
     repoBase,
     locale,
+    themeMode,
+    accent,
     users,
     currentUser,
     currentProject,
@@ -3335,6 +3380,9 @@ export const useAppStore = defineStore('app', () => {
     setUser,
     selectUser,
     setLocale,
+    setThemeMode,
+    setAccent,
+    applyTheme,
     setProject,
     cloneProjectStructure,
     guard,
