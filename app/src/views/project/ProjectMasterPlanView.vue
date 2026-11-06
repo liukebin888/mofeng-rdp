@@ -33,16 +33,17 @@
       </div>
     </div>
 
-    <!-- 数据未录入提示 -->
-    <div v-if="!planNodes.length" class="panel empty-panel" style="margin-top: 14px">
-      <el-empty description="尚无四级计划数据，集成视图为空。请先点击「新增」录入主计划与四级计划节点，或进入「编辑模式（表单）」填写。" :image-size="80" />
-      <div class="row center">
-        <el-button type="primary" size="small" @click="wfNew">新增主计划</el-button>
-        <el-button size="small" @click="$router.push('/project/master-plan')">进入编辑模式</el-button>
+    <!-- 演示数据提示（四级计划未录入时回退内置 RMP 演示数据，对齐 RMP 打开即见全貌） -->
+    <div v-if="!hasRealData" class="panel demo-tip" style="margin-top: 14px">
+      <span class="demo-flag">演示数据</span>
+      <span class="demo-txt">当前展示内置项目主计划（CG1–CG7 里程碑 + 结构/硬件/软件/测试/过程 5 分计划）。录入真实四级计划后将自动切换为实际数据。</span>
+      <div class="row" style="gap: 8px">
+        <el-button type="primary" size="small" @click="$router.push('/project/master-plan')">录入真实计划</el-button>
+        <el-button size="small" @click="wfNew">新增主计划</el-button>
       </div>
     </div>
 
-    <template v-else>
+    <div class="mp-body">
       <!-- ② 5 项 KPI -->
       <div class="grid grid-5" style="margin-top: 14px">
         <KpiCard label="计划总数" :value="kpis.total" unit="项" sub="1 主 + 5 分" />
@@ -235,7 +236,7 @@
           </div>
         </div>
       </div>
-    </template>
+    </div>
   </div>
 </template>
 
@@ -261,6 +262,10 @@ import {
   masterPlanKpisFrom,
   computeRagFrom,
   subPlanTimelineNodes,
+  unifiedTimelinePlans,
+  milestoneMatrix,
+  masterPlanKpis,
+  computeRag,
   type PlanTimelineNode
 } from '@/domain/projectMasterPlan'
 import type { PlanNode } from '@/domain/fourLevelPlan'
@@ -279,15 +284,18 @@ const projOwner = computed(() => (proj.value as any).owner ?? '项目经理')
 const projStart = computed(() => (proj.value as any).start ?? (proj.value as any).from ?? '—')
 const projEnd = computed(() => (proj.value as any).end ?? (proj.value as any).to ?? '—')
 
-const kpis = computed(() => masterPlanKpisFrom(planNodes.value))
-const rag = computed(() => computeRagFrom(planNodes.value))
+// 是否有真实四级计划数据：有则真数据驱动，无则回退内置 RMP 演示数据（对齐 RMP 打开即见全貌）
+const hasRealData = computed(() => planNodes.value.length > 0)
+
+const kpis = computed(() => (hasRealData.value ? masterPlanKpisFrom(planNodes.value) : masterPlanKpis()))
+const rag = computed(() => (hasRealData.value ? computeRagFrom(planNodes.value) : computeRag()))
 const ragCls = computed(() => ({ red: 'rag-red', amber: 'rag-amber', green: 'rag-green' }[rag.value.cls]))
 const estimate = computed(() => gradeEstimate(calcGrade.value))
-const matrix = computed(() => milestoneMatrixFrom(planNodes.value))
-const lanes = computed(() => unifiedTimelinePlansFrom(planNodes.value))
+const matrix = computed(() => (hasRealData.value ? milestoneMatrixFrom(planNodes.value) : milestoneMatrix()))
+const lanes = computed(() => (hasRealData.value ? unifiedTimelinePlansFrom(planNodes.value) : unifiedTimelinePlans()))
 
 const projections = computed(() =>
-  DEV_PLANS.map((p) => ({ plan: p, nodeCount: subPlanTimelineNodes(planNodes.value, p.key as import('@/domain/projectMasterPlan').SubPlanKey).length }))
+  DEV_PLANS.map((p) => ({ plan: p, nodeCount: hasRealData.value ? subPlanTimelineNodes(planNodes.value, p.key as import('@/domain/projectMasterPlan').SubPlanKey).length : p.timeline.length }))
 )
 
 onMounted(async () => {
@@ -466,6 +474,10 @@ void SUB_ORDER
 
 .empty-panel { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 40px 0; }
 .row.center { justify-content: center; }
+.demo-tip { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 14px; border-left: 3px solid #f59e0b; }
+.demo-flag { font-size: 11px; font-weight: 700; color: #ffd79a; border: 1px solid #5b3c14; background: #2a1f10; border-radius: 4px; padding: 1px 8px; flex: none; }
+.demo-txt { font-size: 12px; color: var(--text-2); flex: 1; min-width: 260px; line-height: 1.6; }
+.demo-tip .row { margin-left: auto; }
 
 .sub-note { font-size: 11px; font-weight: 400; color: var(--text-3); }
 .sec-t { font-size: 12px; font-weight: 600; color: var(--text-1); margin-bottom: 6px; }
