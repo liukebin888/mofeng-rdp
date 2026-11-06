@@ -170,6 +170,7 @@ export const MENUS: MenuGroup[] = [
       { path: '/flow/start', title: '发起流程', desc: '四类流程对象', comp: v('flow/ApprovalsView') },
       { path: '/flow/approvals', title: '待我审批', desc: 'SOD-01 强制校验', comp: v('flow/ApprovalsView') },
       { path: '/flow/monitor', title: '流程监控与时限', desc: '超时升级（GAT-008）', comp: v('flow/ApprovalsView') },
+      { path: '/flow/apqp', title: '流程管理（APQP）', desc: 'APQP 五阶段流程节点 + 主计划模板 A/B/C/D 裁剪（APQ-001~005）', comp: v('flow/ApqpFlowView') },
       { path: '/flow/config', title: '流程与表单配置', desc: '配置化边界', comp: v('flow/ConfigView') }
     ]
   },

@@ -24,6 +24,25 @@
     </div>
 
     <div v-else>
+      <!-- 两步向导步骤条 -->
+      <div class="step-bar">
+        <div class="step-item" :class="{ active: step === 1, done: step === 2 }">
+          <span class="step-dot">{{ step === 2 ? '✓' : '1' }}</span>
+          <span class="step-text">① 项目基本信息 · 明确主计划对象 · 选模板</span>
+        </div>
+        <div class="step-line" :class="{ on: step === 2 }" />
+        <div class="step-item" :class="{ active: step === 2 }">
+          <span class="step-dot">2</span>
+          <span class="step-text">② 编辑固定计划节点（时间 / 负责人）</span>
+        </div>
+        <div class="step-actions" v-if="step === 1">
+          <el-button type="primary" size="small" @click="confirmStep1">下一步：载入模板节点</el-button>
+        </div>
+        <div class="step-actions" v-else>
+          <el-button size="small" @click="backToStep1">上一步：改基本信息 / 重选模板</el-button>
+        </div>
+      </div>
+
       <el-tabs v-model="activeTab" class="plan-tabs" type="border-card">
         <!-- ① 基本信息 -->
         <el-tab-pane name="basic">
@@ -34,9 +53,17 @@
                 <div class="panel-title">项目基本信息（<span class="required-note">红色 * 为必填项</span>）</div>
                 <el-form label-width="100px" size="small">
                   <el-form-item label="项目名称" required>
-                    <el-select v-model="form.name" filterable allow-create default-first-option placeholder="选择或输入项目名称" style="width: 100%" @change="markDirty">
+                    <el-select v-model="form.name" filterable allow-create default-first-option placeholder="选择或输入项目名称（明确主计划对象）" style="width: 100%" @change="markDirty">
                       <el-option v-for="p in store.spaceProjects" :key="p.id" :value="p.name" :label="`${p.code} · ${p.name}`" />
                     </el-select>
+                  </el-form-item>
+                  <el-form-item label="主计划模板" required>
+                    <el-select v-model="form.templateKind" placeholder="选择主计划模板 A/B/C/D" style="width: 100%" @change="onTemplateChange">
+                      <el-option v-for="t in tmplMetas" :key="t.kind" :value="t.kind" :label="`${t.name}（${t.nodeCount} 节点）`" />
+                    </el-select>
+                    <div class="muted" style="font-size: 11px; margin-top: 4px">
+                      模板由 APQP 流程节点裁剪而来（A 骨架级 → B 控制级 → C 核心专项级 → D 全专项级），节点固定、只改时间与负责人。
+                    </div>
                   </el-form-item>
                   <el-form-item label="产品大类" required>
                     <el-select v-model="form.category" filterable placeholder="选择产品大类（智能交互/智能控制等）" style="width: 100%" @change="onCategoryChange">
@@ -136,51 +163,32 @@
           </div>
         </el-tab-pane>
 
-        <!-- ③ 四级计划（十大专业线） -->
-        <el-tab-pane name="plan">
+        <!-- ③ 四级计划（固定节点，由模板裁剪） -->
+        <el-tab-pane v-if="step === 2" name="plan">
           <template #label><span class="tab-label">③ 四级计划</span></template>
           <div class="panel">
             <div class="panel-title">
-              四级计划（L1→L2→L3→L4 自上而下）
-              <span class="tag" :class="planValidation.passable ? 'ok' : 'fail'">{{ planNodes.length ? (planValidation.passable ? '对齐' : `${planValidation.violations.length} 项违规`) : '未录入' }}</span>
+              四级计划（固定节点 · {{ form.templateKind || '未选' }} 模板）
+              <span class="tag" :class="planValidation.passable ? 'ok' : 'fail'">{{ planNodes.length ? (planValidation.passable ? '对齐' : `${planValidation.violations.length} 项违规`) : '未载入' }}</span>
             </div>
-            <div class="muted" style="margin-bottom: 8px">上级计划是下级输入，下级不得滞后（R-COVER / R-NOLAG / R-COMPLETE 硬约束）。L4 十类专项对应主计划模板十大专业线。</div>
-
-            <!-- 新增节点 -->
-            <div class="node-add">
-              <el-select v-model="newNodeDraft.level" size="small" style="width: 92px" @change="onNewLevelChange">
-                <el-option v-for="lv in PLAN_LEVELS" :key="lv" :value="lv" :label="lv" />
-              </el-select>
-              <el-input v-model="newNodeDraft.code" size="small" placeholder="编码" style="width: 96px" />
-              <el-input v-model="newNodeDraft.name" size="small" placeholder="节点名称" style="flex: 1" />
-              <el-date-picker v-model="newNodeDraft.date" type="date" value-format="YYYY-MM-DD" size="small" placeholder="日期" style="width: 128px" />
-              <div class="node-owner"><PersonSelect v-model="newNodeDraft.ownerName" placeholder="负责人" /></div>
-              <el-select v-if="upperOptionsFor(newNodeDraft.level).length" v-model="newNodeDraft.upperNodeId" size="small" placeholder="承接上级" clearable style="width: 132px">
-                <el-option v-for="u in upperOptionsFor(newNodeDraft.level)" :key="u.id" :value="u.id" :label="u.name" />
-              </el-select>
-              <el-button size="small" type="primary" @click="addPlanNode">添加</el-button>
+            <div class="muted" style="margin-bottom: 8px">
+              节点由主计划模板 {{ form.templateKind || '—' }} 从 APQP 流程裁剪而来（固定，不可增删）；可编辑每个节点的计划完成时间与负责人。上级计划是下级输入，下级不得滞后（R-COVER / R-NOLAG 硬约束）。
             </div>
 
-            <!-- 十类专项快捷建行提示 -->
-            <div class="muted" style="margin-bottom: 8px; font-size: 11px">
-              L4 十类专项：{{ L4_SPECIALTIES.map((s) => s.name).join(' / ') }}
-            </div>
-
-            <!-- 四层节点列表（自上而下） -->
+            <!-- 四层节点列表（自上而下，只读编码/名称 + 可编辑时间/负责人） -->
             <div v-for="group in nodesByLevel" :key="group.level" class="level-block">
               <div class="level-head">
                 <span class="level-badge" :class="group.level.toLowerCase()">{{ group.level }}</span>
                 <span class="level-name">{{ group.meta.name }}</span>
                 <span class="muted" style="font-size: 11px">{{ group.meta.granularity }}</span>
               </div>
-              <div v-if="!group.nodes.length" class="level-empty">（暂无节点）</div>
+              <div v-if="!group.nodes.length" class="level-empty">（该层级在当前模板下无节点）</div>
               <div v-for="n in group.nodes" :key="n.id" class="node-row">
                 <span class="mono node-code">{{ n.code }}</span>
-                <span class="node-name">{{ n.name }}</span>
-                <span v-if="n.upperNodeId" class="node-up" :title="`承接：${upperName(n.upperNodeId)}`">↑ {{ upperName(n.upperNodeId) }}</span>
-                <el-date-picker :model-value="n.date" type="date" value-format="YYYY-MM-DD" size="small" class="node-date-pick" :class="{ lag: isLagging(n.id) }" placeholder="日期" @update:model-value="(v: string) => updateNodeDate(n.id, v)" />
-                <PersonSelect :model-value="n.ownerName || ''" placeholder="负责人" class="node-owner-inline" @update:model-value="(v: string) => updateNodeOwner(n.id, v)" />
-                <el-button link size="small" type="danger" @click="removePlanNode(n.id)">删除</el-button>
+                <span class="node-name" :title="n.ownerRole ? `默认责任角色：${n.ownerRole}` : undefined">{{ n.name }}</span>
+                <span v-if="n.milestone" class="node-ms">里程碑</span>
+                <el-date-picker :model-value="n.date" type="date" value-format="YYYY-MM-DD" size="small" class="node-date-pick" :class="{ lag: isLagging(n.id) }" placeholder="计划完成日" @update:model-value="(v: string) => updateNodeDate(n.id, v)" />
+                <PersonSelect :model-value="n.ownerName || ''" placeholder="负责人（组织架构）" class="node-owner-inline" @update:model-value="(v: string) => updateNodeOwner(n.id, v)" />
               </div>
             </div>
 
@@ -196,7 +204,7 @@
         </el-tab-pane>
 
         <!-- ④ 变更履历 -->
-        <el-tab-pane name="changes">
+        <el-tab-pane v-if="step === 2" name="changes">
           <template #label><span class="tab-label">④ 变更履历</span></template>
           <div class="panel">
             <div class="panel-title">主计划变更履历</div>
@@ -227,7 +235,7 @@
         </el-tab-pane>
 
         <!-- ⑤ 报警项 -->
-        <el-tab-pane name="alerts">
+        <el-tab-pane v-if="step === 2" name="alerts">
           <template #label><span class="tab-label">⑤ 报警项</span></template>
           <div class="panel">
             <div class="panel-title">红色 / 黄色报警项状态更新</div>
@@ -276,8 +284,9 @@ import WorkflowFormShell from '@/components/WorkflowFormShell.vue'
 import { useAppStore } from '@/store/app'
 import { newWorkflowForm, saveWorkflowForm } from '@/domain/workflowForm'
 import type { WorkflowForm } from '@/domain/workflowForm'
-import { PLAN_LEVELS, PLAN_LEVEL_META, L4_SPECIALTIES, sortByLevel, validateFourLevelPlan, type PlanNode, type PlanLevel } from '@/domain/fourLevelPlan'
+import { PLAN_LEVELS, PLAN_LEVEL_META, sortByLevel, type PlanNode } from '@/domain/fourLevelPlan'
 import { nextVersion, compareVersion, isValidVersion, INITIAL_PLAN_VERSION } from '@/domain/planVersion'
+import { templateNodesOf, templateMetas, isValidTemplateKind, validateTemplatePlan, type PlanTemplateKind } from '@/domain/planTemplate'
 
 const store = useAppStore()
 
@@ -287,13 +296,15 @@ const activeTab = ref('basic')
 const EMPTY_FORM = {
   name: '', category: '', productLine: '', startDate: '', endDate: '', milestones: '', resource: '',
   customer: '', vehicleModel: '', productQty: 0, annualVolume: 0, lifecycle: 0, otsDate: '', sopDate: '',
-  bookNo: '', devNature: '', planVersion: ''
+  bookNo: '', devNature: '', planVersion: '', templateKind: '' as '' | PlanTemplateKind
 }
 const form = reactive({ ...EMPTY_FORM })
 
-// —— 四级计划层级树（L1→L2→L3→L4 自上而下，方案 PLN-4LV）——
+/** 两步向导步骤：1 = 基本信息 + 选对象 + 选模板；2 = 编辑固定节点 */
+const step = ref<1 | 2>(1)
+
+// —— 四级计划层级树（固定节点，由主计划模板 A/B/C/D 裁剪而来）——
 const planNodes = ref<PlanNode[]>([])
-const newNodeDraft = reactive({ level: 'L1' as PlanLevel, code: '', name: '', date: '', ownerName: '', upperNodeId: '' })
 
 // —— 主计划变更履历 ——
 interface PlanChange { time: string; content: string; basis: string; confirmers: string }
@@ -305,41 +316,26 @@ interface PlanAlert { level: string; time: string; content: string; owner: strin
 const alerts = ref<PlanAlert[]>([])
 const alertDraft = reactive({ level: '黄色', time: '', content: '', owner: '' })
 
-/** 当前层级可选上级（上一级节点） */
-function upperOptionsFor(level: PlanLevel): PlanNode[] {
-  const order: Record<PlanLevel, PlanLevel | null> = { L1: null, L2: 'L1', L3: 'L2', L4: 'L3' }
-  const upper = order[level]
-  if (!upper) return []
-  return planNodes.value.filter((n) => n.level === upper)
-}
-
 /** 按层级分组后的节点（L1 在最上） */
 const nodesByLevel = computed(() => {
   const sorted = sortByLevel(planNodes.value)
   return PLAN_LEVELS.map((lv) => ({ level: lv, meta: PLAN_LEVEL_META.find((m) => m.level === lv)!, nodes: sorted.filter((n) => n.level === lv) }))
 })
 
-/** 四级计划校验结果（单一权威 validateFourLevelPlan） */
-const planValidation = computed(() => validateFourLevelPlan(planNodes.value))
-
-function addPlanNode() {
-  if (!newNodeDraft.code.trim() || !newNodeDraft.name.trim() || !newNodeDraft.date) {
-    store.notify('error', '节点编码 / 名称 / 日期为必填')
-    return
+/** 模板骨架校验结果（单一权威 validateTemplatePlan，节点固定无需 R-COVER） */
+const planValidation = computed(() => {
+  const v = validateTemplatePlan(planNodes.value, { projectStartDate: form.startDate || undefined, projectEndDate: form.endDate || undefined })
+  return {
+    passable: v.passable,
+    missingDates: v.missingDates,
+    outOfRange: v.outOfRange,
+    violations: [
+      ...v.missingDates.map((n) => ({ rule: 'MPT-004', message: `节点「${n.name}」未填计划完成日` })),
+      ...v.outOfRange.map((n) => ({ rule: 'MPT-004', message: `节点「${n.name}」日期超出项目周期` }))
+    ],
+    lagging: [] as Array<{ nodeId: string }>
   }
-  const node: PlanNode = {
-    id: `${newNodeDraft.level}-${Date.now()}`,
-    level: newNodeDraft.level,
-    code: newNodeDraft.code.trim(),
-    name: newNodeDraft.name.trim(),
-    date: newNodeDraft.date,
-    ownerName: newNodeDraft.ownerName.trim() || undefined,
-    upperNodeId: newNodeDraft.upperNodeId || undefined
-  }
-  planNodes.value = [...planNodes.value, node]
-  Object.assign(newNodeDraft, { code: '', name: '', date: '', ownerName: '', upperNodeId: '' })
-  markDirty()
-}
+})
 
 /** 修改节点日期（时间可编辑修改） */
 function updateNodeDate(id: string, date: string) {
@@ -353,23 +349,8 @@ function updateNodeOwner(id: string, ownerName: string) {
   markDirty()
 }
 
-function removePlanNode(id: string) {
-  planNodes.value = planNodes.value
-    .filter((n) => n.id !== id)
-    .map((n) => (n.upperNodeId === id ? { ...n, upperNodeId: undefined } : n))
-  markDirty()
-}
-
-function onNewLevelChange() {
-  newNodeDraft.upperNodeId = ''
-}
-
-function upperName(id: string): string {
-  return planNodes.value.find((n) => n.id === id)?.name ?? id
-}
-
 function isLagging(nodeId: string): boolean {
-  return planValidation.value.lagging.some((l) => l.nodeId === nodeId)
+  return planValidation.value.outOfRange.some((n) => n.id === nodeId)
 }
 
 function addChange() {
@@ -441,12 +422,21 @@ function deriveNextVersion(): string {
 }
 
 const productCategories = computed(() => store.productCategories)
+/** 四套主计划模板元信息（供模板选择器） */
+const tmplMetas = computed(() => templateMetas())
 const currentLines = computed(() => {
   const cat = store.productCategories.find((c) => c.name === form.category)
   return cat ? store.productLines.filter((l) => l.categoryId === cat.id) : store.productLines
 })
 function onCategoryChange() {
   form.productLine = ''
+  markDirty()
+}
+
+/** 切换模板：清空已载入节点（若已在步骤 2 需重载） */
+function onTemplateChange() {
+  planNodes.value = []
+  if (step.value === 2) step.value = 1
   markDirty()
 }
 
@@ -488,6 +478,8 @@ function hydrateContent(content: string) {
     if (Array.isArray(obj.changes)) changes.value = obj.changes
     if (Array.isArray(obj.alerts)) alerts.value = obj.alerts
     if (typeof obj.planVersion === 'string' && isValidVersion(obj.planVersion)) planVersion.value = obj.planVersion
+    // 续编：若已选模板且已载入节点，则直接进入步骤 2
+    if (form.templateKind && planNodes.value.length) step.value = 2
   } catch {
     /* 忽略损坏草稿 */
   }
@@ -513,14 +505,38 @@ async function wfNew() {
   wfForm.value = f
   dirty.value = false
   wfBlockers.value = []
+  step.value = 1
   activeTab.value = 'basic'
+}
 
-  // 回显：从后端拉取已落表节点（落表为权威，覆盖可能过期的草稿）
-  const persisted = await store.loadFourLevelPlan()
-  if (persisted.length) {
-    planNodes.value = sortByLevel(persisted)
-    store.notify('info', `已从后端回显 ${persisted.length} 个已落表计划节点`)
+/**
+ * 步骤 1 → 步骤 2：校验基本信息 + 已明确主计划对象 + 已选模板，
+ * 然后载入模板固定节点骨架，进入节点编辑。
+ */
+function confirmStep1() {
+  const missing = missingRequiredFields()
+  if (missing.length) {
+    store.notify('error', `请先填写必填项：${missing.join('、')}`)
+    return
   }
+  if (!form.templateKind || !isValidTemplateKind(form.templateKind)) {
+    store.notify('error', '请选择主计划模板（A/B/C/D）')
+    return
+  }
+  // 载入模板固定节点骨架（节点固定，只改时间/负责人）
+  planNodes.value = templateNodesOf(form.templateKind)
+  markDirty()
+  step.value = 2
+  activeTab.value = 'plan'
+  store.notify('info', `已载入 ${form.templateKind} 模板固定节点 ${planNodes.value.length} 个（节点固定，可编辑时间与负责人）`)
+}
+
+/** 返回步骤 1（重新选模板/改基本信息） */
+function backToStep1() {
+  step.value = 1
+  activeTab.value = 'basic'
+  // 保留已填基本信息，仅清空节点以便重选模板后重新载入
+  planNodes.value = []
 }
 
 function wfSave() {
@@ -543,11 +559,13 @@ async function wfSubmit(customApprovers: import('@/domain/flowEngine').CustomApp
   const blockers: string[] = []
   const missing = missingRequiredFields()
   if (missing.length) blockers.push(`必填项未填写：${missing.join('、')}`)
-  // 四级计划硬约束：存在孤儿上级 / 下级滞后时阻断提交（PLN-4LV R-COVER/R-NOLAG，本地即时预检）
+  // 模板骨架校验：节点日期已填 + 日期不越界（MPT-004，本地即时预检）
   if (planNodes.value.length) {
-    const v = planValidation.value
-    if (v.orphans.length) blockers.push(`R-COVER：${v.orphans.length} 个上级节点无下级承接（${v.orphans.map((o) => o.name).join('、')}）`)
-    if (v.lagging.length) blockers.push(`R-NOLAG：${v.lagging.length} 个下级节点滞后上级（${v.lagging.map((l) => l.nodeId).join('、')}）`)
+    const v = validateTemplatePlan(planNodes.value, { projectStartDate: form.startDate || undefined, projectEndDate: form.endDate || undefined })
+    if (v.missingDates.length) blockers.push(`MPT-004：${v.missingDates.length} 个节点未填计划完成日（${v.missingDates.map((n) => n.name).join('、')}）`)
+    if (v.outOfRange.length) blockers.push(`MPT-004：${v.outOfRange.length} 个节点日期超出项目周期（${v.outOfRange.map((n) => n.name).join('、')}）`)
+  } else {
+    blockers.push('未载入主计划模板节点，请返回步骤 1 选择模板')
   }
   if (blockers.length) {
     wfBlockers.value = blockers
@@ -584,6 +602,7 @@ async function wfSubmit(customApprovers: import('@/domain/flowEngine').CustomApp
     sopDate: form.sopDate,
     bookNo: form.bookNo,
     devNature: form.devNature,
+    templateKind: form.templateKind,
     planVersion: planVersion.value,
     planNodeCount: planNodes.value.length,
     changeCount: changes.value.length,
@@ -591,7 +610,7 @@ async function wfSubmit(customApprovers: import('@/domain/flowEngine').CustomApp
   }
   const ok = store.submitWorkflowForm(wfForm.value, `项目主计划：${form.name}`, formData, customApprovers)
   if (ok) {
-    store.notify('success', `项目主计划（版本 ${planVersion.value}）已提交审批（PMO 审核 → 部门会签 → 总经理批准）；下次编制将自动升版为 ${nextVersion(planVersion.value)}`)
+    store.notify('success', `项目主计划（模板 ${form.templateKind} · 版本 ${planVersion.value}）已提交审批（PMO 审核 → 部门会签 → 总经理批准）；下次编制将自动升版为 ${nextVersion(planVersion.value)}`)
     dirty.value = false
     wfBlockers.value = []
   }
@@ -624,10 +643,10 @@ async function wfSubmit(customApprovers: import('@/domain/flowEngine').CustomApp
 .level-badge.l4 { background: #1d4a2e; color: #8ee6b0; }
 .level-name { font-size: 12.5px; font-weight: 600; color: var(--text-1); }
 .level-empty { font-size: 11px; color: var(--text-3); padding: 4px 0 4px 34px; }
-.node-row { display: grid; grid-template-columns: 70px 1fr auto 128px 150px 40px; gap: 8px; align-items: center; padding: 4px 0 4px 34px; font-size: 12px; border-bottom: 1px dashed #16233a; }
+.node-row { display: grid; grid-template-columns: 74px 1fr auto 128px 150px; gap: 8px; align-items: center; padding: 4px 0 4px 34px; font-size: 12px; border-bottom: 1px dashed #16233a; }
 .node-code { color: var(--text-3); }
 .node-name { color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.node-up { color: #93c5fd; font-size: 11px; }
+.node-ms { color: #c4b5fd; font-size: 11px; border: 1px solid #3b2a6b; background: #1d1535; padding: 0 5px; border-radius: 4px; }
 .node-date { color: var(--text-2); font-variant-numeric: tabular-nums; text-align: right; }
 .node-date.lag { color: #f87171; font-weight: 600; }
 .node-date-pick :deep(.el-input__wrapper) { padding: 0 6px; }
@@ -635,6 +654,17 @@ async function wfSubmit(customApprovers: import('@/domain/flowEngine').CustomApp
 .node-owner { width: 170px; flex: none; }
 .node-owner-inline { width: 100%; }
 .node-owner-inline :deep(.el-input__wrapper) { padding: 0 6px; }
+/* 两步向导步骤条 */
+.step-bar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; margin-bottom: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-bg, #0f1a2a); }
+.step-item { display: flex; align-items: center; gap: 7px; }
+.step-item .step-dot { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; font-size: 12px; font-weight: 700; background: var(--bg-2, #1c2b44); color: var(--text-3); border: 1px solid var(--line); }
+.step-item.active .step-dot { background: #1d4a2e; color: #8ee6b0; border-color: #1d4a2e; }
+.step-item.done .step-dot { background: #1d4a2e; color: #8ee6b0; border-color: #1d4a2e; }
+.step-item .step-text { font-size: 12.5px; color: var(--text-3); }
+.step-item.active .step-text { color: var(--text-1); font-weight: 600; }
+.step-line { flex: 1; height: 1px; background: var(--line); }
+.step-line.on { background: #1d4a2e; }
+.step-actions { display: flex; gap: 6px; }
 .ok-box { padding: 7px 9px; border: 1px solid #1d4a2e; background: #0f2418; color: #8ee6b0; border-radius: 6px; font-size: 11.5px; }
 .check { display: flex; gap: 7px; align-items: flex-start; padding: 4px 0; font-size: 11.5px; color: var(--text-1); }
 .warn-box { background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.35); color: #fbbf24; border-radius: 6px; padding: 8px 12px; font-size: 12px; }
