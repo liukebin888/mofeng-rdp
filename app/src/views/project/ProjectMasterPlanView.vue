@@ -113,30 +113,44 @@
           <span class="sub-note">项目主计划（L1 客户里程碑）与各分计划（结构 / 硬件 / 软件 / 测试 / 过程）统一编排于同一时间轴，并展开里程碑门禁与分计划支撑，合成一个整体；数据实时映射自四级计划节点</span>
         </div>
 
-        <!-- 统一时间轴 -->
+        <!-- 统一时间轴（RMP 式：全局时间基准 · 横线居中 · 节点上下交错 · 今天红线跨行） -->
         <div class="pp-uni">
           <div class="pp-uni-h">统一时间轴（项目主计划 + 各分计划 · 同一时间基准，红线为今天，跨所有泳道）</div>
-          <div class="pp-tl-scroll">
-            <div class="pp-lanes">
-              <div v-for="(lane, i) in lanes" :key="lane.key" class="pp-lane" :class="{ master: lane.key === 'mp' }" :style="{ '--hue': lane.hue }">
-                <div class="pp-lane-lab">
-                  <span class="dot" :style="{ background: lane.hue }" />{{ lane.name }}
-                  <span v-if="lane.key === 'mp'" class="mtag">主</span>
+          <div v-if="timelineLayout" class="pp-tl-scroll">
+            <div class="pp-scroll">
+              <!-- 顶部月轴刻度 -->
+              <div class="pp-axis">
+                <span v-for="mo in timelineLayout.months" :key="mo.label" class="pp-ml" :style="{ left: mo.left + '%' }">{{ mo.label }}</span>
+              </div>
+              <!-- 泳道区（含网格线 + 今天红线跨行 + 各泳道） -->
+              <div class="pp-lanes">
+                <!-- 月网格线 -->
+                <span v-for="mo in timelineLayout.months" :key="'g' + mo.label" class="pp-g" :style="{ left: mo.left + '%' }" />
+                <!-- 今天红线（跨所有泳道） -->
+                <div class="pp-today2" :class="{ out: !timelineLayout.todayInRange }" :style="{ left: timelineLayout.todayLeft + '%' }">
+                  <span class="pp-today-lab">今天 {{ todayLabel }}</span>
                 </div>
-                <div class="pp-lane-track">
-                  <div class="pp-lane-line" />
-                  <div
-                    v-for="(n, k) in sortedTimeline(lane.timeline)"
-                    :key="n.name"
-                    class="tl-node"
-                    :style="{ left: posOf(lane, n, k) + '%' }"
-                  >
-                    <div class="tl-box" :class="k % 2 === 0 ? 'tl-above' : 'tl-below'">
-                      <div class="tl-name">{{ stripCg(n.name) }}</div>
-                      <div class="tl-meta">{{ n.date }} · {{ n.owner }}</div>
-                      <span class="badge" :class="TL_ST[n.status].cls">{{ TL_ST[n.status].t }}</span>
+                <!-- 各泳道：一条横向时间轴线，节点落在线上，说明框上下交错 -->
+                <div v-for="lane in lanes" :key="lane.key" class="pp-lane" :class="{ master: lane.key === 'mp' }" :style="{ '--hue': lane.hue }">
+                  <div class="pp-lane-lab" :style="lane.key === 'mp' ? {} : { color: lane.hue }">
+                    <span class="dot" :style="{ background: lane.hue }" />{{ lane.name }}
+                    <span v-if="lane.key === 'mp'" class="mtag">主</span>
+                  </div>
+                  <div class="pp-lane-track">
+                    <div class="pp-lane-line" />
+                    <div
+                      v-for="(n, k) in sortedTimeline(lane.timeline)"
+                      :key="lane.key + '-' + n.name + '-' + k"
+                      class="tl-node"
+                      :style="{ left: gposOf(n.date) + '%' }"
+                    >
+                      <div class="tl-box" :class="k % 2 === 0 ? 'tl-above' : 'tl-below'">
+                        <div class="tl-name">{{ stripCg(n.name) }}</div>
+                        <div class="tl-meta">{{ n.date }} · {{ n.owner }}</div>
+                        <span class="badge" :class="TL_ST[n.status].cls">{{ TL_ST[n.status].t }}</span>
+                      </div>
+                      <div class="tl-dot" :class="TL_ST[n.status].cls" :title="`${stripCg(n.name)} · ${n.date} · ${n.owner} · ${TL_ST[n.status].t}`" />
                     </div>
-                    <div class="tl-dot" :class="TL_ST[n.status].cls" :title="`${stripCg(n.name)} · ${n.date} · ${n.owner} · ${TL_ST[n.status].t}`" />
                   </div>
                 </div>
               </div>
@@ -148,7 +162,7 @@
             <span><i class="lg" style="background: #94a3b8" />未开始</span>
             <span><i class="lg" style="background: #ef4444" />已逾期</span>
             <span><i class="lg" style="background: #ff4d4f" />今天（{{ todayLabel }}）</span>
-            <span class="sub">· 同侧相邻图框间隔 ≥ 2mm；可横向滚动</span>
+            <span class="sub">· 同一时间基准跨所有泳道 · 节点说明框上下交错 · 可横向滚动</span>
           </div>
         </div>
 
@@ -297,16 +311,65 @@ function sortedTimeline(tl: PlanTimelineNode[]): PlanTimelineNode[] {
   return tl.slice().sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 }
 
-/** 统一时间轴节点位置（百分比），按泳道内时间范围映射，左右留白 */
-function posOf(lane: { timeline: PlanTimelineNode[] }, node: PlanTimelineNode, idx: number): number {
-  const arr = sortedTimeline(lane.timeline)
-  const dates = arr.map((n) => new Date(n.date).getTime())
-  const t0 = Math.min(...dates)
-  const t1 = Math.max(...dates)
-  const span = t1 - t0 || 1
-  const IN = 6
-  const p = IN + ((new Date(node.date).getTime() - t0) / span) * (100 - 2 * IN)
-  void idx
+/**
+ * 统一时间轴全局布局（忠实复刻 RMP renderUnifiedTimeline）：
+ * 所有泳道共用同一全局时间基准（全局 min/max + 前后各 PAD 天），
+ * 月轴刻度 / 网格线 / 今天红线跨所有泳道，节点按全局日期映射百分比。
+ */
+const PAD = 20
+const IN = 10 // 两端留白(%)
+
+interface TimelineLayout {
+  pad: Date
+  hi: Date
+  span: number
+  months: Array<{ label: string; left: number }>
+  todayLeft: number
+  todayInRange: boolean
+}
+
+const timelineLayout = computed<TimelineLayout | null>(() => {
+  const all = lanes.value
+  const allDates: number[] = []
+  for (const p of all) {
+    for (const n of p.timeline) {
+      if (n.date) {
+        const t = new Date(n.date).getTime()
+        if (!Number.isNaN(t)) allDates.push(t)
+      }
+    }
+  }
+  if (!allDates.length) return null
+  const dmin = new Date(Math.min(...allDates))
+  const dmax = new Date(Math.max(...allDates))
+  const pad = new Date(dmin)
+  pad.setDate(pad.getDate() - PAD)
+  const hi = new Date(dmax)
+  hi.setDate(hi.getDate() + PAD)
+  const span = hi.getTime() - pad.getTime() || 1
+  const gpos = (t: number) => {
+    const p = IN + ((t - pad.getTime()) / span) * (100 - 2 * IN)
+    return Math.max(IN, Math.min(100 - IN, p))
+  }
+  const months: Array<{ label: string; left: number }> = []
+  let m = new Date(pad.getFullYear(), pad.getMonth(), 1)
+  while (m <= hi) {
+    months.push({ label: `${m.getFullYear()}/${m.getMonth() + 1}`, left: gpos(m.getTime()) })
+    m = new Date(m.getFullYear(), m.getMonth() + 1, 1)
+  }
+  const today = new Date()
+  const todayLeft = gpos(today.getTime())
+  const todayInRange = today >= pad && today <= hi
+  return { pad, hi, span, months, todayLeft, todayInRange }
+})
+
+/** 节点在全局时间轴上的百分比位置（同一时间基准，跨泳道对齐） */
+function gposOf(date: string): number {
+  const layout = timelineLayout.value
+  if (!layout) return IN
+  const t = new Date(date).getTime()
+  if (Number.isNaN(t)) return IN
+  const p = IN + ((t - layout.pad.getTime()) / layout.span) * (100 - 2 * IN)
   return Math.max(IN, Math.min(100 - IN, p))
 }
 
@@ -415,23 +478,39 @@ void SUB_ORDER
 
 .pp-uni-h { font-size: 12px; font-weight: 600; color: var(--text-1); margin-bottom: 8px; }
 .pp-tl-scroll { overflow-x: auto; }
-.pp-lanes { display: flex; flex-direction: column; gap: 10px; min-width: 900px; }
-.pp-lane { display: flex; gap: 10px; align-items: stretch; }
-.pp-lane-lab { flex: none; width: 150px; font-size: 12px; font-weight: 600; color: var(--text-1); display: flex; align-items: center; gap: 6px; padding-top: 22px; }
-.pp-lane.master .pp-lane-lab { color: #dc2626; }
-.pp-lane-track { flex: 1; position: relative; height: 78px; }
-.pp-lane-line { position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: var(--hue, #94a3b8); opacity: 0.35; border-radius: 1px; }
-.tl-node { position: absolute; top: 0; height: 100%; display: flex; flex-direction: column; align-items: center; }
-.tl-box { position: absolute; font-size: 10px; padding: 3px 7px; border-radius: 5px; background: var(--bg-2); border: 1px solid var(--line); white-space: nowrap; }
-.tl-above { bottom: 55%; }
-.tl-below { top: 55%; }
+.pp-scroll { position: relative; min-width: 1000px; }
+/* 顶部月轴刻度 */
+.pp-axis { position: relative; height: 18px; margin-left: 158px; font-size: 11px; color: var(--text-3); }
+.pp-ml { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+/* 泳道区 */
+.pp-lanes { position: relative; margin-left: 158px; margin-top: 18px; }
+.pp-g { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line-soft); opacity: .6; }
+/* 今天红线（跨所有泳道） */
+.pp-today2 { position: absolute; top: 0; bottom: 0; width: 2px; background: #dc2626; z-index: 5; }
+.pp-today2.out { background: #9ca3af; }
+.pp-today-lab { position: absolute; top: 0; left: 50%; transform: translateX(-50%); background: #dc2626; color: #fff; font-size: 10px; padding: 1px 6px; border-radius: 4px; white-space: nowrap; }
+.pp-today2.out .pp-today-lab { background: #9ca3af; }
+/* 每个泳道：一条横向时间轴线，节点落在线上，说明框上下交错 */
+.pp-lane { position: relative; height: 230px; border-top: 1px solid var(--line-soft); }
+.pp-lane:first-child { border-top: none; }
+.pp-lane.master .pp-lane-lab { color: #dc2626; font-weight: 800; }
+.pp-lane-lab { position: absolute; left: -158px; top: 50%; transform: translateY(-50%); width: 150px; font-weight: 700; font-size: 13px; padding-right: 8px; box-sizing: border-box; display: flex; align-items: center; gap: 7px; z-index: 3; }
+.pp-lane-lab .dot { width: 11px; height: 11px; border-radius: 50%; flex: none; margin: 0; }
+.pp-lane-track { position: absolute; left: 0; right: 0; top: 0; bottom: 0; }
+.pp-lane-line { position: absolute; left: 0; right: 0; top: 50%; height: 3px; background: var(--hue, #cbd5e1); opacity: .7; border-radius: 2px; transform: translateY(-50%); }
+.pp-lane-track .tl-node { top: 50%; }
+.pp-lane-track .tl-above { bottom: 20px; }
+.pp-lane-track .tl-below { top: 20px; }
+.pp-lane-track .tl-dot { width: 14px; height: 14px; }
+.tl-node { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; }
+.tl-box { position: absolute; left: 50%; transform: translateX(-50%); width: 168px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 9px; padding: 6px 9px; box-shadow: 0 2px 8px rgba(0,0,0,.07); font-size: 11.5px; line-height: 1.4; }
 .tl-name { font-weight: 600; color: var(--text-1); }
-.tl-meta { color: var(--text-3); font-size: 9px; }
-.tl-dot { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 10px; height: 10px; border-radius: 50%; }
+.tl-meta { color: var(--text-3); font-size: 11px; margin: 3px 0 5px; }
+.tl-dot { width: 14px; height: 14px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.28); cursor: pointer; }
 .tl-dot.done { background: #16a34a; }
 .tl-dot.doing { background: #0891b2; }
 .tl-dot.todo { background: #94a3b8; }
-.tl-dot.overdue { background: #ef4444; }
+.tl-dot.overdue { background: #dc2626; box-shadow: 0 0 0 3px #fecaca; }
 .badge { font-size: 9px; padding: 0 5px; border-radius: 4px; border: 1px solid; }
 .badge.done { color: #9ae6b4; border-color: #1d4a2e; }
 .badge.doing { color: #67e8f9; border-color: #155e75; }
@@ -439,7 +518,7 @@ void SUB_ORDER
 .badge.overdue { color: #fca5a5; border-color: #5b2020; }
 .badge.approved { color: #9ae6b4; border-color: #1d4a2e; background: #0f2418; }
 .badge.draft { color: #cbd5e1; border-color: #475569; }
-.pp-legend { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-top: 8px; font-size: 11px; color: var(--text-2); }
+.pp-legend { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 11px; color: var(--text-2); }
 .pp-legend .sub { color: var(--text-3); }
 .lg { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
 
