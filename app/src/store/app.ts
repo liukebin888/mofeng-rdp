@@ -5,7 +5,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { buildSeed, SEED_VERSION, type SeedData, type SeedUser } from '@/data/seed'
-import { buildDemoSeed } from '@/data/demoSeed'
 import { evaluateControlPoints, type CpContext } from '@/domain/controlPoints'
 import {
   filterByScope,
@@ -167,22 +166,12 @@ function load(): PersistShape | null {
 }
 
 /**
- * e2e 演示种子开关：e2e 交互回归脚本在浏览器启动前写入该标记，
- * 使应用以演示数据（buildDemoSeed）初始化，而非空项目种子（buildSeed）。
- * 该标记仅影响首次播种与重置，不改变生产发布基线（生产 buildSeed 项目台账恒为空）。
+ * 平台为通用研发管理工具，生产种子项目台账恒为空，
+ * 项目由用户通过「立项」工作流创建，不预置任何演示/示例数据。
  */
-const E2E_DEMO_KEY = 'mofeng.rdp.e2e-demo.v1'
-function e2eDemoEnabled(): boolean {
-  try {
-    return localStorage.getItem(E2E_DEMO_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
 export const useAppStore = defineStore('app', () => {
   const saved = load()
-  const data = ref<SeedData>(saved?.data ?? (e2eDemoEnabled() ? (buildDemoSeed() as SeedData) : buildSeed()))
+  const data = ref<SeedData>(saved?.data ?? buildSeed())
   const userId = ref<string>(saved?.userId ?? 'U003')
   const projectId = ref<string>(saved?.projectId ?? '')
   const spaceId = ref<string>(saved?.spaceId ?? 'SP-001')
@@ -409,7 +398,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function reset() {
-    data.value = e2eDemoEnabled() ? (buildDemoSeed() as SeedData) : buildSeed()
+    data.value = buildSeed()
     userId.value = 'U003'
     projectId.value = ''
     spaceId.value = 'SP-001'
