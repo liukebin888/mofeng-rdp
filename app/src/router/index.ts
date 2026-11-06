@@ -51,6 +51,7 @@ export const MENUS: MenuGroup[] = [
     items: [
       { path: '/project/task', title: '项目任务书', desc: '任务目标/交付物/里程碑，项目经理发起→研发副总审核→总经理批准', comp: v('project/ProjectTaskView') },
       { path: '/project/plan', title: '项目主计划', desc: '计划周期/里程碑/资源，PMO审核→部门会签→总经理批准', comp: v('project/ProjectPlanView') },
+      { path: '/project/master-plan', title: '项目主计划·集成视图', desc: 'RMP 式集成整体视图：CG1-CG7 × 分计划统一时间轴 + 产品等级工时估算', comp: v('project/ProjectMasterPlanView') },
       { path: '/project/ots', title: 'OTS 认可', desc: '三大条件附件驱动 + L1-L4 等级自动判定，部门会签→客户认可→总经理批准', comp: v('project/OtsApprovalView') },
       { path: '/project/ots-attachment-a', title: '附件 A 设计文件归档', desc: '设计文件归档汇总表（A-1 电子 / A-2 结构 / A-3 工艺），只读', comp: v('project/OtsAttachmentA') },
       { path: '/project/ots-attachment-b', title: '附件 B 样件评审报告', desc: 'OTS 样件评审报告，只读', comp: v('project/OtsAttachmentB') },
