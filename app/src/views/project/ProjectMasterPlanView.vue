@@ -33,17 +33,16 @@
       </div>
     </div>
 
-    <!-- 演示数据提示（四级计划未录入时回退内置 RMP 演示数据，对齐 RMP 打开即见全貌） -->
-    <div v-if="!hasRealData" class="panel demo-tip" style="margin-top: 14px">
-      <span class="demo-flag">演示数据</span>
-      <span class="demo-txt">当前展示内置项目主计划（CG1–CG7 里程碑 + 结构/硬件/软件/测试/过程 5 分计划）。录入真实四级计划后将自动切换为实际数据。</span>
-      <div class="row" style="gap: 8px">
-        <el-button type="primary" size="small" @click="$router.push('/project/master-plan')">录入真实计划</el-button>
-        <el-button size="small" @click="wfNew">新增主计划</el-button>
+    <!-- 空白模板引导态（尚未录入任何主计划数据时展示） -->
+    <div v-if="!hasRealData" class="panel empty-panel" style="margin-top: 14px">
+      <el-empty description="项目主计划是适用于任何项目的通用计划模板。点击「新增主计划」用模板引导编制：里程碑 CG1–CG7 与结构/硬件/软件/测试/过程五类分计划时间轴，编制完成后提交审批。" :image-size="90" />
+      <div class="row center">
+        <el-button type="primary" size="small" @click="wfNew">新增主计划</el-button>
+        <el-button size="small" @click="$router.push('/project/master-plan')">进入编辑模式</el-button>
       </div>
     </div>
 
-    <div class="mp-body">
+    <div v-if="hasRealData" class="mp-body">
       <!-- ② 5 项 KPI -->
       <div class="grid grid-5" style="margin-top: 14px">
         <KpiCard label="计划总数" :value="kpis.total" unit="项" sub="1 主 + 5 分" />
@@ -71,7 +70,7 @@
 
         <div class="pb" style="padding: 0; margin-top: 12px">
           <div class="sec-t">项目产品清单（含产品等级）</div>
-          <el-table :data="MASTER_PLAN.products" size="small" border>
+          <el-table :data="products" size="small" border>
             <el-table-column prop="cat" label="产品大类" width="120" />
             <el-table-column prop="name" label="产品" min-width="140" />
             <el-table-column prop="model" label="型号" min-width="120" />
@@ -83,6 +82,7 @@
               </template>
             </el-table-column>
           </el-table>
+          <div v-if="!products.length" style="text-align: center; color: var(--text-3); padding: 12px; font-size: 12px">暂无产品，编制主计划时按需添加产品清单</div>
         </div>
 
         <div class="pb" style="padding: 0; margin-top: 14px">
@@ -250,7 +250,6 @@ import { useAppStore } from '@/store/app'
 import { newWorkflowForm, saveWorkflowForm } from '@/domain/workflowForm'
 import type { WorkflowForm } from '@/domain/workflowForm'
 import {
-  MASTER_PLAN,
   DEV_PLANS,
   SUB_ORDER,
   TL_ST,
@@ -262,10 +261,6 @@ import {
   masterPlanKpisFrom,
   computeRagFrom,
   subPlanTimelineNodes,
-  unifiedTimelinePlans,
-  milestoneMatrix,
-  masterPlanKpis,
-  computeRag,
   type PlanTimelineNode
 } from '@/domain/projectMasterPlan'
 import type { PlanNode } from '@/domain/fourLevelPlan'
@@ -274,28 +269,31 @@ const store = useAppStore()
 const router = useRouter()
 
 const projId = ref(store.projectId)
-const calcGrade = ref(MASTER_PLAN.calcGrade)
+const calcGrade = ref(3)
 
-// 四级计划真实数据（真数据驱动）
+// 产品清单（空白模板不预填，由用户编制主计划时添加）
+const products = ref<Array<{ cat: string; name: string; model: string; grade: number }>>([])
+
+// 四级计划真实数据（真数据驱动）：仅由用户「新建主计划」后录入，不预填任何演示数据
 const planNodes = ref<PlanNode[]>([])
 
-const proj = computed(() => store.spaceProjects.find((p) => p.id === projId.value) ?? store.spaceProjects[0] ?? { code: 'PRJ-001', name: '示例项目', productLine: '项目管理部', start: '2026-01-01', end: '2026-12-31', owner: '项目经理' } as any)
-const projOwner = computed(() => (proj.value as any).owner ?? '项目经理')
+const proj = computed(() => store.spaceProjects.find((p) => p.id === projId.value) ?? store.spaceProjects[0] ?? { code: '', name: '', productLine: '', start: '', end: '', owner: '' } as any)
+const projOwner = computed(() => (proj.value as any).owner ?? '—')
 const projStart = computed(() => (proj.value as any).start ?? (proj.value as any).from ?? '—')
 const projEnd = computed(() => (proj.value as any).end ?? (proj.value as any).to ?? '—')
 
-// 是否有真实四级计划数据：有则真数据驱动，无则回退内置 RMP 演示数据（对齐 RMP 打开即见全貌）
+// 是否有已录入的四级计划数据（真数据驱动，无演示数据回退）
 const hasRealData = computed(() => planNodes.value.length > 0)
 
-const kpis = computed(() => (hasRealData.value ? masterPlanKpisFrom(planNodes.value) : masterPlanKpis()))
-const rag = computed(() => (hasRealData.value ? computeRagFrom(planNodes.value) : computeRag()))
+const kpis = computed(() => masterPlanKpisFrom(planNodes.value))
+const rag = computed(() => computeRagFrom(planNodes.value))
 const ragCls = computed(() => ({ red: 'rag-red', amber: 'rag-amber', green: 'rag-green' }[rag.value.cls]))
 const estimate = computed(() => gradeEstimate(calcGrade.value))
-const matrix = computed(() => (hasRealData.value ? milestoneMatrixFrom(planNodes.value) : milestoneMatrix()))
-const lanes = computed(() => (hasRealData.value ? unifiedTimelinePlansFrom(planNodes.value) : unifiedTimelinePlans()))
+const matrix = computed(() => milestoneMatrixFrom(planNodes.value))
+const lanes = computed(() => unifiedTimelinePlansFrom(planNodes.value))
 
 const projections = computed(() =>
-  DEV_PLANS.map((p) => ({ plan: p, nodeCount: hasRealData.value ? subPlanTimelineNodes(planNodes.value, p.key as import('@/domain/projectMasterPlan').SubPlanKey).length : p.timeline.length }))
+  DEV_PLANS.map((p) => ({ plan: p, nodeCount: subPlanTimelineNodes(planNodes.value, p.key as import('@/domain/projectMasterPlan').SubPlanKey).length }))
 )
 
 onMounted(async () => {
@@ -419,6 +417,9 @@ function wfNew() {
   wfForm.value = f
   dirty.value = false
   wfBlockers.value = []
+  // 空白模板：不预填任何项目/计划数据，由用户按模板引导逐步编制
+  planNodes.value = []
+  store.notify('info', '已打开项目主计划空白模板，请前往「编辑模式」按模板引导编制（里程碑 CG1–CG7 + 五类分计划时间轴）')
 }
 
 function wfSave() {
@@ -445,7 +446,8 @@ async function wfSubmit(customApprovers: import('@/domain/flowEngine').CustomApp
     store.notify('error', blockers.join('；'))
     return
   }
-  const ok = store.submitWorkflowForm(wfForm.value, `项目主计划：${proj.value.name}`, { planNodeCount: planNodes.value.length }, customApprovers)
+  const projName = (proj.value as any).name || '未命名项目'
+  const ok = store.submitWorkflowForm(wfForm.value, `项目主计划：${projName}`, { planNodeCount: planNodes.value.length }, customApprovers)
   if (ok) {
     store.notify('success', '项目主计划已提交审批（PMO 审核 → 部门会签 → 总经理批准）')
     dirty.value = false
@@ -474,10 +476,6 @@ void SUB_ORDER
 
 .empty-panel { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 40px 0; }
 .row.center { justify-content: center; }
-.demo-tip { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 14px; border-left: 3px solid #f59e0b; }
-.demo-flag { font-size: 11px; font-weight: 700; color: #ffd79a; border: 1px solid #5b3c14; background: #2a1f10; border-radius: 4px; padding: 1px 8px; flex: none; }
-.demo-txt { font-size: 12px; color: var(--text-2); flex: 1; min-width: 260px; line-height: 1.6; }
-.demo-tip .row { margin-left: auto; }
 
 .sub-note { font-size: 11px; font-weight: 400; color: var(--text-3); }
 .sec-t { font-size: 12px; font-weight: 600; color: var(--text-1); margin-bottom: 6px; }
