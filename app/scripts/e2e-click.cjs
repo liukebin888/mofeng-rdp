@@ -357,7 +357,7 @@ async function resetState(page) {
   await resetState(page)
   await page.goto(BASE + '/#/workbench/today', { waitUntil: 'domcontentloaded' })
   await page.waitForTimeout(400)
-  // 顶部空间切换器存在，且当前空间为「九甲科技」（默认 SP-001）
+  // 顶部空间切换器存在，且当前空间为「演示科技有限公司」（默认 SP-001）
   const spaceSelInfo = await page.evaluate(() => {
     const sels = [...document.querySelectorAll('.top .el-select')]
     const first = sels[0]
@@ -365,7 +365,7 @@ async function resetState(page) {
     return { count: sels.length, text }
   })
   ok('顶部存在空间切换器（首个 el-select）', spaceSelInfo.count >= 2, `选择器数=${spaceSelInfo.count}`)
-  ok('默认空间为「九甲科技」', /九甲科技/.test(spaceSelInfo.text), spaceSelInfo.text.slice(0, 30))
+  ok('默认空间为「演示科技有限公司」', /演示科技有限公司/.test(spaceSelInfo.text), spaceSelInfo.text.slice(0, 30))
 
   // 展开空间切换器下拉（点第一个 el-select 的 wrapper）
   await page.evaluate(() => {
@@ -385,7 +385,7 @@ async function resetState(page) {
   })
   ok('空间下拉包含多空间选项（同租户两个项目组合）', spaceOptions.length >= 2, spaceOptions.join(' | ').slice(0, 80))
 
-  // 选中「中科电安」选项（同租户 T-1001 的第二个空间）
+  // 选中「示例电子有限公司」选项（同租户 T-1001 的第二个空间）
   const pickSpace = await page.evaluate(() => {
     const visibleDd = [...document.querySelectorAll('.el-select-dropdown')].filter(
       (d) => d.offsetParent !== null && d.getAttribute('style') !== 'display: none;'
@@ -393,14 +393,14 @@ async function resetState(page) {
     const dd = visibleDd[0]
     if (!dd) return false
     const items = [...dd.querySelectorAll('.el-select-dropdown__item')]
-    const target = items.find((o) => /中科电安/.test(o.innerText))
+    const target = items.find((o) => /示例电子有限公司/.test(o.innerText))
     if (target) {
       target.click()
       return true
     }
     return false
   })
-  ok('可选中「中科电安」空间', pickSpace)
+  ok('可选中「示例电子有限公司」空间', pickSpace)
   await page.waitForTimeout(400)
   const afterSwitch = await page.evaluate(() => {
     const sels = [...document.querySelectorAll('.top .el-select')]
@@ -408,7 +408,7 @@ async function resetState(page) {
     const projText = sels[1] ? sels[1].innerText.trim() : ''
     return { spaceText, projText }
   })
-  ok('切换后空间显示「中科电安」', /中科电安/.test(afterSwitch.spaceText), afterSwitch.spaceText.slice(0, 30))
+  ok('切换后空间显示「示例电子有限公司」', /示例电子有限公司/.test(afterSwitch.spaceText), afterSwitch.spaceText.slice(0, 30))
   ok('切换后项目收窄至空间内项目', /C11|PRJ-2026-031/.test(afterSwitch.projText), afterSwitch.projText.slice(0, 40))
 
   // 审计留痕：切换空间应写入审计链（SWITCH_SPACE 记录）

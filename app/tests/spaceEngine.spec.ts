@@ -30,7 +30,7 @@ import {
 const SP1: Space = {
   id: 'SP-001',
   code: 'SP-JJ',
-  name: '九甲科技',
+  name: '演示科技有限公司',
   tenantId: 'T-1001',
   type: '项目组合',
   roleBoundary: ['PM', 'SYS_ADMIN'],
@@ -41,7 +41,7 @@ const SP1: Space = {
 const SP2: Space = {
   id: 'SP-002',
   code: 'SP-ZKD',
-  name: '中科电安',
+  name: '示例电子有限公司',
   tenantId: 'T-1001',
   type: '项目组合',
   roleBoundary: [],
@@ -146,7 +146,7 @@ describe('QA-space 查询面：跨空间过滤不泄露存在性', () => {
 
 describe('QA-space 注册表与查找', () => {
   it('findSpace / findSpaceByCode', () => {
-    expect(findSpace(SPACES, 'SP-002')?.name).toBe('中科电安')
+    expect(findSpace(SPACES, 'SP-002')?.name).toBe('示例电子有限公司')
     expect(findSpaceByCode(SPACES, 'SP-ZKD')?.id).toBe('SP-002')
     expect(findSpace(SPACES, 'SP-999')).toBeUndefined()
   })

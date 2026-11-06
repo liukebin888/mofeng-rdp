@@ -136,8 +136,8 @@ describe('命名规则结构化校验（前缀/长度/禁用字符/大小写）'
 
   it('validateName：长度范围', () => {
     const p = { minLength: 2, maxLength: 4 }
-    expect(validateName(p, '五菱').ok).toBe(true)
-    expect(validateName(p, '上汽通用五菱汽车').ok).toBe(false) // 超长
+    expect(validateName(p, '示例甲').ok).toBe(true)
+    expect(validateName(p, '示例客户制造').ok).toBe(false) // 超长
     expect(validateName(p, 'A').ok).toBe(false) // 过短
   })
 

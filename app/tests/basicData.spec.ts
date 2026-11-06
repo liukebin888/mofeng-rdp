@@ -17,8 +17,8 @@ import {
 import type { Customer, ProductCategory, ProductLine, Product } from '@/domain/types'
 
 const baseCustomers: Customer[] = [
-  { id: 'C1', code: 'CUST-001', name: '上汽通用五菱', vehicleModels: ['E15', 'B30'] },
-  { id: 'C2', code: 'CUST-002', name: '奇瑞汽车', vehicleModels: ['瑞虎'] }
+  { id: 'C1', code: 'CUST-001', name: '示例汽车', vehicleModels: ['E15', 'B30'] },
+  { id: 'C2', code: 'CUST-002', name: '示例新能源', vehicleModels: ['瑞虎'] }
 ]
 
 const categories: ProductCategory[] = [
@@ -37,11 +37,11 @@ const products: Product[] = [
 
 describe('客户（车厂）', () => {
   it('新增客户：名称/编号唯一', () => {
-    const r = addCustomer(baseCustomers, { name: '比亚迪', code: 'CUST-003', vehicleModels: ['汉'] })
+    const r = addCustomer(baseCustomers, { name: '示例商用车', code: 'CUST-003', vehicleModels: ['汉'] })
     expect(r.item?.id).toBeTruthy()
     expect(r.list).toHaveLength(3)
 
-    const dup = addCustomer(baseCustomers, { name: '上汽通用五菱', code: 'CUST-999', vehicleModels: [] })
+    const dup = addCustomer(baseCustomers, { name: '示例汽车', code: 'CUST-999', vehicleModels: [] })
     expect(dup.error).toContain('已存在')
 
     const dupCode = addCustomer(baseCustomers, { name: '新客户', code: 'CUST-001', vehicleModels: [] })
@@ -59,7 +59,7 @@ describe('客户（车厂）', () => {
     expect(r.list.find((c) => c.id === 'C1')?.vehicleModels).toContain('新车型')
 
     // 改名撞已有客户名 → 报错
-    const clash = updateCustomer(baseCustomers, 'C1', { name: '奇瑞汽车' })
+    const clash = updateCustomer(baseCustomers, 'C1', { name: '示例新能源' })
     expect(clash.error).toContain('已存在')
   })
 
@@ -115,12 +115,12 @@ describe('导入导出（CSV）', () => {
     const r = parseCustomers(csv, [])
     expect(r.errors).toHaveLength(0)
     expect(r.list).toHaveLength(2)
-    expect(r.list[0].name).toBe('上汽通用五菱')
+    expect(r.list[0].name).toBe('示例汽车')
     expect(r.list[0].vehicleModels).toEqual(['E15', 'B30'])
   })
 
   it('客户导入：重复/空行报错定位', () => {
-    const csv = '编号,名称,车型\nCUST-001,上汽通用五菱,E15\n,空客户,\nCUST-002,奇瑞汽车,瑞虎'
+    const csv = '编号,名称,车型\nCUST-001,示例汽车,E15\n,空客户,\nCUST-002,示例新能源,瑞虎'
     const r = parseCustomers(csv, [])
     expect(r.errors.length).toBeGreaterThan(0)
     expect(r.list).toHaveLength(2)

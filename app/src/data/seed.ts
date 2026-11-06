@@ -356,8 +356,8 @@ function buildNamingRules(): NamingRule[] {
 
   return [
     // 客户
-    r('NM-1', 'customer', 'naming', '客户全称规范', '车厂工商注册全称，不含「有限公司」缩写以外的简称', '上汽通用五菱汽车股份有限公司', true, undefined, { minLength: 4, maxLength: 30 }),
-    r('NM-2', 'customer', 'naming', '客户简称规范', '2~4 字通用简称，用于台账与报表展示', '五菱 / 奇瑞 / 埃安', true, undefined, { minLength: 2, maxLength: 4 }),
+    r('NM-1', 'customer', 'naming', '客户全称规范', '客户工商注册全称，不含「有限公司」缩写以外的简称', '示例汽车制造股份有限公司', true, undefined, { minLength: 4, maxLength: 30 }),
+    r('NM-2', 'customer', 'naming', '客户简称规范', '2~4 字通用简称，用于台账与报表展示', '示例客户甲 / 示例客户乙 / 示例客户丙', true, undefined, { minLength: 2, maxLength: 4 }),
     r('NM-3', 'customer', 'coding', '客户编号规则', '已统一为《产品型号编制办法》(CJQW0106 B1) 附表1 顾客编码（2 位，0A~0Z 或 AA~AT，ES 为前瞻输出），不再使用 CUST- 前缀', '0A、0U、AB', false, pat([lit('CUST'), varr('abbr')])),
     r('NM-4', 'customer', 'coding', '车型编号规则', '已统一为《产品型号编制办法》(CJQW0106 B1) 附表2 车型代码（2 位数字+大写字母，O/I/J/V 除外），不再使用 MODEL- 前缀', '0A、1A', false, pat([lit('MODEL'), seq(3)])),
     // 产品
@@ -401,7 +401,7 @@ const actor = (u: SeedUser, projectId?: string): ActorContext => ({
 function buildProjects(users: SeedUser[]): Project[] {
   const pm = users.find((u) => u.roleCode === 'PM')!
   const base = {
-    customer: '上汽通用五菱',
+    customer: '示例汽车',
     productLine: '车身电子',
     platform: 'E 平台',
     owner: pm.name,
@@ -438,7 +438,7 @@ function buildProjects(users: SeedUser[]): Project[] {
       id: 'P-002',
       code: 'PRJ-2026-023',
       name: 'B30 智能座舱域控平台',
-      customer: '奇瑞汽车',
+      customer: '示例汽车',
       platform: 'B 平台',
       level: g2.level,
       grading: { input: p2Input, result: g2 },
@@ -506,7 +506,7 @@ function buildProjects(users: SeedUser[]): Project[] {
       id: 'P-005',
       code: 'PRJ-2026-052',
       name: 'E30 高压集成电驱（子租户 T-1003）',
-      customer: '比亚迪',
+      customer: '示例商用车',
       productLine: '高压电驱',
       platform: 'E 平台',
       owner: '沈雅',
@@ -809,7 +809,7 @@ function buildBom(): BomNode[] {
 function buildSampleArchive(): ArchiveLayer {
   let vol: ArchiveVolume = {
     id: 'AV-P-001-2026Q4',
-    name: 'P-001 九甲电驱控制器合规归档卷',
+    name: 'P-001 电驱控制器合规归档卷',
     projectId: 'P-001',
     windowStart: '2026-10-01T00:00:00+08:00',
     windowEnd: '2026-12-31T23:59:59+08:00',
@@ -1567,8 +1567,8 @@ export function buildSeed() {
     ],
     /** 空间（项目组合，SPA-001）：租户之下的聚合维度，顶部切换器切换 */
     spaces: [
-      { id: 'SP-001', code: 'SP-JJ', name: '九甲科技', tenantId: 'T-1001', type: '项目组合', roleBoundary: ['PM', 'SYS_ADMIN', 'OPS'], resourcePoolIds: ['NODE-1', 'NODE-2'], costSubjectIds: ['C-100'] },
-      { id: 'SP-002', code: 'SP-ZKD', name: '中科电安', tenantId: 'T-1001', type: '项目组合', roleBoundary: [], resourcePoolIds: ['NODE-3'], costSubjectIds: ['C-200'] },
+      { id: 'SP-001', code: 'SP-DEMO', name: '演示科技有限公司', tenantId: 'T-1001', type: '项目组合', roleBoundary: ['PM', 'SYS_ADMIN', 'OPS'], resourcePoolIds: ['NODE-1', 'NODE-2'], costSubjectIds: ['C-100'] },
+      { id: 'SP-002', code: 'SP-SAMPLE', name: '示例电子有限公司', tenantId: 'T-1001', type: '项目组合', roleBoundary: [], resourcePoolIds: ['NODE-3'], costSubjectIds: ['C-200'] },
       { id: 'SP-003', code: 'SP-ZJ', name: '智驾项目集', tenantId: 'T-1002', type: '项目组合', roleBoundary: [], resourcePoolIds: ['NODE-1'], costSubjectIds: ['C-300'] },
       { id: 'SP-004', code: 'SP-XNY', name: '新能源项目集', tenantId: 'T-1003', type: '项目组合', roleBoundary: [], resourcePoolIds: ['NODE-2'], costSubjectIds: ['C-400'] }
     ] as Space[],
@@ -2017,7 +2017,7 @@ export function buildSeed() {
       // P-001 E15 车身域控制器：五条流程齐全，其中前期交流/TR/报价进行中，立项/立项评审已完成
       {
         id: 'PRE-1-001', defId: 'DEF-PRE-1', defCode: 'FLOW-PRE-1', title: 'E15 车身域控制器项目前期交流申请', submitter: '市场客户经理 王芳', projectId: 'P-001',
-        form: { customer: '奇瑞汽车', productLine: '车身域控制器', budget: 1280000 }, currentNodeId: 'p3', status: '运行中', passedNodeIds: ['p1', 'p2'], history: [],
+        form: { customer: '示例汽车', productLine: '车身域控制器', budget: 1280000 }, currentNodeId: 'p3', status: '运行中', passedNodeIds: ['p1', 'p2'], history: [],
         nodeEnteredAt: '2026-11-03T08:30:00+08:00', escalated: false, addedSigners: [], createdAt: '2026-10-28T08:30:00+08:00'
       },
       {
@@ -2043,7 +2043,7 @@ export function buildSeed() {
       // P-002 B30 智能座舱：前期交流已完成，TR 运行中，其余未启动
       {
         id: 'PRE-1-002', defId: 'DEF-PRE-1', defCode: 'FLOW-PRE-1', title: 'B30 智能座舱域控平台前期交流申请', submitter: '市场客户经理 李敏', projectId: 'P-002',
-        form: { customer: '奇瑞汽车', productLine: '智能座舱', budget: 7600000 }, currentNodeId: 'p5', status: '已完成', passedNodeIds: ['p1', 'p2', 'p3', 'p4'], history: [],
+        form: { customer: '示例汽车', productLine: '智能座舱', budget: 7600000 }, currentNodeId: 'p5', status: '已完成', passedNodeIds: ['p1', 'p2', 'p3', 'p4'], history: [],
         nodeEnteredAt: '2026-10-15T09:00:00+08:00', escalated: false, addedSigners: [], createdAt: '2026-10-15T09:00:00+08:00', finishedAt: '2026-10-18T16:00:00+08:00'
       },
       {

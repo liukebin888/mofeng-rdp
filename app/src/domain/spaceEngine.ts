@@ -25,7 +25,7 @@ export interface Space {
   id: string
   /** 空间编码 */
   code: string
-  /** 空间名，如「九甲科技」「中科电安」 */
+  /** 空间名，如「演示科技有限公司」「示例电子有限公司」 */
   name: string
   /** 归属租户（继承租户隔离：空间必须归属某租户） */
   tenantId: string
