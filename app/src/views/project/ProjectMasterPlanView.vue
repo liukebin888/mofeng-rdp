@@ -29,6 +29,7 @@
         </span>
       </div>
       <div class="mp-rag">
+        <span v-if="currentPlanVersion" class="mp-ver" :title="`当前主计划版本（A1→A2→…→B1→…，提交后自动升版）`">版本 {{ currentPlanVersion }}</span>
         <span class="rag" :class="ragCls"><i />{{ rag.label }}</span>
       </div>
     </div>
@@ -264,12 +265,26 @@ import {
   type PlanTimelineNode
 } from '@/domain/projectMasterPlan'
 import type { PlanNode } from '@/domain/fourLevelPlan'
+import { compareVersion, isValidVersion } from '@/domain/planVersion'
 
 const store = useAppStore()
 const router = useRouter()
 
 const projId = ref(store.projectId)
 const calcGrade = ref(3)
+
+/** 当前项目已提交主计划的最高版本号（MPV-001，反查流程实例 form.planVersion） */
+const currentPlanVersion = computed(() => {
+  const instances = store.flowInstances.filter((i) => i.defId === 'DEF-PRJ-PLAN' && i.projectId === store.projectId)
+  let latest: string | null = null
+  for (const inst of instances) {
+    const v = inst.form?.planVersion
+    if (typeof v === 'string' && isValidVersion(v)) {
+      if (latest === null || compareVersion(v, latest) > 0) latest = v
+    }
+  }
+  return latest
+})
 
 // 产品清单（空白模板不预填，由用户编制主计划时添加）
 const products = ref<Array<{ cat: string; name: string; model: string; grade: number }>>([])
@@ -464,7 +479,8 @@ void SUB_ORDER
 .mp-projbar-l { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .mp-projbar-lab { font-size: 12px; font-weight: 700; color: var(--brand); }
 .mp-projbar-ctx { font-size: 12px; color: var(--text-2); display: flex; align-items: center; gap: 8px; }
-.mp-rag { display: flex; align-items: center; }
+.mp-rag { display: flex; align-items: center; gap: 10px; }
+.mp-ver { display: inline-flex; align-items: center; font-size: 11px; font-weight: 700; color: #c4b5fd; border: 1px solid #4c3a7a; background: #1c1533; padding: 3px 10px; border-radius: 999px; letter-spacing: .3px; }
 .rag { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 999px; }
 .rag i { width: 8px; height: 8px; border-radius: 50%; }
 .rag-red { color: #fca5a5; border: 1px solid #5b2020; background: #2a1114; }

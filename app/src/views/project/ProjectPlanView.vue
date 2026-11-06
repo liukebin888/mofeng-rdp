@@ -125,7 +125,12 @@
                 </el-select>
               </el-form-item>
               <el-form-item label="主计划版本">
-                <el-input v-model="form.planVersion" placeholder="如 V1.0-20261105" style="width: 100%" @input="markDirty" />
+                <el-input :model-value="planVersion" disabled style="width: 100%">
+                  <template #append>
+                    <span class="ver-note">提交后自动升版</span>
+                  </template>
+                </el-input>
+                <div class="muted" style="font-size: 11px; margin-top: 4px">版本号 A1→A2→A3→A4→B1→B2→… 依次递增，每次提交审批后下次编制自动进入下一版本（MPV-001）</div>
               </el-form-item>
             </el-form>
           </div>
@@ -149,6 +154,7 @@
               <el-input v-model="newNodeDraft.code" size="small" placeholder="编码" style="width: 96px" />
               <el-input v-model="newNodeDraft.name" size="small" placeholder="节点名称" style="flex: 1" />
               <el-date-picker v-model="newNodeDraft.date" type="date" value-format="YYYY-MM-DD" size="small" placeholder="日期" style="width: 128px" />
+              <div class="node-owner"><PersonSelect v-model="newNodeDraft.ownerName" placeholder="负责人" /></div>
               <el-select v-if="upperOptionsFor(newNodeDraft.level).length" v-model="newNodeDraft.upperNodeId" size="small" placeholder="承接上级" clearable style="width: 132px">
                 <el-option v-for="u in upperOptionsFor(newNodeDraft.level)" :key="u.id" :value="u.id" :label="u.name" />
               </el-select>
@@ -172,7 +178,8 @@
                 <span class="mono node-code">{{ n.code }}</span>
                 <span class="node-name">{{ n.name }}</span>
                 <span v-if="n.upperNodeId" class="node-up" :title="`承接：${upperName(n.upperNodeId)}`">↑ {{ upperName(n.upperNodeId) }}</span>
-                <span class="node-date" :class="{ lag: isLagging(n.id) }">{{ n.date }}</span>
+                <el-date-picker :model-value="n.date" type="date" value-format="YYYY-MM-DD" size="small" class="node-date-pick" :class="{ lag: isLagging(n.id) }" placeholder="日期" @update:model-value="(v: string) => updateNodeDate(n.id, v)" />
+                <PersonSelect :model-value="n.ownerName || ''" placeholder="负责人" class="node-owner-inline" @update:model-value="(v: string) => updateNodeOwner(n.id, v)" />
                 <el-button link size="small" type="danger" @click="removePlanNode(n.id)">删除</el-button>
               </div>
             </div>
@@ -264,11 +271,13 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import PageHeader from '@/components/PageHeader.vue'
+import PersonSelect from '@/components/PersonSelect.vue'
 import WorkflowFormShell from '@/components/WorkflowFormShell.vue'
 import { useAppStore } from '@/store/app'
 import { newWorkflowForm, saveWorkflowForm } from '@/domain/workflowForm'
 import type { WorkflowForm } from '@/domain/workflowForm'
 import { PLAN_LEVELS, PLAN_LEVEL_META, L4_SPECIALTIES, sortByLevel, validateFourLevelPlan, type PlanNode, type PlanLevel } from '@/domain/fourLevelPlan'
+import { nextVersion, compareVersion, isValidVersion, INITIAL_PLAN_VERSION } from '@/domain/planVersion'
 
 const store = useAppStore()
 
@@ -284,7 +293,7 @@ const form = reactive({ ...EMPTY_FORM })
 
 // —— 四级计划层级树（L1→L2→L3→L4 自上而下，方案 PLN-4LV）——
 const planNodes = ref<PlanNode[]>([])
-const newNodeDraft = reactive({ level: 'L1' as PlanLevel, code: '', name: '', date: '', upperNodeId: '' })
+const newNodeDraft = reactive({ level: 'L1' as PlanLevel, code: '', name: '', date: '', ownerName: '', upperNodeId: '' })
 
 // —— 主计划变更履历 ——
 interface PlanChange { time: string; content: string; basis: string; confirmers: string }
@@ -324,10 +333,23 @@ function addPlanNode() {
     code: newNodeDraft.code.trim(),
     name: newNodeDraft.name.trim(),
     date: newNodeDraft.date,
+    ownerName: newNodeDraft.ownerName.trim() || undefined,
     upperNodeId: newNodeDraft.upperNodeId || undefined
   }
   planNodes.value = [...planNodes.value, node]
-  Object.assign(newNodeDraft, { code: '', name: '', date: '', upperNodeId: '' })
+  Object.assign(newNodeDraft, { code: '', name: '', date: '', ownerName: '', upperNodeId: '' })
+  markDirty()
+}
+
+/** 修改节点日期（时间可编辑修改） */
+function updateNodeDate(id: string, date: string) {
+  planNodes.value = planNodes.value.map((n) => (n.id === id ? { ...n, date } : n))
+  markDirty()
+}
+
+/** 修改节点负责人（从组织架构选取） */
+function updateNodeOwner(id: string, ownerName: string) {
+  planNodes.value = planNodes.value.map((n) => (n.id === id ? { ...n, ownerName: ownerName || undefined } : n))
   markDirty()
 }
 
@@ -391,6 +413,33 @@ const customApprovers = ref<Array<import('@/domain/flowEngine').CustomApproverAd
 
 const INITIATION_DEF_ID = 'DEF-PRJ-PLAN'
 
+// —— 计划版本（MPV-001：A1→A2→…→A4→B1→…，提交审批后自动升版）——
+const planVersion = ref(INITIAL_PLAN_VERSION)
+
+/**
+ * 反查当前项目已提交的主计划最高版本（单一权威：流程实例 form.planVersion）。
+ * 返回该项目的最高版本号；从未提交过则返回 null。
+ */
+function latestSubmittedVersion(): string | null {
+  const instances = store.flowInstances.filter((i) => i.defId === INITIATION_DEF_ID && i.projectId === store.projectId)
+  let latest: string | null = null
+  for (const inst of instances) {
+    const v = inst.form?.planVersion
+    if (typeof v === 'string' && isValidVersion(v)) {
+      if (latest === null || compareVersion(v, latest) > 0) latest = v
+    }
+  }
+  return latest
+}
+
+/** 推导「本次新增」应使用的版本号：已提交过 → 上一版自动升版；否则 A1。 */
+function deriveNextVersion(): string {
+  const latest = latestSubmittedVersion()
+  if (!latest) return INITIAL_PLAN_VERSION
+  const nxt = nextVersion(latest)
+  return nxt ?? INITIAL_PLAN_VERSION
+}
+
 const productCategories = computed(() => store.productCategories)
 const currentLines = computed(() => {
   const cat = store.productCategories.find((c) => c.name === form.category)
@@ -425,7 +474,8 @@ function serializeContent(): string {
     customApprovers: customApprovers.value,
     planNodes: planNodes.value,
     changes: changes.value,
-    alerts: alerts.value
+    alerts: alerts.value,
+    planVersion: planVersion.value
   })
 }
 
@@ -437,6 +487,7 @@ function hydrateContent(content: string) {
     if (Array.isArray(obj.planNodes)) planNodes.value = obj.planNodes
     if (Array.isArray(obj.changes)) changes.value = obj.changes
     if (Array.isArray(obj.alerts)) alerts.value = obj.alerts
+    if (typeof obj.planVersion === 'string' && isValidVersion(obj.planVersion)) planVersion.value = obj.planVersion
   } catch {
     /* 忽略损坏草稿 */
   }
@@ -456,6 +507,8 @@ async function wfNew() {
   planNodes.value = []
   changes.value = []
   alerts.value = []
+  // 版本号：未提交过 → A1；已提交过 → 上一版自动升版（MPV-001）
+  planVersion.value = deriveNextVersion()
   if (draft?.content) hydrateContent(draft.content)
   wfForm.value = f
   dirty.value = false
@@ -531,14 +584,14 @@ async function wfSubmit(customApprovers: import('@/domain/flowEngine').CustomApp
     sopDate: form.sopDate,
     bookNo: form.bookNo,
     devNature: form.devNature,
-    planVersion: form.planVersion,
+    planVersion: planVersion.value,
     planNodeCount: planNodes.value.length,
     changeCount: changes.value.length,
     alertCount: alerts.value.length
   }
   const ok = store.submitWorkflowForm(wfForm.value, `项目主计划：${form.name}`, formData, customApprovers)
   if (ok) {
-    store.notify('success', '项目主计划已提交审批（PMO 审核 → 部门会签 → 总经理批准）')
+    store.notify('success', `项目主计划（版本 ${planVersion.value}）已提交审批（PMO 审核 → 部门会签 → 总经理批准）；下次编制将自动升版为 ${nextVersion(planVersion.value)}`)
     dirty.value = false
     wfBlockers.value = []
   }
@@ -571,12 +624,17 @@ async function wfSubmit(customApprovers: import('@/domain/flowEngine').CustomApp
 .level-badge.l4 { background: #1d4a2e; color: #8ee6b0; }
 .level-name { font-size: 12.5px; font-weight: 600; color: var(--text-1); }
 .level-empty { font-size: 11px; color: var(--text-3); padding: 4px 0 4px 34px; }
-.node-row { display: grid; grid-template-columns: 70px 1fr auto 92px 40px; gap: 8px; align-items: center; padding: 4px 0 4px 34px; font-size: 12px; border-bottom: 1px dashed #16233a; }
+.node-row { display: grid; grid-template-columns: 70px 1fr auto 128px 150px 40px; gap: 8px; align-items: center; padding: 4px 0 4px 34px; font-size: 12px; border-bottom: 1px dashed #16233a; }
 .node-code { color: var(--text-3); }
 .node-name { color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .node-up { color: #93c5fd; font-size: 11px; }
 .node-date { color: var(--text-2); font-variant-numeric: tabular-nums; text-align: right; }
 .node-date.lag { color: #f87171; font-weight: 600; }
+.node-date-pick :deep(.el-input__wrapper) { padding: 0 6px; }
+.node-date-pick.lag :deep(.el-input__inner) { color: #f87171; font-weight: 600; }
+.node-owner { width: 170px; flex: none; }
+.node-owner-inline { width: 100%; }
+.node-owner-inline :deep(.el-input__wrapper) { padding: 0 6px; }
 .ok-box { padding: 7px 9px; border: 1px solid #1d4a2e; background: #0f2418; color: #8ee6b0; border-radius: 6px; font-size: 11.5px; }
 .check { display: flex; gap: 7px; align-items: flex-start; padding: 4px 0; font-size: 11.5px; color: var(--text-1); }
 .warn-box { background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.35); color: #fbbf24; border-radius: 6px; padding: 8px 12px; font-size: 12px; }
