@@ -10,8 +10,8 @@ export type Dict = Record<string, string>
 
 export const zhCN: Dict = {
   // —— 品牌 / 顶栏 ——
-  'app.brand': '研发项目管理平台',
-  'app.brandSub': '通用研发项目管理工具',
+  'app.brand': '魔程化解研发管理平台',
+  'app.brandSub': '研发项目管理工具 · R1',
   'app.tenant': '租户',
   'app.auditChainOk': '审计链 连续',
   'app.auditChainFail': '审计链 断裂',
@@ -211,8 +211,8 @@ export const zhCN: Dict = {
 
 export const enUS: Dict = {
   // —— 品牌 / 顶栏 ——
-  'app.brand': 'R&D Project Management',
-  'app.brandSub': 'Generic R&D Project Management Tool',
+  'app.brand': 'MOFENG-RDP',
+  'app.brandSub': 'R&D Project Management · R1',
   'app.tenant': 'Tenant',
   'app.auditChainOk': 'Audit chain intact',
   'app.auditChainFail': 'Audit chain broken',

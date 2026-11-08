@@ -73,7 +73,7 @@ async function resetState(page) {
   await page.goto(BASE + '/#/plan/list', { waitUntil: 'domcontentloaded' })
   await page.waitForTimeout(400)
   let t = await bodyText(page)
-  ok('品牌名已去公司化（研发项目管理平台）', /研发项目管理平台/.test(t) && !/魔程|演示科技|示例电子/.test(t))
+  ok('品牌名正确（魔程化解研发管理平台）', /魔程化解研发管理平台/.test(t))
   ok('租户名已去化（默认集团租户）', /默认集团租户/.test(t) && !/魔程科技/.test(t))
   ok('审计链连续标识存在', /审计链\s*连续/.test(t))
   ok('项目台账为空（无演示项目）', /暂无|无数据|未录入|空|请.*立项|尚未/.test(t), '空态提示存在')
