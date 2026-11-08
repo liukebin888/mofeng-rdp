@@ -1,19 +1,6 @@
 <template>
   <div>
-    <PageHeader title="项目主计划" desc="采用 RMP 研发管理平台主计划表达方式：项目上下文 + RAG 健康度 + 5 项 KPI + 产品等级工时估算 + 集成整体视图（统一时间轴 / 里程碑×分计划支撑矩阵 / 分计划投影）。数据实时映射自四级计划节点（L1 里程碑 → 主计划泳道，L4 前五类专项 → 五个分计划泳道），真数据驱动。">
-      <template #actions>
-        <WorkflowFormShell
-          :form="wfForm"
-          :blockers="wfBlockers"
-          :dirty="dirty"
-          v-model:custom-approvers="customApprovers"
-          @new="wfNew"
-          @save="wfSave"
-          @close="wfClose"
-          @submit="wfSubmit"
-        />
-      </template>
-    </PageHeader>
+    <PageHeader title="项目主计划" desc="采用 RMP 研发管理平台主计划表达方式：项目上下文 + RAG 健康度 + 5 项 KPI + 产品等级工时估算 + 集成整体视图（统一时间轴 / 里程碑×分计划支撑矩阵 / 分计划投影）。数据实时映射自四级计划节点（L1 里程碑 → 主计划泳道，L4 前五类专项 → 五个分计划泳道），真数据驱动。" />
 
     <!-- ① 项目上下文条 + RAG -->
     <div class="mp-projbar">
@@ -33,12 +20,9 @@
       </div>
     </div>
 
-    <!-- 空白模板引导态（尚未录入任何主计划数据时展示） -->
+    <!-- 空白态（尚未录入任何主计划数据时展示） -->
     <div v-if="!hasRealData" class="panel empty-panel" style="margin-top: 14px">
-      <el-empty description="项目主计划是适用于任何项目的通用计划模板。点击「新增主计划」用模板引导编制：里程碑 CG1–CG7 与结构/硬件/软件/测试/过程五类分计划时间轴，编制完成后提交审批。" :image-size="90" />
-      <div class="row center">
-        <el-button type="primary" size="small" @click="wfNew">新增主计划</el-button>
-      </div>
+      <el-empty description="项目主计划是适用于任何项目的通用计划展示。四级计划节点录入后，此处将实时映射出 KPI、统一时间轴、里程碑×分计划支撑矩阵与分计划投影。" :image-size="90" />
     </div>
 
     <div v-if="hasRealData" class="mp-body">
@@ -213,7 +197,7 @@
         </div>
 
         <!-- 分计划投影 -->
-        <div class="pp-subs-h">分计划投影（数据实时映射自四级计划 L4 前五类专项，本页不可直接编辑，修改请在编辑模式完成）</div>
+        <div class="pp-subs-h">分计划投影（数据实时映射自四级计划 L4 前五类专项）</div>
         <div class="pp-subs-grid" style="margin-top: 2px">
           <div v-for="s in projections" :key="s.plan.key" class="pp-sub" :style="{ '--hue': s.plan.hue }">
             <div class="pp-sub-h">
@@ -244,10 +228,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import KpiCard from '@/components/KpiCard.vue'
-import WorkflowFormShell from '@/components/WorkflowFormShell.vue'
 import { useAppStore } from '@/store/app'
-import { newWorkflowForm, saveWorkflowForm } from '@/domain/workflowForm'
-import type { WorkflowForm } from '@/domain/workflowForm'
 import {
   DEV_PLANS,
   SUB_ORDER,
@@ -405,56 +386,6 @@ function toggleCard(name: string) {
   if (s.has(name)) s.delete(name)
   else s.add(name)
   openCards.value = s
-}
-
-// —— WF-001 工作流（新增/保存/关闭/提交）——
-const wfForm = ref<WorkflowForm | null>(null)
-const dirty = ref(false)
-const wfBlockers = ref<string[]>([])
-const customApprovers = ref<Array<import('@/domain/flowEngine').CustomApproverAddition & { signRoles: string[] }>>([])
-
-const INITIATION_DEF_ID = 'DEF-PRJ-PLAN'
-
-function markDirty() {
-  dirty.value = true
-}
-
-function wfNew() {
-  // 新增主计划：跳转到编辑模式，由编辑模式打开空白主计划模板（两步向导引导编制）
-  router.push('/project/master-plan?new=1')
-}
-
-function wfSave() {
-  if (!wfForm.value) return
-  const content = JSON.stringify({ planNodes: planNodes.value })
-  wfForm.value = saveWorkflowForm(wfForm.value, content)
-  store.saveDraft('项目主计划', wfForm.value.id, content)
-  dirty.value = false
-}
-
-function wfClose() {
-  store.notify('info', dirty.value ? '已关闭编辑（未保存的改动不会保留）' : '已关闭编辑（草稿已保存，可再次打开续编）')
-  wfForm.value = null
-  dirty.value = false
-  wfBlockers.value = []
-}
-
-async function wfSubmit(customApprovers: import('@/domain/flowEngine').CustomApproverAddition[] = []) {
-  if (!wfForm.value) return
-  const blockers: string[] = []
-  if (!planNodes.value.length) blockers.push('四级计划尚未录入，请先在编辑模式添加计划节点')
-  if (blockers.length) {
-    wfBlockers.value = blockers
-    store.notify('error', blockers.join('；'))
-    return
-  }
-  const projName = (proj.value as any).name || '未命名项目'
-  const ok = store.submitWorkflowForm(wfForm.value, `项目主计划：${projName}`, { planNodeCount: planNodes.value.length }, customApprovers)
-  if (ok) {
-    store.notify('success', '项目主计划已提交审批（PMO 审核 → 部门会签 → 总经理批准）')
-    dirty.value = false
-    wfBlockers.value = []
-  }
 }
 
 void router
