@@ -2,7 +2,6 @@
   <div>
     <PageHeader title="项目主计划" desc="采用 RMP 研发管理平台主计划表达方式：项目上下文 + RAG 健康度 + 5 项 KPI + 产品等级工时估算 + 集成整体视图（统一时间轴 / 里程碑×分计划支撑矩阵 / 分计划投影）。数据实时映射自四级计划节点（L1 里程碑 → 主计划泳道，L4 前五类专项 → 五个分计划泳道），真数据驱动。">
       <template #actions>
-        <el-button size="small" @click="$router.push('/project/master-plan')">编辑模式（表单）</el-button>
         <WorkflowFormShell
           :form="wfForm"
           :blockers="wfBlockers"
