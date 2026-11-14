@@ -143,6 +143,48 @@
         </div>
       </div>
     </div>
+
+    <!-- OTS 认可台账（闭环） -->
+    <div class="panel" style="margin-top: 12px" v-if="approvalRecords.length">
+      <div class="panel-title">
+        OTS 认可台账（闭环）
+        <span class="muted" style="margin-left: 8px">闭环 {{ closureSummary.closed }} · 进行中 {{ closureSummary.inProgress }} · 待整改 {{ closureSummary.pendingRework }} · 需复评 {{ closureSummary.needReview }} · 已过期 {{ closureSummary.expired }}</span>
+        <el-button size="small" style="margin-left: auto" @click="scanExpiry">扫描 L3 到期</el-button>
+      </div>
+      <el-table :data="approvalRecords" size="small" border>
+        <el-table-column prop="reportNo" label="报告编号" width="120" />
+        <el-table-column prop="projectName" label="项目" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="level" label="等级" width="70" />
+        <el-table-column label="客户结论" width="150">
+          <template #default="{ row }">
+            <el-select v-if="row.flowInstanceId && !row.customerConclusion" v-model="row.customerConclusion" size="small" placeholder="客户认可结论" style="width: 130px" @change="(v: CustomerConclusion) => setCustomerConclusion(row, v)">
+              <el-option v-for="c in CUSTOMER_CONCLUSIONS" :key="c" :label="c" :value="c" />
+            </el-select>
+            <span v-else class="tag" :class="row.customerConclusion === '认可' ? 'ok' : row.customerConclusion === '拒收' ? 'fail' : 'l2'">{{ row.customerConclusion || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="闭环状态" width="100">
+          <template #default="{ row }">
+            <span class="tag" :class="closureTagClass(closureOf(row).status)">{{ closureOf(row).label }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="L3 到期" width="100">
+          <template #default="{ row }">
+            <span v-if="row.level === 'L3'" class="tag" :class="expiryOf(row) === '已过期' ? 'fail' : expiryOf(row) === '临期' ? 'l2' : 'ok'">{{ expiryOf(row) === '无到期日期' ? row.dueDate || '—' : `${expiryOf(row)}${row.dueDate ? ' ' + row.dueDate : ''}` }}</span>
+            <span v-else class="dim">—</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="140">
+          <template #default="{ row }">
+            <el-button v-if="closureOf(row).status === '需复评' && row.level === 'L2'" link size="small" type="primary" @click="upgradeRecord(row)">复评升级 L1</el-button>
+            <span v-else class="dim">{{ closureOf(row).status === '待整改' ? '待重新提交' : '—' }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div class="muted" style="margin-top: 8px; font-size: 12px">
+        闭环规则：L1 审批完成即闭环；L2/L3 问题全部关闭后可复评升级（L2→L1）；L3 到期未闭环自动升级为问题；客户拒收退回整改后重新提交。
+      </div>
+    </div>
   </div>
 </template>
 
@@ -156,6 +198,7 @@ import { newWorkflowForm, saveWorkflowForm } from '@/domain/workflowForm'
 import type { WorkflowForm } from '@/domain/workflowForm'
 import { determineConditions, determineLevel, validateIssuePlan, type IssueActionItem } from '@/domain/otsApproval'
 import { issueChecklistGate, ISSUE_CHECKLIST_STATUSES } from '@/domain/issueChecklist'
+import { determineClosureStatus, evaluateExpiry, summarizeClosure, OTS_CLOSURE_LABEL, CUSTOMER_CONCLUSIONS, type CustomerConclusion } from '@/domain/otsClosure'
 
 const store = useAppStore()
 const router = useRouter()
@@ -206,6 +249,45 @@ const levelResult = computed(() =>
     dueDate: form.dueDate
   })
 )
+
+// —— OTS 认可台账（闭环展示）——
+const approvalRecords = computed(() => store.otsApprovals)
+const closureSummary = computed(() => summarizeClosure(store.otsApprovals))
+
+function closureOf(rec: (typeof store.otsApprovals)[number]) {
+  return determineClosureStatus({
+    level: rec.level,
+    approved: rec.approved,
+    customerConclusion: rec.customerConclusion,
+    dueDate: rec.dueDate,
+    issueIds: rec.issueIds,
+    closedIssueIds: store.closedIssueIds
+  })
+}
+
+function expiryOf(rec: (typeof store.otsApprovals)[number]) {
+  return evaluateExpiry(rec.dueDate)
+}
+
+function closureTagClass(status: string) {
+  return { 已闭环: 'ok', 进行中: 'cond', 待整改: 'fail', 已过期: 'fail', 需复评: 'l2' }[status] || 'cond'
+}
+
+function setCustomerConclusion(rec: (typeof store.otsApprovals)[number], conclusion: CustomerConclusion) {
+  if (!rec.flowInstanceId) {
+    store.notify('warning', '该记录未绑定审批流实例，无法写入客户结论')
+    return
+  }
+  store.setOtsCustomerConclusion(rec.flowInstanceId, conclusion)
+}
+
+function upgradeRecord(rec: (typeof store.otsApprovals)[number]) {
+  store.upgradeOtsApproval(rec.id)
+}
+
+function scanExpiry() {
+  store.scanOtsExpiry()
+}
 
 function goAttachmentA() {
   router.push('/project/ots-attachment-a')
@@ -324,6 +406,13 @@ function wfSubmit(customApprovers: import('@/domain/flowEngine').CustomApproverA
   }
   const ok = store.submitWorkflowForm(wfForm.value, `OTS 认可：${form.name}（${levelResult.value.label}）`, formData, customApprovers)
   if (ok) {
+    // 偏差整改闭环：把问题清单同步到问题台账，并回填 OTS 认可台账的 issueIds
+    if (levelResult.value.needIssuePlan && issuePlan.value.length) {
+      store.syncOtsIssuesToLedger(
+        issuePlan.value.map((p) => ({ id: p.id, issue: p.issue, action: p.action, owner: p.owner, dueDate: p.dueDate, status: p.status })),
+        form.reportNo
+      )
+    }
     store.notify('success', `OTS 认可已提交审批（${levelResult.value.label} → 部门会签 → 客户认可 → 总经理批准）`)
     dirty.value = false
     wfBlockers.value = []

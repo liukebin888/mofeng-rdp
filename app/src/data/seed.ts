@@ -85,6 +85,7 @@ import type { SupplierPerfScore } from '@/domain/supplierPerformance'
 import type { QuoteCostSheet, QuoteCostLine } from '@/domain/quoteCost'
 import type { DesignArchiveTable, SampleReviewReport, DvTestReport } from '@/domain/otsApproval'
 import { DEFAULT_DESIGN_ARCHIVE } from '@/domain/otsApproval'
+import type { OtsApprovalRecord } from '@/domain/otsClosure'
 import type { IssueLedgerItem, IssueAlertMail } from '@/domain/issueAlert'
 
 export const SEED_VERSION = 'mofeng.rdp.v1.0.36'
@@ -875,6 +876,8 @@ export function buildSeed() {
     docAnnotations,
     samples,
     otsAttachments,
+    /** OTS 认可台账（OTS 认可闭环单一数据源，空白模板：不预置演示数据） */
+    otsApprovals: [] as OtsApprovalRecord[],
     defects,
     softwareVersions,
     hours,

@@ -26,6 +26,7 @@ import { AUTOMOTIVE_STAGE_TEMPLATE, findStageTemplate, orderedStages, type Stage
 import { gateReleaseEvidence, stageFullyReleased, prerequisitesFullyReleased, stageAdvanceVerdict, type ApprovalBinding } from '@/domain/approvalBinding'
 import { deliverableProvidedEvidence, stageDeliverablesComplete, type DeliverableApprovalBinding } from '@/domain/deliverableApproval'
 import { resolveArchiveTable, type ArchiveSource, type DesignArchiveItem } from '@/domain/otsApproval'
+import { determineClosureStatus, evaluateExpiry, evaluateUpgrade, validateCustomerConclusion, type OtsApprovalRecord, type CustomerConclusion } from '@/domain/otsClosure'
 import { receiveManifest, type TransferManifest, type ReceiptResult } from '@/domain/fileTransfer'
 import { applySeverityChange, findRejectionPolicy, severitySummary, shouldReject, type RejectionPolicyItem, type RejectionSeverity } from '@/domain/rejectionPolicy'
 import { freeze as freezeBaseline, verifyBaseline } from '@/domain/baseline'
@@ -1329,6 +1330,12 @@ export const useAppStore = defineStore('app', () => {
     sampleReview: import('@/domain/otsApproval').SampleReviewReport
     dvReport: import('@/domain/otsApproval').DvTestReport
   } | null)
+
+  /** OTS 认可台账（OTS 认可闭环单一数据源，随主文档持久化） */
+  const otsApprovals = computed<OtsApprovalRecord[]>(() => (data.value.otsApprovals ?? []) as OtsApprovalRecord[])
+
+  /** 已关闭的问题 id 集合（来自问题台账，供 OTS 偏差整改闭环判定） */
+  const closedIssueIds = computed<Set<string>>(() => new Set((data.value.issueLedger ?? []).filter((i) => i.status === '已关闭').map((i) => i.id)))
 
   // —— 临界值自动触发（对标 Oracle Thresholds：业务指标越限→自动生成问题→分派）——
   /** 当前项目可观测业务指标（阈值引擎输入，全部同源自既有派生，禁止自造比例） */
@@ -3743,6 +3750,10 @@ export const useAppStore = defineStore('app', () => {
     // 提交后自动清除草稿（POR-007）
     data.value.drafts = clearDraft(drafts.value, currentUser.value.id, form.objectType as import('@/domain/types').DraftObjectType, form.id)
     log('SUBMIT', '工作流单据', form.id, { defCode: form.defCode, flowInstanceId: instId })
+    // OTS 认可提交 → 创建/更新认可台账（闭环起点：进行中）
+    if (form.defCode === 'DEF-PRJ-OTS') {
+      ensureOtsApprovalRecord(form, formData)
+    }
     persist()
     return true
   }
@@ -3779,6 +3790,10 @@ export const useAppStore = defineStore('app', () => {
       const ver = typeof inst.form?.version === 'string' ? inst.form.version : ''
       if (ver) releaseSoftwareVersionByCode(ver)
     }
+    // OTS 认可流程审批完成 → 回写台账（闭环：approved=true + 联动样件状态）
+    if (next.status === '已完成' && inst.defCode === 'DEF-PRJ-OTS') {
+      finalizeOtsApproval(inst)
+    }
     persist()
     notify('success', next.status === '已完成' ? `${inst.title} 流程已走完` : `${inst.title} 已推进至下一节点`)
   }
@@ -3808,6 +3823,212 @@ export const useAppStore = defineStore('app', () => {
       log('UPDATE', '软件版本', code, undefined, undefined, 'DENY')
       notify('warning', `软件版本 ${code} 当前状态「${obj.status}」无法直接推进为已发布`)
     }
+  }
+
+  // —— OTS 认可闭环（台账回写 / 客户三态结论 / L3 到期 / 偏差整改复评）——
+
+  /**
+   * 提交 OTS 认可时创建/更新台账记录（闭环起点：进行中）。
+   * 以「报告编号 + 样件编号」幂等：已存在则更新等级/到期/问题清单，不存在则新建。
+   */
+  function ensureOtsApprovalRecord(
+    form: import('@/domain/workflowForm').WorkflowForm,
+    formData: Record<string, string | number | boolean>,
+    issueIds: string[] = []
+  ) {
+    if (!data.value.otsApprovals) data.value.otsApprovals = []
+    const reportNo = String(formData.reportNo ?? formData.sampleNo ?? '')
+    const sampleNo = String(formData.sampleNo ?? '')
+    const level = (formData.level ?? 'L4') as OtsApprovalRecord['level']
+    const existing = (data.value.otsApprovals as OtsApprovalRecord[]).find((r) => r.reportNo === reportNo && reportNo !== '')
+    if (existing) {
+      existing.level = level
+      existing.projectName = String(formData.name ?? existing.projectName)
+      existing.sampleNo = sampleNo || existing.sampleNo
+      if (formData.dueDate) existing.dueDate = String(formData.dueDate)
+      existing.flowInstanceId = form.flowInstanceId
+      if (issueIds.length) existing.issueIds = issueIds
+      log('UPDATE', 'OTS认可台账', existing.id, { level, dueDate: existing.dueDate, issueCount: existing.issueIds.length })
+      return
+    }
+    const rec: OtsApprovalRecord = {
+      id: `OTSAP-${Date.now()}`,
+      projectName: String(formData.name ?? ''),
+      sampleNo,
+      reportNo,
+      level,
+      approved: false,
+      dueDate: formData.dueDate ? String(formData.dueDate) : undefined,
+      issueIds,
+      upgraded: false,
+      createdAt: new Date().toISOString(),
+      flowInstanceId: form.flowInstanceId
+    }
+    ;(data.value.otsApprovals as OtsApprovalRecord[]).push(rec)
+    log('CREATE', 'OTS认可台账', rec.id, { reportNo, sampleNo, level, issueCount: issueIds.length })
+  }
+
+  /**
+   * OTS 认可审批完成 → 回写台账（approved=true）+ 联动 OTS 样件状态。
+   * 认可结论（客户三态）若已写入则保留，未写入则按等级推导默认结论。
+   */
+  function finalizeOtsApproval(inst: import('@/domain/flowEngine').FlowInstance) {
+    const reportNo = String(inst.form?.reportNo ?? inst.form?.sampleNo ?? '')
+    const sampleNo = String(inst.form?.sampleNo ?? '')
+    const rec = (data.value.otsApprovals ?? []).find((r) => r.reportNo === reportNo && reportNo !== '')
+    if (!rec) {
+      // 台账缺失（如直接走旧流程）→ 补建
+      const level = (inst.form?.level ?? 'L4') as OtsApprovalRecord['level']
+      const nr: OtsApprovalRecord = {
+        id: `OTSAP-${Date.now()}`,
+        projectName: String(inst.form?.name ?? ''),
+        sampleNo,
+        reportNo,
+        level,
+        approved: false,
+        dueDate: inst.form?.dueDate ? String(inst.form.dueDate) : undefined,
+        issueIds: [],
+        upgraded: false,
+        createdAt: new Date().toISOString(),
+        flowInstanceId: inst.id
+      }
+      if (!data.value.otsApprovals) data.value.otsApprovals = []
+      ;(data.value.otsApprovals as OtsApprovalRecord[]).push(nr)
+      finalizeOtsApproval(inst)
+      return
+    }
+    const before = { approved: rec.approved }
+    rec.approved = true
+    rec.approvedAt = new Date().toISOString()
+    // 若客户结论缺失，按等级推导默认结论
+    if (!rec.customerConclusion) {
+      if (rec.level === 'L4') rec.customerConclusion = '拒收'
+      else if (rec.level === 'L1') rec.customerConclusion = '认可'
+      else rec.customerConclusion = '有条件认可'
+    }
+    log('UPDATE', 'OTS认可台账', rec.id, { approved: true, conclusion: rec.customerConclusion, level: rec.level }, before)
+    // 联动 OTS 样件状态
+    const sample = data.value.samples.find((s) => s.type === 'OTS' && (s.code === sampleNo || sampleNo === '' || s.code.includes(sampleNo)))
+    if (sample) {
+      const sBefore = { status: sample.status }
+      sample.status = rec.customerConclusion === '拒收' ? '拒收' : rec.customerConclusion === '有条件认可' ? '有条件认可' : '已认可'
+      log('UPDATE', 'OTS样件', sample.code, { status: sample.status }, sBefore)
+    }
+    notify('success', `OTS 认可「${rec.reportNo || sampleNo}」已闭环（${rec.level} · ${rec.customerConclusion}）`)
+  }
+
+  /**
+   * OTS 偏差整改问题同步：把 OTS 认可提交的问题清单（issuePlan）同步到问题台账（IssueLedger），
+   * 并把生成的问题 id 回填到 OTS 认可台账记录的 issueIds（按报告编号查找）。
+   * 幂等：同一问题描述不重复入账。
+   */
+  function syncOtsIssuesToLedger(issuePlan: Array<{ id: string; issue: string; action: string; owner: string; dueDate: string; status: string }>, reportNo: string): string[] {
+    const ids: string[] = []
+    for (const it of issuePlan) {
+      if (!it.issue?.trim()) continue
+      const dup = (data.value.issueLedger ?? []).find((i) => i.title === it.issue.trim())
+      if (dup) {
+        ids.push(dup.id)
+        continue
+      }
+      const severity: IssueSeverity = it.issue.includes('关键') || it.issue.includes('安全') || it.issue.includes('功能') ? 'P2' : 'P3'
+      const res = addIssueManually({ title: it.issue.trim(), desc: `${it.action || '（行动计划待补充）'}（OTS 偏差整改，完成日期 ${it.dueDate || '—'}）`, owner: it.owner || currentUser.value.name, severity })
+      if (res.ok && res.issue) ids.push(res.issue.id)
+    }
+    // 回填台账
+    const rec = (data.value.otsApprovals ?? []).find((r) => r.reportNo === reportNo && reportNo !== '')
+    if (rec && ids.length) {
+      rec.issueIds = ids
+      log('UPDATE', 'OTS认可台账', rec.id, { issueIds: ids })
+    }
+    return ids
+  }
+
+  /** 客户认可三态结论落台账（审批链客户认可环节调用，仅 DEF-PRJ-OTS） */
+  function setOtsCustomerConclusion(flowInstanceId: string, conclusion: CustomerConclusion, note = '') {
+    const rec = (data.value.otsApprovals ?? []).find((r) => r.flowInstanceId === flowInstanceId)
+    if (!rec) {
+      notify('warning', '未找到对应 OTS 认可台账，无法写入客户结论')
+      return false
+    }
+    const check = validateCustomerConclusion(conclusion, rec.level)
+    if (!check.ok) {
+      notify('error', check.reason)
+      return false
+    }
+    const before = { customerConclusion: rec.customerConclusion }
+    rec.customerConclusion = conclusion
+    rec.customerConcludedAt = new Date().toISOString()
+    log('UPDATE', 'OTS认可台账', rec.id, { customerConclusion: conclusion, note }, before)
+    notify('success', `客户认可结论已记录：${conclusion}`)
+    return true
+  }
+
+  /** 扫描 L3 临时认可到期：临期提醒 / 已过期升级为问题（复用问题台账 + 邮件报警） */
+  function scanOtsExpiry(): number {
+    const now = new Date().toISOString()
+    let escalated = 0
+    for (const rec of otsApprovals.value) {
+      if (rec.level !== 'L3' || !rec.dueDate) continue
+      const st = determineClosureStatus({
+        level: rec.level,
+        approved: rec.approved,
+        customerConclusion: rec.customerConclusion,
+        dueDate: rec.dueDate,
+        issueIds: rec.issueIds,
+        closedIssueIds: closedIssueIds.value
+      })
+      const expiry = evaluateExpiry(rec.dueDate, now)
+      if (expiry === '已过期' && st.status === '已过期') {
+        // 升级为问题（幂等：同一报告编号不重复生成）
+        const dup = (data.value.issueLedger ?? []).find((i) => i.title.includes(`OTS 临时认可到期：${rec.reportNo || rec.sampleNo}`))
+        if (!dup) {
+          addIssueManually({
+            title: `OTS 临时认可到期：${rec.reportNo || rec.sampleNo}`,
+            desc: `L3 临时认可已于 ${rec.dueDate} 到期，未闭环，请升级评估（L2 复评或退回整改）`,
+            owner: currentUser.value.name,
+            severity: 'P2'
+          })
+          escalated++
+        }
+      } else if (expiry === '临期') {
+        notify('warning', `OTS 临时认可「${rec.reportNo || rec.sampleNo}」即将于 ${rec.dueDate} 到期（≤7 天）`)
+      }
+    }
+    if (escalated > 0) notify('warning', `已升级 ${escalated} 条到期的 L3 临时认可为问题`)
+    else notify('info', 'L3 临时认可到期扫描完成，无新增升级')
+    return escalated
+  }
+
+  /**
+   * 偏差整改复评升级：L2 问题全部关闭后复评升级为 L1。
+   * 准入由 otsClosure.evaluateUpgrade 判定（fail-closed）。
+   */
+  function upgradeOtsApproval(recordId: string): boolean {
+    const rec = (data.value.otsApprovals ?? []).find((r) => r.id === recordId)
+    if (!rec) {
+      notify('error', '未找到该 OTS 认可台账记录')
+      return false
+    }
+    const ev = evaluateUpgrade({
+      level: rec.level,
+      approved: rec.approved,
+      customerConclusion: rec.customerConclusion,
+      dueDate: rec.dueDate,
+      issueIds: rec.issueIds,
+      closedIssueIds: closedIssueIds.value
+    })
+    if (!ev.ok) {
+      notify('error', ev.reason)
+      return false
+    }
+    const before = { level: rec.level, upgraded: rec.upgraded }
+    rec.upgraded = true
+    rec.upgradedLevel = 'L1'
+    rec.upgradedAt = new Date().toISOString()
+    log('UPDATE', 'OTS认可台账', rec.id, { upgraded: true, from: before.level, to: 'L1' }, before)
+    notify('success', `OTS 认可「${rec.reportNo || rec.sampleNo}」复评通过，已升级为 L1 认可（闭环）`)
+    return true
   }
 
   /** 以指定角色会签（供多部门会签演示：引擎 signNode 支持 signRole 参数） */
@@ -4010,6 +4231,12 @@ export const useAppStore = defineStore('app', () => {
     costSheet,
     quoteCosts,
     otsAttachments,
+    otsApprovals,
+    closedIssueIds,
+    setOtsCustomerConclusion,
+    syncOtsIssuesToLedger,
+    scanOtsExpiry,
+    upgradeOtsApproval,
     handoffHand,
     handoffReceive,
     projectReqs,
