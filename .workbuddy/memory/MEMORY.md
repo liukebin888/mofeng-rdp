@@ -16,7 +16,7 @@
   然后 `mvn test -pl mofeng-domain`（375 例）、`mvn test -pl mofeng-application -am`（90 例，须带 -am 构建依赖）。注意：java.exe 需 `C:/jdk/jdk-21.0.2/bin` 在 PATH 且含 `C:/Windows/System32`，否则报 vcruntime140_1.dll 缺失。
 - 四层架构：views → application(store) → domain ← infra。domain 零 DOM/零 vue/pinia，可被 vitest 直接调用。
 - **Git 仓库**：已建立，分支 main，远程 origin = https://github.com/liukebin888/mofeng-rdp.git（已跟踪 origin/main）。提交身份 留总 <liuzong@mofeng.com>（项目级）。.gitignore 排除 node_modules/dist/server/data/.env/密钥/`.workbuddy/backup/`。后续 `git add -A && git commit && git push` 即可。
-- **Git 推送踩坑（务必记住）**：本机走环境代理 `https_proxy=http://127.0.0.1:7814`，且 git 默认 schannel 后端与该代理握手会报 `CONNECT tunnel failed, response 502` 或 `schannel: server closed abruptly`。**已设 `git config --global http.sslBackend openssl` 解决**，之后推送正常。若再遇 502 是代理网关瞬时抖动，重试即可。
+- **Git 推送踩坑（务必记住）**：本机走环境代理 `https_proxy=http://127.0.0.1:7814`，且 git 默认 schannel 后端与该代理握手会报 `CONNECT tunnel failed, response 502` 或 `schannel: server closed abruptly`。**已设 `git config --global http.sslBackend openssl`**。但即便 openssl，若环境变量代理仍在，push 会报 `OpenSSL SSL_read unexpected eof`——**push 前须 `unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY`**，否则代理拦截失败。
 - **部署（Docker 化）**：server/Dockerfile（Node 20-alpine 零依赖、非 root、HEALTHCHECK、数据卷）、deploy/Dockerfile.web（多阶段 vite→nginx + SPA 回退 + /api 反代）、deploy/nginx.conf、docker-compose.yml（前端:8080 + 后端仅内网 + 命名卷 mofeng-data）、.dockerignore。部署手册 docs/DEPLOYMENT.md。启动 `docker compose up -d --build`。后端构建上下文 context=./server（非根目录）。
 
 ## 门禁铁律（完成六门禁才算闭环）
