@@ -186,6 +186,7 @@ export const MENUS: MenuGroup[] = [
   {
     key: 'supply', title: '采购管理', icon: 'Connection', stage: 'P5', role: 'SQE / 采购', cp: 'K8',
     items: [
+      { path: '/supply/supplier', title: '供应商管理', desc: '准入/定点/PPAP/状态机/绩效评估（SUP-001~006）', icon: 'User', comp: v('supply/SupplierView') },
       { path: '/supply/portal', title: '门户与代录', desc: '代录标记来源（SUP-014）', icon: 'Monitor', comp: v('supply/PortalView') },
       { path: '/supply/purchase-plan', title: '采购计划', desc: '采购计划编制与跟踪（长周期零件）', icon: 'Tickets', comp: v('supply/PurchasePlanView') },
       { path: '/supply/tender', title: '招投标', desc: '招标立项/投标评审/开标定标留痕', icon: 'Document', comp: v('supply/TenderView') },

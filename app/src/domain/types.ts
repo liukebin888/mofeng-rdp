@@ -233,6 +233,8 @@ export interface Supplier {
   ppapElements: number
   riskLevel: '低' | '中' | '高'
   sqe: string
+  /** 供应商状态机（SUP-002：潜在→准入评审中→准入通过→定点评审中→定点确认→暂停→淘汰） */
+  status?: string
 }
 
 export interface SampleReq {
@@ -1212,9 +1214,62 @@ export interface Tender {
   flowInstanceId?: string
   /** 备注 */
   remark?: string
+  /** 投标人清单（招投标闭环：开标后录入） */
+  bids?: TenderBid[]
+  /** 中标供应商（定标后写入） */
+  awardedSupplier?: string
+  /** 中标金额（万元，定标后写入） */
+  awardedAmount?: number
 }
 
-/** 产品类别（一级：智能交互 / 智能控制 / 智能座舱 / 智能驾驶 / 动力能源 / 底盘控制 / 车载电器） */
+/** 招投标投标人（招投标闭环：开标→评标→定标） */
+export interface TenderBid {
+  /** 投标人 id */
+  id: string
+  /** 投标人名称 */
+  bidder: string
+  /** 投标报价（万元） */
+  price: number
+  /** 技术分（0~100） */
+  techScore: number
+  /** 商务分（0~100） */
+  commercialScore: number
+  /** 综合得分（评标方式加权合成） */
+  totalScore: number
+  /** 是否中标 */
+  awarded: boolean
+}
+
+/** 样件采购单（采购管理域：样件采购需求/下单/到货/验收闭环） */
+export interface SamplePurchase {
+  id: string
+  /** 采购单编号（SMP-PUR-xxx） */
+  code: string
+  /** 关联样件需求 id（先 BOM 后样件 P-03） */
+  sampleReqId?: string
+  /** 样件需求编号 */
+  sampleReqCode?: string
+  /** 样件名称 */
+  part: string
+  /** 样件类型 A/B/C/OTS */
+  sampleType: string
+  /** 供应商 */
+  supplier: string
+  /** 数量 */
+  quantity: number
+  /** 单位 */
+  unit: string
+  /** 需求日期 */
+  needDate: string
+  /** 计划到货日期 */
+  planArriveDate: string
+  /** 申请人 */
+  creator: string
+  /** 状态：草稿 / 待下单 / 已下单 / 已到货 / 已验收 / 已关闭 */
+  status: string
+  /** 备注 */
+  remark?: string
+}
 export interface ProductCategory {
   id: string
   name: string

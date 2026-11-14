@@ -130,6 +130,8 @@ import { validateImport, type FieldMapping } from '@/domain/interop'
 import { defineForm, runHooksAtPoint, apiContractComplete, extensionPointsComplete, type CustomFormDef, type EventHook, type OpenApiEndpoint } from '@/domain/extensionPoint'
 import { checkContrast, checkKeyboardAccessible, checkFormLabels, accessibilityPassRate } from '@/domain/accessibility'
 import { validateRegister, validateAccept, validateDispose, summarizeArrivals, type GoodsArrival } from '@/domain/goodsArrival'
+import { evaluatePerformance, validatePerfScore, gradeOf, weightedTotal, summarizePerformance, PERF_GRADES, type SupplierPerfScore, type PerfGrade } from '@/domain/supplierPerformance'
+import { transitionSupplier, checkAdmission, checkNomination, checkPpapComplete, SUPPLIER_STATUSES, type SupplierStatus, type SupplierEvent } from '@/domain/supplier'
 
 const KEY = 'mofeng.rdp.state.v1'
 /** 语言偏好独立持久化（UI 偏好 ≠ 业务数据，不进入主文档乐观锁通道） */
@@ -229,6 +231,9 @@ export const useAppStore = defineStore('app', () => {
   const purchasePlans = computed(() => (data.value.purchasePlans ?? []) as import('@/domain/types').PurchasePlan[])
   const tenders = computed(() => (data.value.tenders ?? []) as import('@/domain/types').Tender[])
   const goodsArrivals = computed(() => (data.value.goodsArrivals ?? []) as import('@/domain/goodsArrival').GoodsArrival[])
+  const supplierPerfs = computed(() => (data.value.supplierPerfs ?? []) as SupplierPerfScore[])
+  const samplePurchases = computed(() => (data.value.samplePurchases ?? []) as import('@/domain/types').SamplePurchase[])
+  const suppliers = computed(() => (data.value.suppliers ?? []) as import('@/domain/types').Supplier[])
 
   // —— 多租户隔离（TEN-002/TEN-004）：当前租户上下文 + 可见项目 ——
   const tenants = computed(() => (data.value.tenants ?? []) as import('@/domain/tenant').Tenant[])
@@ -2629,6 +2634,152 @@ export const useAppStore = defineStore('app', () => {
     return true
   }
 
+  // —— 采购管理：供应商状态机推进（SUP-002）——
+  function advanceSupplierStatus(supplierId: string, event: SupplierEvent): boolean {
+    const s = suppliers.value.find((x) => x.id === supplierId)
+    if (!s) { notify('error', '未找到供应商'); return false }
+    const from = (s.status ?? '潜在') as SupplierStatus
+    const r = transitionSupplier(from, event)
+    if (!r.ok) { notify('error', r.reason ?? '状态迁移被拒绝'); return false }
+    // 准入高风险件强制现场审核（SUP-003）
+    if (event === '准入通过' && s.riskLevel === '高') {
+      const adm = checkAdmission({ riskLevel: s.riskLevel, siteAuditDone: false })
+      if (!adm.ok) { notify('error', adm.reason ?? '准入被拒'); return false }
+    }
+    const before = { status: from }
+    s.status = r.to as string
+    log('UPDATE', '供应商', s.code, { status: r.to }, before)
+    persist()
+    notify('success', `供应商「${s.code}」状态已推进为「${r.to}」`)
+    return true
+  }
+
+  // —— 采购管理：供应商绩效评分（四维，联动状态机）——
+  function addSupplierPerfScore(input: Omit<SupplierPerfScore, 'at'>): boolean {
+    const s = suppliers.value.find((x) => x.id === input.supplierId)
+    if (!s) { notify('error', '未找到供应商'); return false }
+    const history = supplierPerfs.value.filter((p) => p.supplierId === input.supplierId)
+    const now = new Date().toISOString()
+    const ev = evaluatePerformance(
+      { ...input, at: now },
+      history,
+      { riskLevel: s.riskLevel }
+    )
+    if (!ev.ok) { notify('error', ev.reason ?? '评分被拒绝'); return false }
+    const score: SupplierPerfScore = { ...input, at: now }
+    data.value.supplierPerfs = [...supplierPerfs.value, score]
+    log('CREATE', '供应商绩效', s.code, { period: score.period, total: ev.result?.total, grade: ev.result?.grade })
+    persist()
+    const r = ev.result!
+    let tip = `「${s.code}」${score.period} 绩效：综合 ${r.total} 分（${r.grade}）`
+    if (r.alerts.length) {
+      tip += '；预警：' + r.alerts.join('；')
+      notify('warning', tip)
+    } else {
+      notify('success', tip)
+    }
+    return true
+  }
+
+  // —— 采购管理：样件采购单 CRUD（先 BOM 后样件 P-03）——
+  function createSamplePurchase(input: Omit<import('@/domain/types').SamplePurchase, 'id' | 'status' | 'creator'> & { creator?: string }): boolean {
+    const id = `SMP-${Date.now()}`
+    const sp: import('@/domain/types').SamplePurchase = {
+      ...input,
+      id,
+      creator: input.creator ?? currentUser.value.name,
+      status: '草稿'
+    }
+    data.value.samplePurchases = [...samplePurchases.value, sp]
+    log('CREATE', '样件采购', id, { code: sp.code, part: sp.part })
+    persist()
+    notify('success', `样件采购单「${sp.code}」已保存为草稿`)
+    return true
+  }
+
+  /** 样件采购状态推进（草稿→待下单→已下单→已到货→已验收→已关闭） */
+  function advanceSamplePurchase(id: string, to: string): boolean {
+    const sp = samplePurchases.value.find((x) => x.id === id)
+    if (!sp) { notify('error', '未找到样件采购单'); return false }
+    const allowed: Record<string, string[]> = {
+      草稿: ['待下单'],
+      待下单: ['已下单'],
+      已下单: ['已到货'],
+      已到货: ['已验收'],
+      已验收: ['已关闭']
+    }
+    const ok = allowed[sp.status]?.includes(to)
+    if (!ok) { notify('error', `不允许从「${sp.status}」流转到「${to}」`); return false }
+    const before = { status: sp.status }
+    sp.status = to
+    log('UPDATE', '样件采购', sp.code, { status: to }, before)
+    persist()
+    notify('success', `样件采购「${sp.code}」状态已推进为「${to}」`)
+    return true
+  }
+
+  // —— 采购管理：招投标闭环（开标→评标→定标→流标）——
+  /** 开标：录入投标人清单 */
+  function recordBids(tenderId: string, bids: import('@/domain/types').TenderBid[]): boolean {
+    const t = tenders.value.find((x) => x.id === tenderId)
+    if (!t) { notify('error', '未找到招标项目'); return false }
+    if (t.status !== '已批准' && t.status !== '招标中' && t.status !== '已截标') {
+      notify('error', `招标「${t.code}」状态为「${t.status}」，须先审批批准后开标`); return false
+    }
+    if (!bids.length) { notify('error', '请至少录入一家投标人'); return false }
+    t.bids = bids
+    t.status = '已开标'
+    log('UPDATE', '招投标', t.code, { status: '已开标', bidCount: bids.length }, { status: '招标中' })
+    persist()
+    notify('success', `招标「${t.code}」已开标，录入 ${bids.length} 家投标人`)
+    return true
+  }
+
+  /** 评标：按评标方式合成综合得分 */
+  function evaluateTender(tenderId: string): boolean {
+    const t = tenders.value.find((x) => x.id === tenderId)
+    if (!t) { notify('error', '未找到招标项目'); return false }
+    if (t.status !== '已开标') { notify('error', '须先开标录入投标人后评标'); return false }
+    if (!t.bids?.length) { notify('error', '无投标人，无法评标'); return false }
+    // 评标方式：综合评分法（技术60/商务40）、最低价法（价格导向）、性价比法（技术40/商务60）
+    const method = t.evaluationMethod
+    t.bids = t.bids.map((b) => {
+      let total = b.totalScore
+      if (method === '综合评分法') total = Math.round((b.techScore * 0.6 + b.commercialScore * 0.4) * 100) / 100
+      else if (method === '性价比法') total = Math.round((b.techScore * 0.4 + b.commercialScore * 0.6) * 100) / 100
+      else if (method === '最低价法') total = Math.round((100 - b.price * 10) * 100) / 100
+      return { ...b, totalScore: total }
+    })
+    log('UPDATE', '招投标评标', t.code, { method, bids: t.bids.map((b) => ({ bidder: b.bidder, total: b.totalScore })) })
+    persist()
+    notify('success', `招标「${t.code}」评标完成（${method}）`)
+    return true
+  }
+
+  /** 定标：综合分最高者中标，否则流标 */
+  function awardTender(tenderId: string): boolean {
+    const t = tenders.value.find((x) => x.id === tenderId)
+    if (!t) { notify('error', '未找到招标项目'); return false }
+    if (t.status !== '已开标') { notify('error', '须先开标并评标后定标'); return false }
+    if (!t.bids?.length) { notify('error', '无投标人，无法定标'); return false }
+    const winner = t.bids.reduce((a, b) => (b.totalScore > a.totalScore ? b : a), t.bids[0])
+    if (!winner || winner.totalScore <= 0) {
+      t.status = '已流标'
+      log('UPDATE', '招投标定标', t.code, { status: '已流标' })
+      persist()
+      notify('warning', `招标「${t.code}」流标（无有效中标人）`)
+      return true
+    }
+    t.bids = t.bids.map((b) => ({ ...b, awarded: b.id === winner.id }))
+    t.awardedSupplier = winner.bidder
+    t.awardedAmount = winner.price
+    t.status = '已定标'
+    log('UPDATE', '招投标定标', t.code, { status: '已定标', awardedSupplier: winner.bidder, awardedAmount: winner.price })
+    persist()
+    notify('success', `招标「${t.code}」定标：${winner.bidder} 中标（${winner.price} 万）`)
+    return true
+  }
+
   // —— 采购管理：到货登记 / 验收 / 不合格处置 ——
   function registerArrival(input: Parameters<typeof validateRegister>[2]): boolean {
     const plan = purchasePlans.value.find((p) => p.id === input.planId)
@@ -3790,6 +3941,15 @@ export const useAppStore = defineStore('app', () => {
     deleteCustomer,
     createPurchasePlan,
     createTender,
+    advanceSupplierStatus,
+    addSupplierPerfScore,
+    createSamplePurchase,
+    advanceSamplePurchase,
+    recordBids,
+    evaluateTender,
+    awardTender,
+    supplierPerfs,
+    samplePurchases,
     registerArrival,
     acceptArrival,
     disposeArrival,

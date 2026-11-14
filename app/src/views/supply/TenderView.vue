@@ -58,8 +58,73 @@
             <span class="tag" :class="statusClass(row.status)">{{ row.status }}</span>
           </template>
         </el-table-column>
+        <el-table-column label="操作" width="190" fixed="right">
+          <template #default="{ row }">
+            <template v-if="row.status === '已批准'">
+              <el-button size="small" type="primary" plain @click="openBids(row)">开标录入</el-button>
+            </template>
+            <template v-else-if="row.status === '已开标'">
+              <el-button size="small" type="primary" plain @click="openBids(row)">投标人</el-button>
+              <el-button size="small" type="warning" plain @click="doEvaluate(row)">评标</el-button>
+              <el-button size="small" type="success" plain @click="doAward(row)">定标</el-button>
+            </template>
+            <template v-else-if="row.status === '已定标'">
+              <span class="tag ok">已定标 {{ row.awardedSupplier }}</span>
+            </template>
+            <template v-else-if="row.status === '已流标'">
+              <span class="tag fail">已流标</span>
+            </template>
+            <span v-else class="dim">—</span>
+          </template>
+        </el-table-column>
       </el-table>
     </div>
+
+    <!-- 投标人录入对话框（开标 / 评标 / 定标） -->
+    <el-dialog v-model="bidsDlgVisible" title="投标人录入与评标" width="760px" :close-on-click-modal="false">
+      <div class="dim" style="margin-bottom: 8px">招标「{{ bidsForm.tenderCode }}」· 评标方式：{{ bidsForm.evaluationMethod }}</div>
+      <el-table :data="bidsForm.bids" size="small">
+        <el-table-column label="投标人" min-width="140">
+          <template #default="{ row }">
+            <el-input v-model="row.bidder" placeholder="投标人名称" size="small" />
+          </template>
+        </el-table-column>
+        <el-table-column label="报价(万)" width="110">
+          <template #default="{ row }">
+            <el-input-number v-model="row.price" :min="0" :precision="2" size="small" style="width: 100%" />
+          </template>
+        </el-table-column>
+        <el-table-column label="技术分" width="100">
+          <template #default="{ row }">
+            <el-input-number v-model="row.techScore" :min="0" :max="100" size="small" style="width: 100%" />
+          </template>
+        </el-table-column>
+        <el-table-column label="商务分" width="100">
+          <template #default="{ row }">
+            <el-input-number v-model="row.commercialScore" :min="0" :max="100" size="small" style="width: 100%" />
+          </template>
+        </el-table-column>
+        <el-table-column label="综合分" width="80" align="right">
+          <template #default="{ row }"><b class="num">{{ row.totalScore }}</b></template>
+        </el-table-column>
+        <el-table-column label="中标" width="64">
+          <template #default="{ row }"><span v-if="row.awarded" class="tag ok">中标</span><span v-else class="dim">—</span></template>
+        </el-table-column>
+        <el-table-column label="" width="60">
+          <template #default="{ $index }">
+            <el-button link type="danger" size="small" @click="bidsForm.bids.splice($index, 1)">删</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-button size="small" style="margin-top: 8px" @click="addBidRow">+ 添加投标人</el-button>
+      <div class="flow-hint" style="margin-top: 8px">
+        开标录入投标人后保存；评标按评标方式合成综合分；定标取综合分最高者中标，无有效中标人则流标。
+      </div>
+      <template #footer>
+        <el-button size="small" @click="bidsDlgVisible = false">取消</el-button>
+        <el-button size="small" type="primary" @click="saveBids">保存投标人</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 发起招投标表单 -->
     <el-dialog v-model="dlgVisible" title="发起招投标" width="760px" :close-on-click-modal="false">
@@ -171,7 +236,7 @@ import KpiCard from '@/components/KpiCard.vue'
 import { useAppStore } from '@/store/app'
 import { getNode } from '@/domain/flowEngine'
 import type { FlowInstance } from '@/domain/flowEngine'
-import type { Tender } from '@/domain/types'
+import type { Tender, TenderBid } from '@/domain/types'
 
 const store = useAppStore()
 
@@ -317,6 +382,42 @@ function submit() {
   if (store.createTender({ ...payload(), submit: true })) {
     dlgVisible.value = false
   }
+}
+
+// —— 招投标闭环：开标 / 评标 / 定标 ——
+const bidsDlgVisible = ref(false)
+const bidsForm = reactive({
+  tenderId: '',
+  tenderCode: '',
+  evaluationMethod: '',
+  bids: [] as TenderBid[]
+})
+
+function openBids(row: import('@/domain/types').Tender) {
+  bidsForm.tenderId = row.id
+  bidsForm.tenderCode = row.code
+  bidsForm.evaluationMethod = row.evaluationMethod
+  bidsForm.bids = (row.bids ?? []).map((b) => ({ ...b }))
+  bidsDlgVisible.value = true
+}
+
+function addBidRow() {
+  bidsForm.bids.push({ id: `BID-${Date.now()}-${bidsForm.bids.length}`, bidder: '', price: 0, techScore: 0, commercialScore: 0, totalScore: 0, awarded: false })
+}
+
+function saveBids() {
+  const valid = bidsForm.bids.filter((b) => b.bidder.trim())
+  if (!valid.length) { store.notify('warning', '请至少填写一家投标人名称'); return }
+  store.recordBids(bidsForm.tenderId, valid.map((b) => ({ ...b, bidder: b.bidder.trim() })))
+  bidsDlgVisible.value = false
+}
+
+function doEvaluate(row: import('@/domain/types').Tender) {
+  store.evaluateTender(row.id)
+}
+
+function doAward(row: import('@/domain/types').Tender) {
+  store.awardTender(row.id)
 }
 </script>
 

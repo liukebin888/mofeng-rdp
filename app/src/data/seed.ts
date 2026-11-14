@@ -53,6 +53,7 @@ import type {
   Customer,
   PurchasePlan,
   Tender,
+  SamplePurchase,
   ProductCategory,
   ProductLine,
   Product,
@@ -80,6 +81,7 @@ import type { DeliverableApprovalBinding } from '@/domain/deliverableApproval'
 import { appendRecord, manifestHashOf, type ArchiveLayer, type ArchiveVolume } from '@/domain/archiveLayer'
 import { DEFAULT_REJECTION_POLICIES, type RejectionPolicyItem } from '@/domain/rejectionPolicy'
 import type { GoodsArrival } from '@/domain/goodsArrival'
+import type { SupplierPerfScore } from '@/domain/supplierPerformance'
 import type { QuoteCostSheet, QuoteCostLine } from '@/domain/quoteCost'
 import type { DesignArchiveTable, SampleReviewReport, DvTestReport } from '@/domain/otsApproval'
 import { DEFAULT_DESIGN_ARCHIVE } from '@/domain/otsApproval'
@@ -452,10 +454,10 @@ function buildRequirements(): { reqs: Requirement[]; links: TraceLink[] } {
 
 function buildSuppliers(): Supplier[] {
   return [
-    { id: 'S1', code: 'SUP-0081', name: '华阳精工电子', type: '关键件', qualified: true, qualifyExpire: '2027-06-30', nominated: true, ppapStatus: '已批准', ppapElements: 18, riskLevel: '低', sqe: '李文杰' },
-    { id: 'S2', code: 'SUP-0142', name: '联创汽车电子', type: '关键件', qualified: true, qualifyExpire: '2026-08-31', nominated: true, ppapStatus: '已批准', ppapElements: 18, riskLevel: '中', sqe: '李文杰' },
-    { id: 'S3', code: 'SUP-0233', name: '长鹰合金材料', type: '一般件', qualified: true, qualifyExpire: '2027-01-31', nominated: false, ppapStatus: '审核中', ppapElements: 13, riskLevel: '中', sqe: '沈雅' },
-    { id: 'S4', code: 'SUP-0310', name: '金泰线束制造', type: '一般件', qualified: false, qualifyExpire: '—', nominated: false, ppapStatus: '未提交', ppapElements: 0, riskLevel: '高', sqe: '沈雅' }
+    { id: 'S1', code: 'SUP-0081', name: '华阳精工电子', type: '关键件', qualified: true, qualifyExpire: '2027-06-30', nominated: true, ppapStatus: '已批准', ppapElements: 18, riskLevel: '低', sqe: '李文杰', status: '定点确认' },
+    { id: 'S2', code: 'SUP-0142', name: '联创汽车电子', type: '关键件', qualified: true, qualifyExpire: '2026-08-31', nominated: true, ppapStatus: '已批准', ppapElements: 18, riskLevel: '中', sqe: '李文杰', status: '定点确认' },
+    { id: 'S3', code: 'SUP-0233', name: '长鹰合金材料', type: '一般件', qualified: true, qualifyExpire: '2027-01-31', nominated: false, ppapStatus: '审核中', ppapElements: 13, riskLevel: '中', sqe: '沈雅', status: '准入通过' },
+    { id: 'S4', code: 'SUP-0310', name: '金泰线束制造', type: '一般件', qualified: false, qualifyExpire: '—', nominated: false, ppapStatus: '未提交', ppapElements: 0, riskLevel: '高', sqe: '沈雅', status: '潜在' }
   ]
 }
 
@@ -857,6 +859,10 @@ export function buildSeed() {
     tenders: [] as Tender[],
     /** 采购货物到货登记（采购管理域，空白模板：不预置演示数据） */
     goodsArrivals: [] as GoodsArrival[],
+    /** 供应商绩效评分（采购管理域，空白模板：不预置演示数据） */
+    supplierPerfs: [] as SupplierPerfScore[],
+    /** 样件采购单（采购管理域，空白模板：不预置演示数据） */
+    samplePurchases: [] as SamplePurchase[],
     boms,
     risks,
     polarityRisks,
