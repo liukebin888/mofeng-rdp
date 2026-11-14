@@ -73,6 +73,7 @@ import type { InterfacePlan } from '@/domain/interfacePlan'
 import type { ProjectGateDecl } from '@/domain/gateConsistency'
 import type { VulnerabilityItem, Issue8D } from '@/domain/defect'
 import type { Sci, CompatibilityRecord, ReleaseSignoff } from '@/domain/softwareVersion'
+import type { SoftwareVersion } from '@/domain/stateMachine'
 import type { Space } from '@/domain/spaceEngine'
 import { buildApprovalChain, DEFAULT_APPROVAL_ROLES, type ApprovalBinding } from '@/domain/approvalBinding'
 import type { DeliverableApprovalBinding } from '@/domain/deliverableApproval'
@@ -84,7 +85,7 @@ import type { DesignArchiveTable, SampleReviewReport, DvTestReport } from '@/dom
 import { DEFAULT_DESIGN_ARCHIVE } from '@/domain/otsApproval'
 import type { IssueLedgerItem, IssueAlertMail } from '@/domain/issueAlert'
 
-export const SEED_VERSION = 'mofeng.rdp.v1.0.35'
+export const SEED_VERSION = 'mofeng.rdp.v1.0.36'
 const TENANT = 'T-1001'
 
 export interface SeedUser {
@@ -576,11 +577,21 @@ export function buildSeed() {
     issues8D: []
   }
 
-  // —— 软件配置项 SCI + 兼容记录 + 发布双签（VER-001/008/009/015）——
-  const softwareVersions: { scis: Sci[]; compat: CompatibilityRecord[]; signoff: ReleaseSignoff } = {
+  // —— 软件配置项 SCI + 兼容记录 + 发布双签 + 软件版本对象（VER-001/003/008/009/015）——
+  const softwareVersions: {
+    scis: Sci[]
+    compat: CompatibilityRecord[]
+    signoff: ReleaseSignoff
+    versionObjs: SoftwareVersion[]
+  } = {
     scis: [],
     compat: [],
-    signoff: { rndSignedBy: '', qualitySignedBy: '' }
+    signoff: { rndSignedBy: '', qualitySignedBy: '' },
+    // 软件版本对象（VER-003 状态机：草稿/评审中/已发布/已作废），软件发布审批通过后回写为「已发布」
+    versionObjs: [
+      { id: 'SV-1000', projectId: 'PRJ-001', code: 'SCI-1000', version: 'V2.3.1', status: '评审中', signoffComplete: false },
+      { id: 'SV-1001', projectId: 'PRJ-001', code: 'SCI-1001', version: 'V1.0.4', status: '草稿', signoffComplete: false }
+    ]
   }
 
   const hours: HourRecord[] = []

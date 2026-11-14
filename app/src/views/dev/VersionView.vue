@@ -29,6 +29,23 @@
           软件版本须纳入受控基线（C-20）；刷写包签名校验用 SM2，哈希用 SM3（国密 TLS 迁移要求）。
           SCI 完整性按 VER-001 校验（须关联架构与安全需求各 ≥1）；发布双签 VER-009、兼容回滚 VER-008 由领域引擎实时判据。
         </div>
+
+        <div class="panel-title" style="margin-top: 16px">软件版本对象（VER-003 状态机，发布审批通过后回写）</div>
+        <el-table :data="versionObjs" size="small">
+          <el-table-column prop="code" label="SCI" width="100" />
+          <el-table-column prop="version" label="版本" width="90" />
+          <el-table-column label="状态" width="110">
+            <template #default="{ row }">
+              <span class="tag" :class="row.status === '已发布' ? 'ok' : row.status === '评审中' ? 'cond' : row.status === '已作废' ? 'fail' : ''">{{ row.status }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="发布双签" width="90">
+            <template #default="{ row }"><span class="tag" :class="row.signoffComplete ? 'ok' : 'fail'">{{ row.signoffComplete ? '已齐' : '缺签' }}</span></template>
+          </el-table-column>
+        </el-table>
+        <div class="src-note" style="margin-top: 8px">
+          软件发布流程（DEF-PRJ-SWREL）审批通过后，自动将对应软件版本状态推进为「已发布」（草稿 → 评审中 → 已发布），并写审计（VER-003）。
+        </div>
       </div>
 
       <div class="panel">
@@ -72,6 +89,9 @@ const sci = computed(() =>
   })
 )
 const latestVersion = computed(() => sci.value.find((s) => s.code === 'SCI-1000')?.version || '—')
+
+// 软件版本对象（VER-003 状态机：草稿/评审中/已发布/已作废），软件发布审批通过后回写「已发布」
+const versionObjs = computed(() => store.data.softwareVersions.versionObjs ?? [])
 
 // VER-009 发布双签（研发 + 质量）判据
 const signoff = computed(() => releaseSignoffComplete(store.data.softwareVersions.signoff))

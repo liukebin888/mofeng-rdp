@@ -198,10 +198,12 @@ export interface RiskItem {
   detection: number
   strategy: string
   owner: string
-  status: '开放' | '缓解中' | '已关闭'
+  status: '开放' | '缓解中' | '残余评估' | '已关闭'
   residual?: number
   /** 关闭时的签署人（C-15：高 RPN≥200 需双签） */
   signatures?: string[]
+  /** 缓解措施要求完成日期（YYYY-MM-DD，用于风险报警升级·超期判定，可选） */
+  dueDate?: string
 }
 
 export interface EcrItem {

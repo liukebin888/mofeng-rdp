@@ -62,6 +62,7 @@
 - `domain/leveling.ts`：资源平衡与平滑引擎（RES-006/007 单一权威：平衡延后非关键活动但里程碑/HARD 零移动，平滑完工日期不变，差异清单可回退 revert）。
 - `domain/bottleneck.ts`：关键资源瓶颈引擎（RES-012 单一权威：占用率≥90% 且位于关键路径才判瓶颈，用 nodes[].critical 标记而非 criticalPath 数组）。
 - `domain/riskQuant.ts` + `domain/simulation.ts` + `domain/contingency.ts`：风险量化域（RQA-001~012 单一权威：PERT 三点估算、蒙特卡洛可复现、风险关联、储备复算、动用审批分级、门禁联动 C-44）。
+- `domain/riskLifecycle.ts`：风险受控生命周期引擎（问题风险深化四项：受控状态机开放→缓解中→残余评估→已关闭、问题↔风险双向联动、风险报警升级、评审决策留痕；`RiskItem.status` 已扩展为四态，`RiskItem.dueDate` 用于超期判定）。
 - `domain/resourcePool.ts` + `domain/resourcePlan.ts`：资源域剩余（RES-001/002/008/009/010/011/013/014/015/016 单一权威：三层资源池/技能/派工承诺/工时回填/外部产能/效率系数/费率/情景）。
 - `domain/reportLibrary.ts` + `domain/interop.ts` + `domain/dataQuality.ts`：报表与互操作（EXA-001~010 单一权威：报表库/口径绑定/订阅/导出/互操作/集成网关/事件订阅/数据质量/三处同值）。
 - `domain/extensionPoint.ts` + `domain/accessibility.ts`：扩展点与可访问性（ARC-020 四类扩展点 + NFR-017 WCAG 对比度/键盘可达/表单标签）。

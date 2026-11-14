@@ -23,6 +23,13 @@
  */
 
 import { validateIssueChecklist, type IssueChecklistItem } from './issueChecklist'
+import {
+  configBaselineGate,
+  traceabilityGate,
+  qualityGatesGate,
+  type ConfigBaselineInfo,
+  type QualityGateItem
+} from './softwareReleaseGate'
 
 /** 软件测试项类别（区分功能与参数） */
 export type SoftwareTestKind = '功能' | '参数'
@@ -49,6 +56,8 @@ export interface SoftwareTestItem {
   critical: boolean
   /** 备注（可选，如不符合的现象说明） */
   note?: string
+  /** 关联的软件需求 ID（需求追溯覆盖率依据，可为空字符串） */
+  requirementId?: string
 }
 
 /** 软件测试报告 */
@@ -122,11 +131,22 @@ export function softwareTestReportCompleteness(
   return { complete: missing.length === 0, missing }
 }
 
-/** 发布判定输入（软件测试报告 + 嵌入软件信息，均可能缺省） */
+/** 发布判定输入（软件测试报告 + 嵌入软件信息 + 发布质量门禁，均可能缺省） */
 export interface SoftwareReleaseInput {
   testReport?: SoftwareTestReport | null
   /** 嵌入软件信息（编译器名称及版本 / MCU 名称与型号 / 编译后文件容量） */
   embeddedInfo?: EmbeddedSoftwareInfo | null
+  /** 配置管理与基线（配置项清单 / 基线编号 / 变更记录 / 冻结状态） */
+  configBaseline?: ConfigBaselineInfo | null
+  /** 需求追溯：全部软件需求 ID 与豁免说明（覆盖率 ≥95% + 豁免） */
+  traceability?: {
+    /** 全部软件需求 ID（应被测试覆盖的需求全集） */
+    allRequirementIds: string[]
+    /** 豁免说明（key = 未覆盖需求 ID，value = 豁免理由） */
+    waivers: Record<string, string>
+  } | null
+  /** 六项质量门禁（静态分析/单元测试/代码评审/回归测试/集成测试/性能测试） */
+  qualityGates?: QualityGateItem[] | null
 }
 
 /** 发布判定结果 */
@@ -149,14 +169,25 @@ export interface SoftwareReleaseOutput {
     /** 非关键参数中不符合的测试项名称 */
     failedNonCriticalParams: string[]
   }
+  /** 需求追溯覆盖率结果（供视图展示，缺省为 null） */
+  traceability: {
+    totalReqs: number
+    coveredReqs: number
+    coverage: number
+    uncoveredReqs: string[]
+    passed: boolean
+  } | null
 }
 
 /**
- * 软件发布结论判定（基于软件测试报告测试项结果 + 嵌入软件信息，fail-closed）。
+ * 软件发布结论判定（基于软件测试报告 + 嵌入软件信息 + 发布质量门禁，fail-closed）。
  *
  * 规则（用户裁决）：
  *   - 嵌入软件信息（编译器名称及版本 / MCU 名称与型号 / 编译后文件容量）不完整 → 不予发布；
+ *   - 六项质量门禁（静态分析/单元测试/代码评审/回归测试/集成测试/性能测试）任一缺失或不通过 → 不予发布；
+ *   - 配置管理与基线（配置项清单/基线编号/变更记录/冻结）不完整或未冻结 → 不予发布；
  *   - 测试报告缺失/不完整或测试项为空 → 不予发布；
+ *   - 需求追溯覆盖率 <95% 或未覆盖需求无豁免 → 不予发布；
  *   - 存在「功能」测试项不符合 → 不予发布（有功能不符合）；
  *   - 存在「关键参数」测试项不符合 → 不予发布（关键参数不符合）；
  *   - 存在「非关键参数」测试项不符合（且功能/关键参数均符合）→ 偏差发布；
@@ -174,6 +205,23 @@ export function determineSoftwareReleaseResult(input: SoftwareReleaseInput): Sof
     failedNonCriticalParams: [] as string[]
   }
 
+  // 需求追溯覆盖率（提前计算，供所有返回分支引用）
+  const coveredReqs = Array.from(
+    new Set((input.testReport?.items ?? []).map((i) => i.requirementId).filter((id): id is string => !!id && id.trim().length > 0))
+  )
+  const trace = traceabilityGate({
+    allRequirementIds: input.traceability?.allRequirementIds ?? [],
+    coveredRequirementIds: coveredReqs,
+    waivers: input.traceability?.waivers ?? {}
+  })
+  const traceOutput = {
+    totalReqs: trace.totalReqs,
+    coveredReqs: trace.coveredReqs,
+    coverage: trace.coverage,
+    uncoveredReqs: trace.uncoveredReqs,
+    passed: trace.passed
+  }
+
   // 嵌入软件信息不完整 → 不予发布（fail-closed）
   const embeddedCompleteness = embeddedSoftwareInfoCompleteness(input.embeddedInfo)
   if (!embeddedCompleteness.complete) {
@@ -182,7 +230,34 @@ export function determineSoftwareReleaseResult(input: SoftwareReleaseInput): Sof
       label: SOFTWARE_RELEASE_RESULT_LABEL['不予发布'],
       needIssuePlan: false,
       reason: `嵌入软件信息不完整（缺：${embeddedCompleteness.missing.join('、')}），退回补齐后重新提交`,
-      stats
+      stats,
+      traceability: traceOutput
+    }
+  }
+
+  // 六项质量门禁：任一缺失或不通过 → 不予发布（fail-closed）
+  const gates = qualityGatesGate(input.qualityGates)
+  if (!gates.passed) {
+    return {
+      result: '不予发布',
+      label: SOFTWARE_RELEASE_RESULT_LABEL['不予发布'],
+      needIssuePlan: false,
+      reason: gates.reason,
+      stats,
+      traceability: traceOutput
+    }
+  }
+
+  // 配置管理与基线：不完整或未冻结 → 不予发布（fail-closed）
+  const baseline = configBaselineGate(input.configBaseline)
+  if (!baseline.passed) {
+    return {
+      result: '不予发布',
+      label: SOFTWARE_RELEASE_RESULT_LABEL['不予发布'],
+      needIssuePlan: false,
+      reason: baseline.reason,
+      stats,
+      traceability: traceOutput
     }
   }
 
@@ -194,7 +269,20 @@ export function determineSoftwareReleaseResult(input: SoftwareReleaseInput): Sof
       label: SOFTWARE_RELEASE_RESULT_LABEL['不予发布'],
       needIssuePlan: false,
       reason: `软件测试报告不完整（缺：${completeness.missing.join('、')}），退回补齐后重新提交`,
-      stats
+      stats,
+      traceability: traceOutput
+    }
+  }
+
+  // 需求追溯覆盖率：<95% 或未覆盖需求无豁免 → 不予发布（fail-closed）
+  if (!trace.passed) {
+    return {
+      result: '不予发布',
+      label: SOFTWARE_RELEASE_RESULT_LABEL['不予发布'],
+      needIssuePlan: false,
+      reason: trace.reason,
+      stats,
+      traceability: traceOutput
     }
   }
 
@@ -222,7 +310,8 @@ export function determineSoftwareReleaseResult(input: SoftwareReleaseInput): Sof
       label: SOFTWARE_RELEASE_RESULT_LABEL['不予发布'],
       needIssuePlan: false,
       reason: `存在功能不符合（${stats.failedFunctions.join('、')}），不予发布，退回整改后重新测试提交`,
-      stats
+      stats,
+      traceability: traceOutput
     }
   }
 
@@ -233,7 +322,8 @@ export function determineSoftwareReleaseResult(input: SoftwareReleaseInput): Sof
       label: SOFTWARE_RELEASE_RESULT_LABEL['不予发布'],
       needIssuePlan: false,
       reason: `存在关键参数不符合（${stats.failedCriticalParams.join('、')}），不予发布，退回整改后重新测试提交`,
-      stats
+      stats,
+      traceability: traceOutput
     }
   }
 
@@ -244,7 +334,8 @@ export function determineSoftwareReleaseResult(input: SoftwareReleaseInput): Sof
       label: SOFTWARE_RELEASE_RESULT_LABEL['偏差发布'],
       needIssuePlan: true,
       reason: `基本功能和关键参数均符合，仅部分非关键参数不符合（${stats.failedNonCriticalParams.join('、')}），予以偏差发布，须附问题清单及整改计划，问题全部关闭后方可偏差通过`,
-      stats
+      stats,
+      traceability: traceOutput
     }
   }
 
@@ -254,7 +345,8 @@ export function determineSoftwareReleaseResult(input: SoftwareReleaseInput): Sof
     label: SOFTWARE_RELEASE_RESULT_LABEL['准予发布'],
     needIssuePlan: false,
     reason: '测试项完全符合要求，准予发布',
-    stats
+    stats,
+    traceability: traceOutput
   }
 }
 

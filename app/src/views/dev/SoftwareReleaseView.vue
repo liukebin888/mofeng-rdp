@@ -69,9 +69,51 @@
           </el-form>
         </div>
 
-        <!-- 三、软件测试报告 -->
+        <!-- 三、配置管理与基线 -->
         <div class="panel">
-          <div class="panel-title">三、软件测试报告（发布结论依据）</div>
+          <div class="panel-title">三、配置管理与基线（发布前须确认）</div>
+          <el-form label-width="120px" size="small">
+            <el-form-item label="基线编号" required>
+              <el-input v-model="configBaseline.baselineNo" placeholder="如 BL-SW-03" @input="markDirty" />
+            </el-form-item>
+            <el-form-item label="基线冻结" required>
+              <el-switch v-model="configBaseline.frozen" @change="markDirty" />
+              <span class="muted" style="margin-left: 8px; font-size: 12px">未冻结不得发布（SUP.8）</span>
+            </el-form-item>
+          </el-form>
+
+          <div class="sub-title">配置项清单</div>
+          <el-table :data="configBaseline.items" size="small" border>
+            <el-table-column label="配置项名称" min-width="160">
+              <template #default="{ row }"><el-input v-model="row.name" size="small" placeholder="如 CAN 通信驱动源文件" @input="markDirty" /></template>
+            </el-table-column>
+            <el-table-column label="版本" width="120">
+              <template #default="{ row }"><el-input v-model="row.version" size="small" placeholder="如 V1.2" @input="markDirty" /></template>
+            </el-table-column>
+            <el-table-column label="" width="60">
+              <template #default="{ $index }"><el-button link size="small" type="danger" @click="removeConfigItem($index)">删除</el-button></template>
+            </el-table-column>
+          </el-table>
+          <el-button size="small" style="margin-top: 8px" @click="addConfigItem">+ 新增配置项</el-button>
+
+          <div class="sub-title">变更记录</div>
+          <el-table :data="configBaseline.changes" size="small" border>
+            <el-table-column label="变更描述" min-width="160">
+              <template #default="{ row }"><el-input v-model="row.description" size="small" placeholder="变更描述" @input="markDirty" /></template>
+            </el-table-column>
+            <el-table-column label="变更单号" width="130">
+              <template #default="{ row }"><el-input v-model="row.changeNo" size="small" placeholder="ECR/ECN 编号" @input="markDirty" /></template>
+            </el-table-column>
+            <el-table-column label="" width="60">
+              <template #default="{ $index }"><el-button link size="small" type="danger" @click="removeChange($index)">删除</el-button></template>
+            </el-table-column>
+          </el-table>
+          <el-button size="small" style="margin-top: 8px" @click="addChange">+ 新增变更记录</el-button>
+        </div>
+
+        <!-- 四、软件测试报告 -->
+        <div class="panel">
+          <div class="panel-title">四、软件测试报告（发布结论依据）</div>
           <el-form label-width="120px" size="small">
             <el-form-item label="报告编号" required>
               <el-input v-model="testReport.reportNo" placeholder="软件测试报告编号" @input="markDirty" />
@@ -116,6 +158,9 @@
             <el-table-column label="备注" min-width="120">
               <template #default="{ row }"><el-input v-model="row.note" size="small" placeholder="不符合现象说明（可选）" @input="markDirty" /></template>
             </el-table-column>
+            <el-table-column label="关联需求ID" width="120">
+              <template #default="{ row }"><el-input v-model="row.requirementId" size="small" placeholder="如 SR-001" @input="markDirty" /></template>
+            </el-table-column>
             <el-table-column label="" width="60">
               <template #default="{ $index }"><el-button link size="small" type="danger" @click="removeItem($index)">删除</el-button></template>
             </el-table-column>
@@ -127,9 +172,61 @@
           </div>
         </div>
 
-        <!-- 三、发布结论（自动判定） -->
+        <!-- 五、需求追溯覆盖 -->
         <div class="panel">
-          <div class="panel-title">四、发布结论（引擎自动判定，不可手选）</div>
+          <div class="panel-title">五、需求追溯覆盖（覆盖率 ≥95% + 豁免）</div>
+          <el-form label-width="130px" size="small">
+            <el-form-item label="软件需求清单" required>
+              <el-input v-model="requirementIdsText" type="textarea" :rows="2" placeholder="填写全部软件需求 ID，逗号/空格分隔（如 SR-001, SR-002, SR-003）" @input="syncRequirementIds" />
+            </el-form-item>
+            <el-form-item label="未覆盖需求豁免">
+              <div style="width: 100%">
+                <template v-if="resultResult.traceability && resultResult.traceability.uncoveredReqs.length">
+                  <div v-for="id in resultResult.traceability.uncoveredReqs" :key="id" class="waiver-row">
+                    <span class="muted" style="width: 100px; flex-shrink: 0">{{ id }}</span>
+                    <el-input v-model="traceability.waivers[id]" size="small" placeholder="豁免理由（未覆盖需求须说明）" @input="markDirty" />
+                  </div>
+                </template>
+                <span v-else class="muted">无未覆盖需求，或尚未填写软件需求清单</span>
+              </div>
+            </el-form-item>
+          </el-form>
+          <div class="stat-row">
+            <span class="stat-item">需求总数 <b>{{ resultResult.traceability ? resultResult.traceability.totalReqs : 0 }}</b></span>
+            <span class="stat-item ok">已覆盖 <b>{{ resultResult.traceability ? resultResult.traceability.coveredReqs : 0 }}</b></span>
+            <span class="stat-item fail">覆盖率 <b>{{ resultResult.traceability ? (resultResult.traceability.coverage * 100).toFixed(1) : '0.0' }}%</b></span>
+          </div>
+          <div class="report-gate-note">需求追溯覆盖率须 ≥95%，未覆盖需求须有豁免说明，否则不予发布（双向追溯 SWE.6）。</div>
+        </div>
+
+        <!-- 六、质量门禁 -->
+        <div class="panel">
+          <div class="panel-title">六、质量门禁（六项齐全且全部通过）</div>
+          <el-table :data="qualityGates.items" size="small" border>
+            <el-table-column label="门禁项" width="130" prop="kind" />
+            <el-table-column label="结果" width="170">
+              <template #default="{ row }">
+                <el-radio-group v-model="row.result" size="small" @change="markDirty">
+                  <el-radio-button label="通过">通过</el-radio-button>
+                  <el-radio-button label="不通过">不通过</el-radio-button>
+                </el-radio-group>
+              </template>
+            </el-table-column>
+            <el-table-column label="说明" min-width="160">
+              <template #default="{ row }"><el-input v-model="row.note" size="small" placeholder="不通过时的现象/问题说明（可选）" @input="markDirty" /></template>
+            </el-table-column>
+            <el-table-column label="状态" width="80" align="center">
+              <template #default="{ row }">
+                <span class="tag" :class="row.result === '通过' ? 'ok' : 'fail'">{{ row.result }}</span>
+              </template>
+            </el-table-column>
+          </el-table>
+          <div class="report-gate-note">六项质量门禁（静态分析/单元测试/代码评审/回归测试/集成测试/性能测试）须逐项「通过」，任一不通过或缺失 → 不予发布。</div>
+        </div>
+
+        <!-- 七、发布结论（自动判定） -->
+        <div class="panel">
+          <div class="panel-title">七、发布结论（引擎自动判定，不可手选）</div>
           <div class="level-card" :class="'lv-' + resultKey">
             <div class="level-label">软件发布结论</div>
             <div class="level-value">{{ resultResult.label }}</div>
@@ -211,6 +308,13 @@ import {
   type EmbeddedSoftwareInfo,
   type SoftwareReleaseIssueItem
 } from '@/domain/softwareRelease'
+import {
+  QUALITY_GATE_KINDS,
+  type ConfigBaselineInfo,
+  type ConfigItem,
+  type BaselineChangeRecord,
+  type QualityGateItem
+} from '@/domain/softwareReleaseGate'
 import { issueChecklistGate, ISSUE_CHECKLIST_STATUSES } from '@/domain/issueChecklist'
 
 const store = useAppStore()
@@ -231,6 +335,28 @@ const embeddedInfo = reactive<EmbeddedSoftwareInfo>({
   mcuModel: '',
   binarySize: ''
 })
+
+// —— 配置管理与基线 ——
+const configBaseline = reactive<ConfigBaselineInfo>({
+  items: [],
+  baselineNo: '',
+  changes: [],
+  frozen: false
+})
+
+// —— 需求追溯（全部需求 ID + 豁免说明）——
+const traceability = reactive<{
+  allRequirementIds: string[]
+  waivers: Record<string, string>
+}>({
+  allRequirementIds: [],
+  waivers: {}
+})
+// 需求 ID 输入（逗号分隔，便于录入）
+const requirementIdsText = ref('')
+
+// —— 六项质量门禁 ——
+const qualityGates = reactive<{ items: QualityGateItem[] }>({ items: [] })
 
 // —— 软件测试报告 ——
 const testReport = reactive<SoftwareTestReport>({
@@ -259,14 +385,22 @@ function markDirty() {
 }
 
 // —— 发布结论（引擎自动判定）——
-const resultResult = computed(() => determineSoftwareReleaseResult({ testReport, embeddedInfo }))
+const resultResult = computed(() =>
+  determineSoftwareReleaseResult({
+    testReport,
+    embeddedInfo,
+    configBaseline,
+    traceability,
+    qualityGates: qualityGates.items
+  })
+)
 const resultKey = computed(() => {
   const r = resultResult.value.result
   return r === '准予发布' ? 'ok' : r === '偏差发布' ? 'cond' : 'fail'
 })
 
 function newTestItem(): SoftwareTestItem {
-  return { id: `ST-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, kind: '功能', name: '', result: '符合', critical: true, note: '' }
+  return { id: `ST-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, kind: '功能', name: '', result: '符合', critical: true, note: '', requirementId: '' }
 }
 function addItem() {
   testReport.items.push(newTestItem())
@@ -275,6 +409,43 @@ function addItem() {
 function removeItem(idx: number) {
   testReport.items.splice(idx, 1)
   markDirty()
+}
+
+// —— 配置项 / 变更记录 / 需求ID 编辑 ——
+function addConfigItem() {
+  configBaseline.items.push({ id: `CI-${Date.now()}`, name: '', version: '' })
+  markDirty()
+}
+function removeConfigItem(idx: number) {
+  configBaseline.items.splice(idx, 1)
+  markDirty()
+}
+function addChange() {
+  configBaseline.changes.push({ id: `CH-${Date.now()}`, description: '', changeNo: '' })
+  markDirty()
+}
+function removeChange(idx: number) {
+  configBaseline.changes.splice(idx, 1)
+  markDirty()
+}
+
+// 需求 ID 文本框 → allRequirementIds 数组（去重、去空）
+function syncRequirementIds() {
+  traceability.allRequirementIds = Array.from(
+    new Set(requirementIdsText.value.split(/[,，\s]+/).map((s) => s.trim()).filter(Boolean))
+  )
+  markDirty()
+}
+
+// 质量门禁初始化（六项默认「不通过」→ fail-closed，须逐项显式确认通过）
+function initQualityGates() {
+  qualityGates.items = QUALITY_GATE_KINDS.map((kind) => ({ kind, result: '不通过', note: '' }))
+}
+function gateResultOf(kind: string): QualityGateItem | undefined {
+  return qualityGates.items.find((g) => g.kind === kind)
+}
+function gateKindPassed(kind: string): boolean {
+  return gateResultOf(kind)?.result === '通过'
 }
 
 function addIssue() {
@@ -312,7 +483,15 @@ function serializeContent(): string {
     customApprovers: customApprovers.value,
     issuePlan: issuePlan.value,
     embeddedInfo: { ...embeddedInfo },
-    testReport: { ...testReport, items: testReport.items.map((i) => ({ ...i })) }
+    testReport: { ...testReport, items: testReport.items.map((i) => ({ ...i })) },
+    configBaseline: {
+      ...configBaseline,
+      items: configBaseline.items.map((i) => ({ ...i })),
+      changes: configBaseline.changes.map((c) => ({ ...c }))
+    },
+    traceability: { allRequirementIds: traceability.allRequirementIds, waivers: traceability.waivers },
+    requirementIdsText: requirementIdsText.value,
+    qualityGates: qualityGates.items.map((g) => ({ ...g }))
   })
 }
 
@@ -327,6 +506,17 @@ function hydrateContent(content: string) {
       Object.assign(testReport, obj.testReport)
       if (Array.isArray(obj.testReport.items)) testReport.items = obj.testReport.items
     }
+    if (obj.configBaseline) {
+      Object.assign(configBaseline, obj.configBaseline)
+      if (Array.isArray(obj.configBaseline.items)) configBaseline.items = obj.configBaseline.items
+      if (Array.isArray(obj.configBaseline.changes)) configBaseline.changes = obj.configBaseline.changes
+    }
+    if (obj.traceability) {
+      if (Array.isArray(obj.traceability.allRequirementIds)) traceability.allRequirementIds = obj.traceability.allRequirementIds
+      if (obj.traceability.waivers) traceability.waivers = obj.traceability.waivers
+    }
+    if (typeof obj.requirementIdsText === 'string') requirementIdsText.value = obj.requirementIdsText
+    if (Array.isArray(obj.qualityGates)) qualityGates.items = obj.qualityGates
   } catch {
     /* 忽略损坏草稿 */
   }
@@ -346,6 +536,11 @@ function wfNew() {
   issuePlan.value = []
   Object.assign(embeddedInfo, { compilerNameVersion: '', mcuName: '', mcuModel: '', binarySize: '' })
   Object.assign(testReport, { reportNo: '', date: '', tester: '', attachmentName: '', version: '', items: [] })
+  Object.assign(configBaseline, { items: [], baselineNo: '', changes: [], frozen: false })
+  traceability.allRequirementIds = []
+  traceability.waivers = {}
+  requirementIdsText.value = ''
+  initQualityGates()
   if (draft?.content) hydrateContent(draft.content)
   wfForm.value = f
   dirty.value = false
@@ -409,6 +604,9 @@ function wfSubmit(customApprovers: import('@/domain/flowEngine').CustomApproverA
     mcuName: embeddedInfo.mcuName,
     mcuModel: embeddedInfo.mcuModel,
     binarySize: embeddedInfo.binarySize,
+    baselineNo: configBaseline.baselineNo,
+    baselineFrozen: configBaseline.frozen,
+    traceCoverage: resultResult.value.traceability ? Math.round(resultResult.value.traceability.coverage * 100) : 0,
     result: resultResult.value.result,
     conclusion: resultResult.value.label
   }
@@ -449,4 +647,6 @@ function wfSubmit(customApprovers: import('@/domain/flowEngine').CustomApproverA
 .chain-node.end { border-color: var(--line); color: var(--text-3); }
 .chain-arrow { color: var(--text-3); font-size: 12px; line-height: 1; }
 .report-gate-note { font-size: 12px; color: var(--text-3); line-height: 1.6; margin-top: 8px; }
+.waiver-row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+.muted { color: var(--text-3); }
 </style>

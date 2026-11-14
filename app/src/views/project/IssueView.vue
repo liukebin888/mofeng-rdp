@@ -60,9 +60,10 @@
           <template #default="{ row }"><span class="tag" :class="row.source === '自动' ? 'cond' : 'ok'">{{ row.source }}</span></template>
         </el-table-column>
         <el-table-column prop="status" label="状态" width="80" align="center" />
-        <el-table-column label="操作" width="90">
+        <el-table-column label="操作" width="150">
           <template #default="{ row }">
             <el-button v-if="row.status !== '已关闭'" link size="small" @click="store.closeIssueLedgerItem(row.id)">关闭</el-button>
+            <el-button v-if="isHigh(row.severity)" link type="warning" size="small" @click="upgradeToRisk(row)">升级为风险</el-button>
             <span v-else class="dim">已闭环</span>
           </template>
         </el-table-column>
@@ -255,6 +256,9 @@ function exportMails() {
 
 function scan() {
   store.scanThresholdIssues()
+}
+function upgradeToRisk(row: { id: string; severity: string }) {
+  store.upgradeIssueToRisk(row.id, '缓解')
 }
 function stayDays(row: Nonconformity): number {
   return stayDaysOf(row.raisedAt, row.status, row.actualDate, AS_OF)

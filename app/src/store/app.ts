@@ -35,7 +35,7 @@ import { computeCpm, planQualityChecks, plannedValue, statusDayOf, weightedCompl
 import { computeEvm } from '@/domain/evm'
 import { rankProjects } from '@/domain/portfolio'
 import { coverage, detectBreaks } from '@/domain/trace'
-import type { ActorContext, Baseline, GateDef, GateRun, Level, WbsNode, ThresholdIssue } from '@/domain/types'
+import type { ActorContext, Baseline, GateDef, GateRun, Level, WbsNode, ThresholdIssue, RiskItem } from '@/domain/types'
 import { can, type ActionKey } from '@/domain/rbac'
 import { guardTenant, visibleInTenant, groupDrillDown, type TenantContext } from '@/domain/tenant'
 import { canAccessSpace, visibleInSpace, accessibleSpaces, describeSwitch, type Space, type SpaceContext } from '@/domain/spaceEngine'
@@ -95,6 +95,7 @@ import { detectOverallocations, gateBlocked } from '@/domain/overallocation'
 import { levelResources, smoothResources, revert, type LevelingResult } from '@/domain/leveling'
 import { scanThresholds, DEFAULT_THRESHOLD_RULES, type ThresholdMetrics } from '@/domain/thresholdEngine'
 import { resolveAlertRecipients, buildIssueAlertMail, isHighSeverity, exportAlertMails, type IssueLedgerItem, type IssueAlertMail, type IssueSeverity } from '@/domain/issueAlert'
+import { fire, SOFTWARE_VERSION_TRANSITIONS } from '@/domain/stateMachine'
 import { evaluateHandoffs } from '@/domain/handoffEngine'
 import { evaluateInterfacePlan, exportInterfacePlan, interfacePlanHealth, type InterfaceEvaluation } from '@/domain/interfacePlan'
 import { summarizeGateConsistency, type ProjectGateDecl } from '@/domain/gateConsistency'
@@ -104,6 +105,7 @@ import { buildCostSheet } from '@/domain/costSheet'
 import { emptyQuoteCostSheet, type QuoteCostSheet } from '@/domain/quoteCost'
 import { isOverdue as isCollabOverdue } from '@/domain/collabEngine'
 import { rpn } from '@/domain/risk'
+import { riskRegistrationCheck, riskCanTransition, riskNextStatus, riskCloseCheck, riskToIssue, issueToRisk, riskEscalation, riskLedgerStats, RISK_STRATEGIES, type RiskLifecycleStatus, type RiskDecision } from '@/domain/riskLifecycle'
 import { reviewProject, humanReviewEvidence, type HumanReview } from '@/domain/projectReview'
 import { summarizePolarity, type PolarityRisk } from '@/domain/riskOpportunity'
 import { analyzeBottlenecks } from '@/domain/bottleneck'
@@ -727,6 +729,185 @@ export const useAppStore = defineStore('app', () => {
     riskLinks.value.set(link.riskId, link)
     log('UPDATE', '风险关联', link.riskId, link)
     notify('success', '风险已关联，纳入模拟范围')
+  }
+
+  // —— 问题风险深化：风险受控生命周期 + 双向联动 + 报警 + 评审决策 ——
+  /** 风险评审决策留痕（riskId → 决策列表） */
+  const riskDecisions = ref<Map<string, RiskDecision[]>>(new Map())
+
+  /**
+   * 新增风险（受控登记）。
+   * C-13 四要素 + 责任人 + 应对策略齐全方可登记；登记后自动派生问题台账条目
+   * （问题↔风险双向联动·正向），并写审计。
+   */
+  function addRisk(input: {
+    title: string
+    failureMode: string
+    cause: string
+    consequence: string
+    trigger: string
+    severity: number
+    occurrence: number
+    detection: number
+    strategy: string
+    owner: string
+    dueDate?: string
+  }): { ok: boolean; risk?: RiskItem; error?: string } {
+    const check = riskRegistrationCheck({ ...input, consequence: input.consequence })
+    if (!check.ok) {
+      notify('error', `风险登记校验未通过：${check.missing.join('、')}（C-13）`)
+      return { ok: false, error: check.missing.join('、') }
+    }
+    const seq = data.value.risks.filter((r) => r.projectId === projectId.value).length + 1
+    const code = `RISK-${String(seq).padStart(3, '0')}`
+    const risk: RiskItem = {
+      id: `RISK-${Date.now()}`,
+      projectId: projectId.value,
+      code,
+      title: input.title.trim(),
+      failureMode: input.failureMode.trim(),
+      cause: input.cause.trim(),
+      consequence: input.consequence.trim(),
+      trigger: input.trigger.trim(),
+      severity: input.severity,
+      occurrence: input.occurrence,
+      detection: input.detection,
+      strategy: input.strategy,
+      owner: input.owner,
+      status: '开放',
+      dueDate: input.dueDate
+    }
+    data.value.risks.push(risk)
+    log('CREATE', '风险', risk.id, { code, title: risk.title, rpn: rpn(risk), strategy: risk.strategy })
+
+    // 双向联动·正向：风险登记自动派生问题台账条目 + 报警
+    const derived = riskToIssue(risk)
+    const issue = addIssueManually({
+      title: derived.title,
+      desc: `由风险 ${risk.code}（失效模式：${risk.failureMode}）自动派生`,
+      owner: risk.owner,
+      severity: derived.severity
+    })
+    notify('success', `风险 ${code} 已登记（RPN=${rpn(risk)}），${issue.ok ? '已派生问题条目并报警' : '问题派生未生成'}`)
+    return { ok: true, risk }
+  }
+
+  /** 风险状态机推进（开放→缓解中→残余评估→已关闭，受控流转） */
+  function advanceRiskStatus(riskId: string): { ok: boolean; reason?: string } {
+    const risk = data.value.risks.find((r) => r.id === riskId)
+    if (!risk) return { ok: false, reason: '风险不存在' }
+    const from = risk.status as RiskLifecycleStatus
+    const to = riskNextStatus(from)
+    if (!to) return { ok: false, reason: '风险已关闭，无后续状态' }
+    const chk = riskCanTransition(from, to)
+    if (!chk.ok) return { ok: false, reason: chk.reason }
+    risk.status = to
+    log('UPDATE', '风险', riskId, { status: to }, { status: from })
+    notify('success', `风险 ${risk.code} 已推进到「${to}」`)
+    return { ok: true }
+  }
+
+  /** 风险关闭（残余评估 + 按级别签署 C-15） */
+  function closeRisk(riskId: string, residual: number, signatures: string[]): { ok: boolean; reason?: string } {
+    const risk = data.value.risks.find((r) => r.id === riskId)
+    if (!risk) return { ok: false, reason: '风险不存在' }
+    const status = risk.status as RiskLifecycleStatus
+    const chk = riskCloseCheck({ ...risk, residual }, status, signatures)
+    if (!chk.ok) {
+      notify('error', chk.reason)
+      return { ok: false, reason: chk.reason }
+    }
+    risk.status = '已关闭'
+    risk.residual = residual
+    risk.signatures = signatures
+    log('UPDATE', '风险', riskId, { status: '已关闭', residual, signatures }, { status })
+    notify('success', `风险 ${risk.code} 已关闭：残余风险 ${residual}，签署 ${signatures.length} 人`)
+    return { ok: true }
+  }
+
+  /** 问题升级为风险（双向联动·反向：仅 P1/P2 高严重度问题可升级） */
+  function upgradeIssueToRisk(issueId: string, strategy: string): { ok: boolean; reason?: string } {
+    const issue = (data.value.issueLedger ?? []).find((x) => x.id === issueId)
+    if (!issue) return { ok: false, reason: '问题不存在' }
+    const chk = issueToRisk(issue.severity)
+    if (!chk.allowed) {
+      notify('error', chk.reason)
+      return { ok: false, reason: chk.reason }
+    }
+    const r = addRisk({
+      title: issue.title,
+      failureMode: issue.desc || issue.title,
+      cause: '由问题升级',
+      consequence: issue.title,
+      trigger: '问题升级',
+      severity: issue.severity === 'P1' ? 10 : 8,
+      occurrence: 5,
+      detection: 4,
+      strategy,
+      owner: issue.owner,
+      dueDate: undefined
+    })
+    if (r.ok) {
+      log('UPDATE', '问题', issueId, { upgradedToRisk: r.risk?.id })
+      notify('success', `问题 ${issue.code} 已升级为风险 ${r.risk?.code}`)
+    }
+    return r
+  }
+
+  /** 风险报警扫描（高 RPN 未处置 / 缓解超期 → 自动生成问题并报警） */
+  function scanRiskEscalation(): number {
+    let added = 0
+    for (const risk of projectRisks.value) {
+      const esc = riskEscalation(risk, new Date().toISOString().slice(0, 10))
+      if (!esc.escalate) continue
+      // 幂等：同风险已派生未关闭问题则不重复
+      const existed = (data.value.issueLedger ?? []).some(
+        (i) => i.status !== '已关闭' && i.title.includes(risk.code)
+      )
+      if (existed) continue
+      const severity = rpn(risk) >= 200 ? 'P1' : rpn(risk) >= 120 ? 'P2' : 'P3'
+      const issue = addIssueManually({
+        title: `风险 ${risk.code} ${esc.reason}`,
+        desc: `风险 ${risk.code}（${risk.title}）触发报警升级：${esc.reason}`,
+        owner: risk.owner,
+        severity
+      })
+      if (issue.ok) added++
+    }
+    if (added > 0) notify('warning', `风险报警升级：自动生成 ${added} 项问题并报警`)
+    return added
+  }
+
+  /** 风险评审决策留痕（接受/规避/转移/缓解） */
+  function addRiskDecision(riskId: string, decision: string, reason: string, gate?: string): { ok: boolean; reason?: string } {
+    const risk = data.value.risks.find((r) => r.id === riskId)
+    if (!risk) return { ok: false, reason: '风险不存在' }
+    if (!RISK_STRATEGIES.includes(decision as never)) {
+      notify('error', `决策类型须为 ${RISK_STRATEGIES.join('/')}`)
+      return { ok: false, reason: '决策类型非法' }
+    }
+    const rec: RiskDecision = {
+      id: `DEC-${Date.now()}`,
+      riskId,
+      decision: decision as RiskDecision['decision'],
+      reason,
+      decider: actor.value.userName,
+      decidedAt: new Date().toISOString(),
+      gate
+    }
+    const list = riskDecisions.value.get(riskId) ?? []
+    list.push(rec)
+    riskDecisions.value.set(riskId, list)
+    log('CREATE', '风险决策', rec.id, { riskId, decision, gate })
+    notify('success', `风险 ${risk.code} 已记录决策「${decision}」`)
+    return { ok: true }
+  }
+
+  /** 风险台账统计（供视图 KPI） */
+  const riskLifecycleStats = computed(() => riskLedgerStats(projectRisks.value, new Date().toISOString().slice(0, 10)))
+  /** 风险决策查询 */
+  function riskDecisionsOf(riskId: string): RiskDecision[] {
+    return riskDecisions.value.get(riskId) ?? []
   }
 
   // —— RES 资源域剩余项 ——
@@ -3442,8 +3623,40 @@ export const useAppStore = defineStore('app', () => {
     const next = approveNode(inst, def, { approverRole: currentUser.value.roleName, approverName: currentUser.value.name, note })
     Object.assign(inst, next)
     log('APPROVE', '流程', id, { to: next.currentNodeId, status: next.status })
+    // 软件发布流程审批完成 → 回写软件版本状态为「已发布」（与版本台账联动）
+    if (next.status === '已完成' && inst.defCode === 'DEF-PRJ-SWREL') {
+      const ver = typeof inst.form?.version === 'string' ? inst.form.version : ''
+      if (ver) releaseSoftwareVersionByCode(ver)
+    }
     persist()
     notify('success', next.status === '已完成' ? `${inst.title} 流程已走完` : `${inst.title} 已推进至下一节点`)
+  }
+
+  /**
+   * 软件发布审批通过后，回写软件版本状态（草稿/评审中 → 已发布）。
+   * 复用 SOFTWARE_VERSION_TRANSITIONS 状态机（VER-003）：评审通过 guard 要求 signoffComplete，
+   * 故此处直接置 signoffComplete=true 后 fire「评审通过」推进到「已发布」，并写审计。
+   */
+  function releaseSoftwareVersionByCode(code: string) {
+    const objs = data.value.softwareVersions?.versionObjs ?? []
+    const obj = objs.find((o) => o.code === code)
+    if (!obj) {
+      log('UPDATE', '软件版本', code, undefined, undefined, 'DENY')
+      notify('warning', `软件发布完成，但未找到软件版本对象 ${code}，未回写版本状态`)
+      return
+    }
+    if (obj.status === '已发布') return
+    try {
+      const target = { ...obj, signoffComplete: true }
+      const res = fire(SOFTWARE_VERSION_TRANSITIONS, obj.status, '评审通过', target)
+      obj.status = res.to as typeof obj.status
+      obj.signoffComplete = true
+      log('UPDATE', '软件版本', code, { to: res.to, action: res.action })
+      notify('success', `软件发布审批通过，软件版本 ${obj.version}（${code}）已回写为「已发布」`)
+    } catch {
+      log('UPDATE', '软件版本', code, undefined, undefined, 'DENY')
+      notify('warning', `软件版本 ${code} 当前状态「${obj.status}」无法直接推进为已发布`)
+    }
   }
 
   /** 以指定角色会签（供多部门会签演示：引擎 signNode 支持 signRole 参数） */
@@ -3668,6 +3881,14 @@ export const useAppStore = defineStore('app', () => {
     runQuantSim,
     setThreePoint,
     linkRisk,
+    addRisk,
+    advanceRiskStatus,
+    closeRisk,
+    upgradeIssueToRisk,
+    scanRiskEscalation,
+    addRiskDecision,
+    riskLifecycleStats,
+    riskDecisionsOf,
     poolNodes,
     poolHierarchyCheck,
     skillSearchResult,
