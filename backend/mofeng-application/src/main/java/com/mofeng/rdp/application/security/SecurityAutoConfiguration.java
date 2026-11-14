@@ -22,9 +22,10 @@ public class SecurityAutoConfiguration {
 
     @Bean
     public JwtService jwtService(@Value("${mofeng.security.jwt.secret:}") String secret) {
-        // 默认密钥仅供本地/测试环境；生产必须注入（长度≥32 字节，JwtService 构造校验）
+        // fail-closed：JWT 签名密钥必须由部署环境显式注入，缺失即拒绝启动，
+        // 不再回退到任何硬编码默认值（防「拿前端包即可自签任意身份」越权，SEC-012/B2）。
         if (secret == null || secret.isBlank()) {
-            secret = "mofeng-rdp-local-dev-secret-0123456789abcdef";
+            throw new IllegalStateException("未配置 JWT 签名密钥 mofeng.security.jwt.secret，拒绝启动（SEC-012 fail-closed）");
         }
         return new JwtService(secret);
     }

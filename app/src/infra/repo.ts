@@ -53,8 +53,19 @@ export async function loadRemoteState(): Promise<Record<string, unknown> | null>
   }
 }
 
-/** 写后端；返回是否成功 */
-export async function saveRemoteState(doc: Record<string, unknown>): Promise<boolean> {
+/** 写后端结果：区分成功 / 乐观锁冲突（409）/ 其它失败，避免把并发冲突误判为网络问题 */
+export interface SaveRemoteResult {
+  ok: boolean
+  /** 乐观锁冲突（expectedRev 与服务端当前 rev 不一致，409） */
+  conflict?: boolean
+  /** 冲突时服务端当前 rev（用于提示「请重新拉取后合并」） */
+  serverRev?: number
+  /** 冲突/失败时的服务端 message */
+  message?: string
+}
+
+/** 写后端；返回结构化结果（成功 / 乐观锁冲突 409 / 其它失败三态分离） */
+export async function saveRemoteState(doc: Record<string, unknown>): Promise<SaveRemoteResult> {
   try {
     const ctrl = new AbortController()
     const t = setTimeout(() => ctrl.abort(), 4000)
@@ -65,11 +76,22 @@ export async function saveRemoteState(doc: Record<string, unknown>): Promise<boo
       signal: ctrl.signal
     })
     clearTimeout(t)
-    if (!res.ok) return false
+    // 乐观锁冲突：expectedRev 落后于服务端当前 rev，须保留 409 语义供调用方感知，
+    // 不得归入「网络失败」走弱网排队重试（重试无法解决 rev 落后）。
+    if (res.status === 409) {
+      const json = (await res.json().catch(() => null)) as { code?: string; message?: string; currentRev?: number } | null
+      return {
+        ok: false,
+        conflict: true,
+        serverRev: json?.currentRev,
+        message: json?.message ?? '并发冲突：请重新拉取后合并'
+      }
+    }
+    if (!res.ok) return { ok: false }
     const json = (await res.json()) as { ok?: boolean }
-    return json?.ok === true
+    return { ok: json?.ok === true }
   } catch {
-    return false
+    return { ok: false }
   }
 }
 

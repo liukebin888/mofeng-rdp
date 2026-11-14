@@ -10,6 +10,7 @@
       @select="onSelect"
       @input="onInput"
       @clear="onClear"
+      @blur="onBlur"
     >
       <template #default="{ item }">
         <div class="sugg">
@@ -42,8 +43,10 @@ const props = withDefaults(
   defineProps<{
     modelValue: string
     placeholder?: string
+    /** 是否强制只能选组织内已有人员（默认 true）：失焦时若输入内容未匹配到人员则清空并提示 */
+    strict?: boolean
   }>(),
-  { placeholder: '输入姓名或首拼（如 zlq）' }
+  { placeholder: '输入姓名或首拼（如 zlq）', strict: true }
 )
 
 const emit = defineEmits<{
@@ -100,6 +103,19 @@ function onInput(v: string) {
 function onClear() {
   emit('update:modelValue', '')
   emit('select', { id: '', name: '', initials: '' })
+}
+
+/** 失焦校验：strict 模式下，输入的内容若不是组织内已有人员，则清空并提示（杜绝自由填写组织外人员） */
+function onBlur() {
+  if (!props.strict) return
+  const v = (props.modelValue || '').trim()
+  if (!v) return
+  const hit = store.users.some((u) => u.name === v)
+  if (!hit) {
+    emit('update:modelValue', '')
+    emit('select', { id: '', name: '', initials: '' })
+    store.notify('warning', `「${v}」不在组织架构人员中，请从下拉候选中选择`)
+  }
 }
 
 /** 当前姓名对应的已带入信息（用于展示已选人员） */

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { APQP_FLOW, APQP_NODES, APQP_PHASES, cutNodes, cutCounts, cutRuleOf, CUT_RULES, orderedPhases, nodesByPhase, findNode, findPhase } from '@/domain/apqpFlow'
+import { APQP_FLOW, APQP_NODES, APQP_PHASES, APQP_FULL_NODES, cutNodes, cutCounts, cutRuleOf, CUT_RULES, orderedPhases, nodesByPhase, findNode, findPhase } from '@/domain/apqpFlow'
 import { templateNodesOf, templateOf, templateMetas, projectNodes, isValidTemplateKind, TEMPLATE_KINDS } from '@/domain/planTemplate'
+import { CG_GATES, APQP_DELIVERABLE_NODES, deliverableCount } from '@/domain/apqpFlow'
 
 describe('APQP 流程引擎（APQ-001~005）', () => {
   it('内置流程含五阶段 P1~P5', () => {
@@ -129,5 +130,74 @@ describe('主计划模板引擎（MPT-001~003）', () => {
       if (inD) expect(inD.code).toBe(n.code)
     }
     expect(aIds.size).toBe(a.length)
+  })
+})
+
+describe('APQP 流程融合清单活动（APQ-007 八门·输出物融合）', () => {
+  it('融合后流程节点 = 骨架 23 + 清单活动 59 = 82', () => {
+    expect(APQP_NODES.length).toBe(23)
+    expect(APQP_DELIVERABLE_NODES.length).toBe(59)
+    expect(APQP_FULL_NODES.length).toBe(82)
+    expect(APQP_FLOW.nodes.length).toBe(82)
+    expect(APQP_FLOW.version).toBe(2)
+  })
+
+  it('清单活动作为 L3 活动节点并入，携带 gateCode 与 deliverables', () => {
+    const act = APQP_FLOW.nodes.find((n) => n.id === 'APQ-ACT-1')
+    expect(act).toBeTruthy()
+    expect(act!.kind).toBe('activity')
+    expect(act!.level).toBe('L3')
+    expect(act!.gateCode).toBe('CG0')
+    expect(act!.name).toBe('前期技术交流')
+    expect(act!.deliverables?.length).toBeGreaterThan(0)
+  })
+
+  it('融合后全量输出物仍为 175 条（不丢失）', () => {
+    const total = APQP_FLOW.nodes.reduce((s, n) => s + (n.deliverables?.length ?? 0), 0)
+    expect(total).toBe(deliverableCount())
+    expect(total).toBe(175)
+  })
+
+  it('B 模板纳入清单 59 项活动（L3），并挂载 175 条输出物', () => {
+    const b = cutNodes(APQP_FLOW, 'B')
+    const acts = b.filter((n) => n.kind === 'activity' && n.level === 'L3' && n.gateCode)
+    expect(acts.length).toBe(59)
+    const deliv = b.reduce((s, n) => s + (n.deliverables?.length ?? 0), 0)
+    expect(deliv).toBe(175)
+  })
+
+  it('A 模板仍为纯骨架（无清单活动，无输出物）', () => {
+    const a = cutNodes(APQP_FLOW, 'A')
+    for (const n of a) {
+      expect(n.gateCode).toBeUndefined()
+      expect(n.deliverables).toBeUndefined()
+    }
+    expect(a.every((n) => n.level === 'L1' || n.level === 'L2')).toBe(true)
+  })
+
+  it('C/D 模板在 B 基础上增加 L4 专项，规模递增 A<B<C<D', () => {
+    const counts = cutCounts(APQP_FLOW)
+    expect(counts.A).toBe(11)
+    expect(counts.B).toBe(72)
+    expect(counts.C).toBe(76)
+    expect(counts.D).toBe(82)
+    expect(counts.A).toBeLessThan(counts.B)
+    expect(counts.B).toBeLessThan(counts.C)
+    expect(counts.C).toBeLessThan(counts.D)
+  })
+
+  it('清单活动编码遵循 CT-{CG}-{seq} 规则', () => {
+    const act = APQP_FLOW.nodes.find((n) => n.id === 'APQ-ACT-8')!
+    expect(act.code).toBe('CT-CG2-08')
+    const act59 = APQP_FLOW.nodes.find((n) => n.id === 'APQ-ACT-59')!
+    expect(act59.code).toBe('CT-CG7-59')
+  })
+
+  it('时序约束锚点 id 在融合后保持不变', () => {
+    for (const id of ['APQ-P2-05', 'APQ-P3-04', 'APQ-P4-01', 'APQ-P5-05']) {
+      expect(findNode(APQP_FLOW, id)).toBeTruthy()
+    }
+    // OTS 认可仍为里程碑
+    expect(findNode(APQP_FLOW, 'APQ-P4-01')?.milestone).toBe(true)
   })
 })

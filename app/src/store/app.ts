@@ -25,6 +25,8 @@ import { enforceStageGate, canCreateWorkItem, type WorkItemKind, type GateEnforc
 import { AUTOMOTIVE_STAGE_TEMPLATE, findStageTemplate, orderedStages, type StageTemplate } from '@/domain/stageTemplate'
 import { gateReleaseEvidence, stageFullyReleased, prerequisitesFullyReleased, stageAdvanceVerdict, type ApprovalBinding } from '@/domain/approvalBinding'
 import { deliverableProvidedEvidence, stageDeliverablesComplete, type DeliverableApprovalBinding } from '@/domain/deliverableApproval'
+import { resolveArchiveTable, type ArchiveSource, type DesignArchiveItem } from '@/domain/otsApproval'
+import { receiveManifest, type TransferManifest, type ReceiptResult } from '@/domain/fileTransfer'
 import { applySeverityChange, findRejectionPolicy, severitySummary, shouldReject, type RejectionPolicyItem, type RejectionSeverity } from '@/domain/rejectionPolicy'
 import { freeze as freezeBaseline, verifyBaseline } from '@/domain/baseline'
 import { appendAudit, verifyChain } from '@/domain/audit'
@@ -56,7 +58,7 @@ import {
 } from '@/domain/docEngine'
 import { summarizeAnnotations, type DocAnnotation } from '@/domain/docAnnotation'
 import { appendRemoteAudit, checkBackend, loadRemoteState, saveRemoteState, seedRemoteAudit, repoBase } from '@/infra/repo'
-import { issueJwt, DEV_JWT_SECRET, savePlan, listPlan, scanPlanAlerts as scanPlanAlertsApi, type PlanSavePayload, type PlanSaveData, type PlanAlertScanData, type PlanNodeDto } from '@/infra/apiV1'
+import { requestToken, savePlan, listPlan, scanPlanAlerts as scanPlanAlertsApi, type PlanSavePayload, type PlanSaveData, type PlanAlertScanData, type PlanNodeDto } from '@/infra/apiV1'
 import { knowledgeStats, markReused, nextLessonCode, pushToLibrary, searchLessons as searchLessonsEngine, validateLesson } from '@/domain/lessonEngine'
 import {
   advanceSupervise as advanceSuperviseEngine,
@@ -92,6 +94,7 @@ import { analyzeSupplyDemand } from '@/domain/supplyDemand'
 import { detectOverallocations, gateBlocked } from '@/domain/overallocation'
 import { levelResources, smoothResources, revert, type LevelingResult } from '@/domain/leveling'
 import { scanThresholds, DEFAULT_THRESHOLD_RULES, type ThresholdMetrics } from '@/domain/thresholdEngine'
+import { resolveAlertRecipients, buildIssueAlertMail, isHighSeverity, exportAlertMails, type IssueLedgerItem, type IssueAlertMail, type IssueSeverity } from '@/domain/issueAlert'
 import { evaluateHandoffs } from '@/domain/handoffEngine'
 import { evaluateInterfacePlan, exportInterfacePlan, interfacePlanHealth, type InterfaceEvaluation } from '@/domain/interfacePlan'
 import { summarizeGateConsistency, type ProjectGateDecl } from '@/domain/gateConsistency'
@@ -124,6 +127,7 @@ import { threeWayConsistency } from '@/domain/dataQuality'
 import { validateImport, type FieldMapping } from '@/domain/interop'
 import { defineForm, runHooksAtPoint, apiContractComplete, extensionPointsComplete, type CustomFormDef, type EventHook, type OpenApiEndpoint } from '@/domain/extensionPoint'
 import { checkContrast, checkKeyboardAccessible, checkFormLabels, accessibilityPassRate } from '@/domain/accessibility'
+import { validateRegister, validateAccept, validateDispose, summarizeArrivals, type GoodsArrival } from '@/domain/goodsArrival'
 
 const KEY = 'mofeng.rdp.state.v1'
 /** 语言偏好独立持久化（UI 偏好 ≠ 业务数据，不进入主文档乐观锁通道） */
@@ -200,6 +204,10 @@ export const useAppStore = defineStore('app', () => {
   const levelingSnapshot = ref<LevelingResult | null>(null)
   /** 临界值自动触发问题台账（对标 Oracle Thresholds：阈值越限→自动生成问题→分派） */
   const thresholdIssues = computed<ThresholdIssue[]>(() => (data.value.thresholdIssues ?? []) as ThresholdIssue[])
+  /** 问题清单台账（人工录入 + 系统扫描自动录入统一台账，带来源标记） */
+  const issueLedger = computed<IssueLedgerItem[]>(() => (data.value.issueLedger ?? []) as IssueLedgerItem[])
+  /** 报警邮件记录（站内邮件，责任人/上级/部门总监） */
+  const issueAlertMails = computed<IssueAlertMail[]>(() => (data.value.issueAlertMails ?? []) as IssueAlertMail[])
 
   const users = computed<SeedUser[]>(() => data.value.users)
   const currentUser = computed(() => users.value.find((u) => u.id === userId.value) || users.value[0])
@@ -216,6 +224,9 @@ export const useAppStore = defineStore('app', () => {
   const namingRules = computed(() => (data.value.namingRules ?? []) as import('@/domain/types').NamingRule[])
   const namingRuleHistory = computed(() => (data.value.namingRuleHistory ?? []) as import('@/domain/types').NamingRuleHistory[])
   const codeIssues = computed(() => (data.value.codeIssues ?? []) as import('@/domain/types').CodeIssue[])
+  const purchasePlans = computed(() => (data.value.purchasePlans ?? []) as import('@/domain/types').PurchasePlan[])
+  const tenders = computed(() => (data.value.tenders ?? []) as import('@/domain/types').Tender[])
+  const goodsArrivals = computed(() => (data.value.goodsArrivals ?? []) as import('@/domain/goodsArrival').GoodsArrival[])
 
   // —— 多租户隔离（TEN-002/TEN-004）：当前租户上下文 + 可见项目 ——
   const tenants = computed(() => (data.value.tenants ?? []) as import('@/domain/tenant').Tenant[])
@@ -330,10 +341,13 @@ export const useAppStore = defineStore('app', () => {
     // 后端可用时异步同步（fire-and-forget，不阻塞交互；失败入队待重试）
     // 降级提示不得覆盖业务反馈：仅当当前无 toast 时提示一次，避免「基线篡改被拒」等关键错误被淹没。
     if (repoMode.value === 'rest') {
-      void saveRemoteState({ ...payload, expectedRev: rev.value }).then((ok) => {
-        if (ok) {
+      void saveRemoteState({ ...payload, expectedRev: rev.value }).then((r) => {
+        if (r.ok) {
           rev.value = rev.value + 1
           void flushPendingWrites()
+        } else if (r.conflict) {
+          // 乐观锁冲突：rev 已落后，重试无法解决，须提示重新拉取合并，不得入弱网队列
+          if (!toast.value) notify('error', r.message ?? '并发冲突：数据已被他人更新，请刷新后重试')
         } else {
           // POR-012 弱网排队去重：同键（数据状态）写失败入队，保留最新
           pendingWrites.value = enqueueWrite(pendingWrites.value, 'state', JSON.stringify(payload), new Date().toISOString())
@@ -348,10 +362,15 @@ export const useAppStore = defineStore('app', () => {
     if (!pendingWrites.value.length) return
     const queue = dedupeQueue(pendingWrites.value)
     for (const w of queue) {
-      const ok = await saveRemoteState({ expectedRev: rev.value, ...(JSON.parse(w.payload) as object) })
-      const r = settleWrite(queue, w.key, ok)
-      pendingWrites.value = r.queue
-      if (r.dead) notify('error', `离线写入 ${w.key} 重试超限，已转死信（POR-012）`)
+      const r = await saveRemoteState({ expectedRev: rev.value, ...(JSON.parse(w.payload) as object) })
+      // 乐观锁冲突时不走弱网结算，直接判定为「冲突」，转死信并提示重新拉取
+      const ok = r.ok && !r.conflict
+      const settled = settleWrite(queue, w.key, ok)
+      pendingWrites.value = settled.queue
+      if (settled.dead) {
+        if (r.conflict) notify('error', r.message ?? '离线写入冲突：数据已被他人更新，请刷新后重试')
+        else notify('error', `离线写入 ${w.key} 重试超限，已转死信（POR-012）`)
+      }
       if (ok) rev.value = rev.value + 1
     }
   }
@@ -383,10 +402,14 @@ export const useAppStore = defineStore('app', () => {
         // 版本不符（如 v1.0.4 → v1.0.5）属合法 seed 升级：携带后端当前 rev 覆盖写入，避免乐观锁 409。
         const backendRev = (remote && typeof remote === 'object' ? (remote as unknown as PersistShape).rev : undefined) ?? 0
         const payload: PersistShape = { version: SEED_VERSION, data: data.value, userId: userId.value, projectId: projectId.value, spaceId: spaceId.value, rev: backendRev }
-        const ok = await saveRemoteState({ ...payload, expectedRev: backendRev })
-        if (ok) {
+        const saveResult = await saveRemoteState({ ...payload, expectedRev: backendRev })
+        if (saveResult.ok) {
           rev.value = backendRev + 1
           notify('info', '数据已播种至服务端（REST 持久化已启用）')
+        } else if (saveResult.conflict) {
+          // 播种时乐观锁冲突：说明并发下服务端 rev 已被推进，退化为本地模式并提示
+          repoMode.value = 'local'
+          notify('error', saveResult.message ?? '播种冲突：服务端数据已变更，请刷新后重试')
         }
       }
       // 审计链播种：仅当服务端审计为空时，把本地种子审计链推上去（服务端权威重算哈希）
@@ -874,12 +897,24 @@ export const useAppStore = defineStore('app', () => {
       apis: openApis.value
     })
   )
-  /** NFR-017 可访问性审计（关键页面抽查） */
+  /**
+   * NFR-017 可访问性审计（设计令牌级抽查）。
+   *
+   * 抽查对象为 tokens.css 真实定义的主题颜色对（非人为填「合格」的假样本）：
+   * 深浅两套主题的正文/次要/弱化文字分别在各自内容背景上必须 ≥4.5:1。
+   * 键盘可达与表单标签为代表性交互元素抽查点（运行时 DOM 全量采样需 e2e 采集，
+   * 本期以 token 静态校验兜底，避免「恒报 100%」假取证）。
+   */
   const accessibilityAudit = computed(() => {
     const contrastChecks = [
-      checkContrast('#e5e7eb', '#0b1220'), // 正文文字 / 深色背景
-      checkContrast('#93c5fd', '#0b1220'), // 次要文字
-      checkContrast('#f87171', '#0b1220') // 危险提示
+      // 深色主题：正文/次要/弱化文字 对 深色内容背景
+      checkContrast('#e8eefb', '#070c16'), // --text-1 / --bg-0
+      checkContrast('#a9bad4', '#0d1523'), // --text-2 / --bg-1
+      checkContrast('#6f83a3', '#0d1523'), // --text-3 / --bg-1
+      // 浅色主题：正文/次要/弱化文字 对 浅色内容背景（含已整改的 --text-3）
+      checkContrast('#1b2735', '#f4f6fa'), // --text-1 / --bg-0
+      checkContrast('#45546a', '#ffffff'), // --text-2 / --bg-1
+      checkContrast('#5b6b80', '#ffffff') // --text-3 / --bg-1（NFR-017 整改后 ≥4.5:1）
     ]
     const keyboardCheck = checkKeyboardAccessible([
       { id: 'nav', tabbable: true, keyboardActivatable: true, focusIndicator: true },
@@ -1180,6 +1215,93 @@ export const useAppStore = defineStore('app', () => {
   }
   const projectThresholdIssues = computed(() => thresholdIssues.value.filter((i) => i.projectId === projectId.value))
 
+  /** 触发报警邮件（单一权威：责任人 + 上级始终；P1/P2 追加部门总监），并写入站内邮件记录 */
+  function fireIssueAlert(issue: IssueLedgerItem) {
+    const { recipients, roles } = resolveAlertRecipients(orgNodes.value, orgMemberships.value, issue.owner, issue.severity)
+    const mail = buildIssueAlertMail(issue, recipients, roles, new Date().toISOString())
+    if (!data.value.issueAlertMails) data.value.issueAlertMails = []
+    data.value.issueAlertMails.push(mail)
+    log('CREATE', '报警邮件', mail.id, { issueId: issue.id, recipients, level: mail.level })
+    return mail
+  }
+
+  /** 人工手动录入问题条目（统一进入台账，触发邮件报警） */
+  function addIssueManually(input: { title: string; desc: string; owner: string; severity: IssueSeverity }): { ok: boolean; issue?: IssueLedgerItem; error?: string } {
+    if (!input.title?.trim()) return { ok: false, error: '问题描述必填' }
+    if (!input.owner?.trim()) return { ok: false, error: '责任人必填' }
+    if (!input.severity) return { ok: false, error: '严重度必填' }
+    const seq = (data.value.issueLedger?.length ?? 0) + 1
+    const issue: IssueLedgerItem = {
+      id: `IL-${Date.now()}`,
+      code: `MAN-${String(seq).padStart(3, '0')}`,
+      title: input.title.trim(),
+      desc: input.desc?.trim() ?? '',
+      severity: input.severity,
+      owner: input.owner.trim(),
+      source: '人工',
+      status: '开放',
+      createdAt: new Date().toISOString()
+    }
+    if (!data.value.issueLedger) data.value.issueLedger = []
+    data.value.issueLedger.push(issue)
+    fireIssueAlert(issue)
+    log('CREATE', '问题清单', issue.id, { source: '人工', severity: issue.severity, owner: issue.owner })
+    notify('success', `问题 ${issue.code} 已录入，报警邮件已发送`)
+    return { ok: true, issue }
+  }
+
+  /** 系统扫描自动录入问题条目（阈值越限，统一进入台账，触发邮件报警） */
+  function scanIssueLedger(): number {
+    const result = scanThresholds(thresholdMetrics.value, DEFAULT_THRESHOLD_RULES, projectId.value)
+    const now = new Date().toISOString()
+    const dayAgo = Date.now() - 24 * 3600 * 1000
+    const existing = (data.value.issueLedger ?? []).filter(
+      (i) => i.source === '自动' && i.status !== '已关闭' && Date.parse(i.createdAt) >= dayAgo
+    )
+    const existingKeys = new Set(existing.map((i) => i.metric))
+    let added = 0
+    for (const hit of result.hits) {
+      const key = hit.rule.id
+      if (existingKeys.has(key)) continue
+      const seq = (data.value.issueLedger?.length ?? 0) + added + 1
+      const issue: IssueLedgerItem = {
+        id: `IL-${Date.now()}-${added}`,
+        code: `AUTO-${String(seq).padStart(3, '0')}`,
+        title: hit.issueTitle,
+        desc: hit.issueDesc,
+        severity: hit.severity as IssueSeverity,
+        owner: hit.assignTo,
+        source: '自动',
+        metric: key,
+        status: '开放',
+        createdAt: now
+      }
+      if (!data.value.issueLedger) data.value.issueLedger = []
+      data.value.issueLedger.push(issue)
+      fireIssueAlert(issue)
+      log('CREATE', '问题清单', issue.id, { source: '自动', ruleId: hit.rule.id, severity: hit.severity })
+      added += 1
+    }
+    if (added > 0) notify('warning', `系统扫描自动录入 ${added} 项问题，已生成并报警`)
+    return added
+  }
+
+  /** 关闭问题台账条目（闭环留痕） */
+  function closeIssueLedgerItem(issueId: string) {
+    const i = (data.value.issueLedger ?? []).find((x) => x.id === issueId)
+    if (!i) return
+    i.status = '已关闭'
+    i.closedBy = currentUser.value.name
+    i.closedAt = new Date().toISOString()
+    log('UPDATE', '问题清单', issueId, { status: '已关闭' })
+    notify('success', `${i.code} 已关闭`)
+  }
+
+  /** 导出报警邮件记录（CSV） */
+  function exportIssueAlertMails(): string {
+    return exportAlertMails(issueAlertMails.value)
+  }
+
   /** 交接点「已交接」：发出方提交交付物（三态闭环第二态） */
   function handoffHand(handoffId: string) {
     const h = (data.value.handoffs ?? []).find((x) => x.id === handoffId)
@@ -1393,7 +1515,11 @@ export const useAppStore = defineStore('app', () => {
       }))
     }
     try {
-      const token = await issueJwt(currentUser.value.id, currentUser.value.roleCode, data.value.tenantId, DEV_JWT_SECRET, 3600)
+      const token = (await requestToken(currentUser.value.id, currentUser.value.roleCode, data.value.tenantId, 3600)).data?.token ?? ''
+      if (!token) {
+        notify('error', '四级计划落表失败：后端未签发令牌')
+        return null
+      }
       const res = await savePlan(payload, token)
       if (res.ok && res.data) {
         if (!res.data.saved) {
@@ -1427,7 +1553,11 @@ export const useAppStore = defineStore('app', () => {
    */
   async function loadFourLevelPlan(): Promise<Array<import('@/domain/fourLevelPlan').PlanNode>> {
     try {
-      const token = await issueJwt(currentUser.value.id, currentUser.value.roleCode, data.value.tenantId, DEV_JWT_SECRET, 3600)
+      const token = (await requestToken(currentUser.value.id, currentUser.value.roleCode, data.value.tenantId, 3600)).data?.token ?? ''
+      if (!token) {
+        log('PLAN_LOAD', '四级计划回显', projectId.value, { error: '后端未签发令牌' }, undefined, 'DENY')
+        return []
+      }
       const res = await listPlan(data.value.tenantId, projectId.value, token)
       if (res.ok && res.data) {
         const nodes: Array<import('@/domain/fourLevelPlan').PlanNode> = (res.data as PlanNodeDto[]).map((d) => ({
@@ -1465,7 +1595,11 @@ export const useAppStore = defineStore('app', () => {
    */
   async function scanPlanAlerts(): Promise<PlanAlertScanData | null> {
     try {
-      const token = await issueJwt(currentUser.value.id, currentUser.value.roleCode, data.value.tenantId, DEV_JWT_SECRET, 3600)
+      const token = (await requestToken(currentUser.value.id, currentUser.value.roleCode, data.value.tenantId, 3600)).data?.token ?? ''
+      if (!token) {
+        notify('error', '告警巡检失败：后端未签发令牌')
+        return null
+      }
       const res = await scanPlanAlertsApi({ tenantId: data.value.tenantId, projectId: projectId.value }, token)
       if (res.ok && res.data) {
         log('PLAN_ALERT_SCAN', '四级计划告警', projectId.value, {
@@ -1536,6 +1670,129 @@ export const useAppStore = defineStore('app', () => {
   /** 某阶段（gate 维度）交付物审批齐套判定 */
   function deliverableComplete(gateCode: string) {
     return stageDeliverablesComplete(gateCode, projectDeliverables.value, deliverableApprovalBindings.value, flowInstances.value)
+  }
+
+  // —— OTS 附件 A 归档：两条路径（手工填写 / 系统自动传递）——
+  /**
+   * 当前项目「已有效提供」的交付物名称集合（审批链完成），
+   * 作为附件 A 自动归档条目（source='auto'）的判定依据。
+   */
+  const providedDeliverableNames = computed<Set<string>>(
+    () =>
+      new Set(
+        projectDeliverables.value
+          .filter((d) => d.required)
+          .map((d) => ({ d, ev: deliverableProvidedEvidence(d, deliverableApprovalBindings.value.find((b) => b.deliverableId === d.id), flowInstances.value) }))
+          .filter(({ ev }) => ev.provided)
+          .map(({ d }) => d.name)
+      )
+  )
+
+  /**
+   * 附件 A「生效」归档表：把自动传递条目的 archived 按交付物实际提供情况实时解算。
+   * 手工条目保持人工勾选状态；自动条目命中已提供交付物即视为已归档（归档人「系统」）。
+   */
+  const resolvedArchiveTable = computed(() =>
+    resolveArchiveTable((data.value.otsAttachments?.archiveTable ?? null) as import('@/domain/otsApproval').DesignArchiveTable | null, providedDeliverableNames.value)
+  )
+
+  /** 手工归档：标准化管理员勾选/取消某条目的归档状态（source=manual 条目） */
+  function markArchiveManual(itemCode: string, archived: boolean) {
+    const table = data.value.otsAttachments?.archiveTable
+    if (!table) return
+    let target: DesignArchiveItem | null = null
+    for (const p of table.parts) {
+      const it = p.items.find((i) => i.code === itemCode)
+      if (it) { target = it; break }
+    }
+    if (!target) return
+    if (target.source !== 'manual') {
+      notify('warning', '该条目为系统自动传递归档，不可手工填写归档状态')
+      return
+    }
+    target.archived = archived
+    target.archivedBy = archived ? currentUser.value.name : undefined
+    target.archivedAt = archived ? new Date().toISOString().slice(0, 19).replace('T', ' ') : undefined
+    log('UPDATE', '附件A归档', itemCode, { archived, source: 'manual', archivedBy: target.archivedBy })
+    notify('success', archived ? `「${target.name}」已标记归档（手工）` : `「${target.name}」已取消归档`)
+  }
+
+  /** 设置归档条目的来源（manual 手工 / auto 自动传递），auto 时可绑定交付物名称 */
+  function setArchiveItemSource(itemCode: string, source: ArchiveSource, deliverableName?: string) {
+    const table = data.value.otsAttachments?.archiveTable
+    if (!table) return
+    let target: DesignArchiveItem | null = null
+    for (const p of table.parts) {
+      const it = p.items.find((i) => i.code === itemCode)
+      if (it) { target = it; break }
+    }
+    if (!target) return
+    target.source = source
+    if (source === 'auto') {
+      target.deliverableName = deliverableName ?? ''
+      // 切到自动：清除手工归档痕迹，交由系统按交付物解算
+      target.archived = false
+      target.archivedBy = undefined
+      target.archivedAt = undefined
+    } else {
+      target.deliverableName = undefined
+    }
+    log('UPDATE', '附件A归档来源', itemCode, { source, deliverableName: target.deliverableName })
+    notify('success', source === 'auto' ? `「${target.name}」已改为系统自动传递归档` : `「${target.name}」已改为手工填写归档`)
+  }
+
+  // —— 文件传递协议（FTP-001：研发管理系统 ↔ OTS 归档）——
+  /** 已入账的批次 id（幂等键，持久化到 data） */
+  const receivedBatchIds = computed<ReadonlySet<string>>(() => new Set(data.value.receivedBatchIds ?? []))
+
+  /**
+   * 接收文件传递清单并入账（权威编排，复用 domain/fileTransfer.receiveManifest）。
+   * 入账成功时，把解算出的归档条目（复用 resolveItemArchived 判定）合并回附件 A 归档表，
+   * 并把 batchId 记入 receivedBatchIds（幂等）。
+   */
+  function receiveFileTransfer(
+    manifest: TransferManifest,
+    files?: ReadonlyMap<string, { size: number; sha256: string }>
+  ): ReceiptResult {
+    const ctx = {
+      tenantId: data.value.tenantId,
+      projectId: projectId.value,
+      receivedBatchIds: receivedBatchIds.value,
+      files
+    }
+    const result = receiveManifest(manifest, ctx, providedDeliverableNames.value)
+    if (!result.accepted || !result.archiveItems) {
+      if (result.code !== 'DUPLICATE') {
+        notify('error', result.note)
+      }
+      log('RECEIVE_DENY', '文件传递', manifest.batchId, { code: result.code, note: result.note })
+      return result
+    }
+
+    // 入账：把解算条目合并回归档表（按 archiveCode 覆盖，保留 source/deliverableName 绑定）
+    const table = data.value.otsAttachments?.archiveTable
+    if (!table) {
+      const r: ReceiptResult = { accepted: false, code: 'INVALID', note: '归档表未初始化，无法入账' }
+      log('RECEIVE_DENY', '文件传递', manifest.batchId, { code: r.code, note: r.note })
+      return r
+    }
+    for (const item of result.archiveItems) {
+      for (const p of table.parts) {
+        const target = p.items.find((i) => i.code === item.code)
+        if (!target) continue
+        if (target.source === 'manual') {
+          // 手工条目：清单只供核对，不覆盖人工勾选（但可补 deliverableName 供后续切换）
+          continue
+        }
+        target.archived = item.archived
+        target.archivedBy = item.archived ? item.archivedBy : undefined
+        target.archivedAt = item.archived ? item.archivedAt : undefined
+      }
+    }
+    data.value.receivedBatchIds = [...(data.value.receivedBatchIds ?? []), manifest.batchId]
+    log('RECEIVE', '文件传递', manifest.batchId, { count: result.archiveItems.length })
+    notify('success', `文件传递批次 ${manifest.batchId} 入账成功（${result.archiveItems.length} 条）`)
+    return result
   }
 
   /**
@@ -2124,6 +2381,146 @@ export const useAppStore = defineStore('app', () => {
     data.value.customers = r.list as import('@/domain/types').Customer[]
     log('DELETE', '客户', id, {})
     notify('success', '客户已删除')
+    return true
+  }
+
+  // —— 采购管理：采购计划 CRUD（采购计划表模板）——
+  function createPurchasePlan(input: Omit<import('@/domain/types').PurchasePlan, 'id' | 'status' | 'creator' | 'flowInstanceId'> & { creator?: string; status?: string; submit?: boolean }): boolean {
+    const id = `PP-${Date.now()}`
+    const submit = input.submit === true
+    const plan: import('@/domain/types').PurchasePlan = {
+      ...input,
+      id,
+      creator: input.creator ?? currentUser.value.name,
+      status: input.status ?? (submit ? '审批中' : '草稿')
+    }
+    data.value.purchasePlans = [...purchasePlans.value, plan]
+    log('CREATE', '采购计划', id, { code: plan.code, name: plan.name, submit })
+    if (submit) {
+      // 提交即启动采购计划审批流（DEF-PURCHASE-PLAN）：申请人 → 部门总监 → 采购 → 财务 → 总经理
+      const instId = launchFlow('DEF-PURCHASE-PLAN', `采购计划 ${plan.code} ${plan.name}`, {
+        code: plan.code,
+        purchaseCategory: plan.purchaseCategory,
+        supplier: plan.supplier,
+        amount: plan.amount
+      })
+      if (instId) {
+        plan.flowInstanceId = instId
+        notify('success', `采购计划「${plan.code}」已提交审批`)
+      } else {
+        notify('warning', `采购计划「${plan.code}」已创建，但审批流未启动（模板缺失）`)
+      }
+    } else {
+      notify('success', `采购计划「${plan.code}」已保存为草稿`)
+    }
+    return true
+  }
+
+  // —— 采购管理：招投标 CRUD（发起招投标表单）——
+  function createTender(input: Omit<import('@/domain/types').Tender, 'id' | 'status' | 'creator' | 'flowInstanceId'> & { creator?: string; status?: string; submit?: boolean }): boolean {
+    const id = `TD-${Date.now()}`
+    const submit = input.submit === true
+    const tender: import('@/domain/types').Tender = {
+      ...input,
+      id,
+      creator: input.creator ?? currentUser.value.name,
+      status: input.status ?? (submit ? '审批中' : '草稿')
+    }
+    data.value.tenders = [...tenders.value, tender]
+    log('CREATE', '招投标', id, { code: tender.code, name: tender.name, submit })
+    if (submit) {
+      // 提交即启动招投标审批流（DEF-TENDER）：发起人 → 部门总监 → 采购 → 财务 → 总经理
+      const instId = launchFlow('DEF-TENDER', `招投标 ${tender.code} ${tender.name}`, {
+        code: tender.code,
+        method: tender.method,
+        purchaseCategory: tender.purchaseCategory,
+        budget: tender.budget
+      })
+      if (instId) {
+        tender.flowInstanceId = instId
+        notify('success', `招投标「${tender.code}」已提交审批`)
+      } else {
+        notify('warning', `招投标「${tender.code}」已创建，但审批流未启动（模板缺失）`)
+      }
+    } else {
+      notify('success', `招投标「${tender.code}」已保存为草稿`)
+    }
+    return true
+  }
+
+  // —— 采购管理：到货登记 / 验收 / 不合格处置 ——
+  function registerArrival(input: Parameters<typeof validateRegister>[2]): boolean {
+    const plan = purchasePlans.value.find((p) => p.id === input.planId)
+    if (!plan) { notify('error', '未找到关联采购计划'); return false }
+    const list = goodsArrivals.value.filter((a) => a.planId === plan.id)
+    const chk = validateRegister(plan, list, input)
+    if (!chk.ok) { notify('error', chk.reason ?? '到货登记被拒绝'); log('CREATE', '到货登记', input.planId, undefined, undefined, 'DENY'); return false }
+    const id = `AR-${Date.now()}`
+    const arrival: GoodsArrival = {
+      id,
+      code: `AR-${new Date().getFullYear()}-${String(list.length + 1).padStart(3, '0')}`,
+      planId: plan.id,
+      planCode: plan.code,
+      itemName: input.itemName,
+      materialCode: input.materialCode ?? plan.materialCode,
+      supplier: input.supplier,
+      quantity: input.quantity,
+      unit: input.unit,
+      arriveDate: input.arriveDate,
+      planArriveDate: input.planArriveDate,
+      receiver: input.receiver,
+      inspection: input.inspection,
+      status: '待验收',
+      createdAt: new Date().toISOString()
+    }
+    data.value.goodsArrivals = [...goodsArrivals.value, arrival]
+    // 计划状态联动：首次到货 → 已到货（若仍为已批准/执行中）
+    if (['已批准', '执行中'].includes(plan.status)) {
+      plan.status = '已到货'
+    }
+    log('CREATE', '到货登记', id, { planCode: plan.code, quantity: input.quantity })
+    notify('success', `到货登记「${arrival.code}」已保存，待验收`)
+    return true
+  }
+
+  function acceptArrival(arrivalId: string, input: import('@/domain/goodsArrival').AcceptArrivalInput): boolean {
+    const a = goodsArrivals.value.find((x) => x.id === arrivalId)
+    if (!a) { notify('error', '未找到到货登记单'); return false }
+    const chk = validateAccept(a, input)
+    if (!chk.ok) { notify('error', chk.reason ?? '验收被拒绝'); log('APPROVE', '到货验收', arrivalId, undefined, undefined, 'DENY'); return false }
+    const before = { status: a.status, acceptedQty: a.acceptedQty, rejectedQty: a.rejectedQty }
+    const d = chk.data!
+    a.status = d.result === '合格' ? '验收合格' : '不合格处置中'
+    a.acceptedQty = d.acceptedQty
+    a.rejectedQty = d.rejectedQty
+    a.acceptDate = new Date().toISOString().slice(0, 10)
+    a.acceptResult = d.result
+    a.acceptor = currentUser.value.name
+    if (d.disposition) a.disposition = d.disposition
+    // 齐套联动：验收合格/部分合格后，把合格入库量回补 BOM 库存（K9 不齐套不开工解锁）
+    if (d.acceptedQty > 0 && a.materialCode) {
+      const bom = (data.value.boms ?? []).find((n) => n.materialCode === a.materialCode)
+      if (bom) {
+        bom.stock += d.acceptedQty
+        log('UPDATE', '到货入库', bom.materialCode, { stock: bom.stock, delta: d.acceptedQty, from: a.code })
+      }
+    }
+    log('APPROVE', '到货验收', arrivalId, { result: d.result, acceptedQty: d.acceptedQty, rejectedQty: d.rejectedQty, disposition: d.disposition }, before)
+    const label = d.result === '合格' ? '验收合格，已入库闭环' : `验收${d.result}，不合格部分进入处置（${d.disposition ?? '-'}）`
+    notify('success', `到货单「${a.code}」${label}`)
+    return true
+  }
+
+  function disposeArrival(arrivalId: string, note?: string): boolean {
+    const a = goodsArrivals.value.find((x) => x.id === arrivalId)
+    if (!a) { notify('error', '未找到到货登记单'); return false }
+    const chk = validateDispose(a)
+    if (!chk.ok) { notify('error', chk.reason ?? '处置关闭被拒绝'); return false }
+    const before = { status: a.status }
+    a.status = '已关闭'
+    if (note) a.dispositionNote = note
+    log('APPROVE', '不合格处置关闭', arrivalId, { note }, before)
+    notify('success', `到货单「${a.code}」不合格处置已关闭`)
     return true
   }
 
@@ -3166,6 +3563,9 @@ export const useAppStore = defineStore('app', () => {
     orgNodes,
     orgMemberships,
     customers,
+    purchasePlans,
+    tenders,
+    goodsArrivals,
     productCategories,
     productLines,
     products,
@@ -3175,6 +3575,12 @@ export const useAppStore = defineStore('app', () => {
     createCustomer,
     saveCustomer,
     deleteCustomer,
+    createPurchasePlan,
+    createTender,
+    registerArrival,
+    acceptArrival,
+    disposeArrival,
+    summarizeArrivals,
     createCategory,
     createProductLine,
     createProduct,
@@ -3244,6 +3650,13 @@ export const useAppStore = defineStore('app', () => {
     projectThresholdIssues,
     scanThresholdIssues,
     closeThresholdIssue,
+    issueLedger,
+    issueAlertMails,
+    addIssueManually,
+    scanIssueLedger,
+    closeIssueLedgerItem,
+    exportIssueAlertMails,
+    isHighSeverity,
     riskLinks,
     threePoints,
     riskLinkage,
@@ -3352,6 +3765,12 @@ export const useAppStore = defineStore('app', () => {
     deliverableApprovalBindings,
     deliverableEvidence,
     deliverableComplete,
+    providedDeliverableNames,
+    resolvedArchiveTable,
+    markArchiveManual,
+    setArchiveItemSource,
+    receiveFileTransfer,
+    receivedBatchIds,
     aiSwitchState,
     aiScope,
     aiVisibleCorpus,

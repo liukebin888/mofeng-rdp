@@ -8,6 +8,6 @@ export default defineConfig({
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) }
   },
-  server: { port: 5178, host: '127.0.0.1' },
+  server: { port: 5178, host: '127.0.0.1', strictPort: true },
   build: { outDir: 'dist', chunkSizeWarningLimit: 2000 }
 })

@@ -9,24 +9,18 @@
 
       <aside class="side" :class="{ 'side-drawer': bp === 'mobile', 'side-collapse': bp === 'tablet', 'side-open': bp === 'mobile' && drawerOpen }">
         <div class="brand">
-          <div class="logo">MO</div>
+          <img class="logo" :src="logoSrc" alt="魔程化解" />
+          <span class="brand-sep" />
           <div>
             <div class="b1">{{ t('app.brand') }}</div>
-            <div class="b2">{{ t('app.brandSub') }}</div>
           </div>
-        </div>
-
-        <div class="tenant">
-          <span class="tag">{{ store.data.tenant.name }}</span>
-          <span class="tag">{{ t('app.tenant') }} {{ store.data.tenant.code }}</span>
-          <span class="tag" :class="store.chainOk ? 'ok' : 'fail'">{{ store.chainOk ? t('app.auditChainOk') : t('app.auditChainFail') }}</span>
         </div>
 
         <el-scrollbar class="menus">
           <div v-for="g in sideMenus" :key="g.key" class="group">
             <div class="ghead" :class="{ active: isGroupActive(g.key) }" @click="toggle(g.key)">
+              <el-icon class="gicon"><component :is="g.icon" /></el-icon>
               <span class="gtitle">{{ t('menu.group.' + g.key) }}</span>
-              <span class="gcp mono">{{ g.cp }}</span>
               <span class="caret">{{ open.includes(g.key) ? '▾' : '▸' }}</span>
             </div>
             <div v-show="open.includes(g.key)" class="items">
@@ -37,7 +31,7 @@
                 :class="{ on: route.path === it.path }"
                 @click="go(it.path)"
               >
-                <span class="dot" />
+                <el-icon class="iicon"><component :is="it.icon || 'Menu'" /></el-icon>
                 <span class="t">{{ t('menu.item.' + it.path) }}</span>
                 <span v-if="it.batch" class="badge">{{ it.batch }}</span>
               </div>
@@ -64,7 +58,10 @@
 
       <main class="main">
         <div class="worktop">
-          <span class="wt-label">{{ t('menu.group.workbench') }}</span>
+          <span class="wt-label">
+            <el-icon class="wt-gicon"><component :is="'Grid'" /></el-icon>
+            <span>{{ t('menu.group.workbench') }}</span>
+          </span>
           <div class="wt-items">
             <button
               v-for="it in workbenchItems"
@@ -73,42 +70,11 @@
               :class="{ on: route.path === it.path }"
               @click="go(it.path)"
             >
+              <el-icon class="wt-iicon"><component :is="it.icon || 'Menu'" /></el-icon>
               <span class="wt-t">{{ t('menu.item.' + it.path) }}</span>
             </button>
           </div>
-        </div>
-
-        <div class="top">
-          <div class="row" style="gap: 10px">
-            <el-select v-model="sid" size="small" style="width: 150px" @change="onSpace">
-              <el-option
-                v-for="s in store.mySpaces"
-                :key="s.id"
-                :value="s.id"
-                :label="s.name"
-                :disabled="!spaceAccessible(s)"
-              >
-                <span>{{ s.name }}</span>
-                <span class="dim" style="margin-left: 6px; font-size: 11px">{{ s.type }}</span>
-              </el-option>
-            </el-select>
-            <el-select v-model="pid" size="small" style="width: 250px" @change="onProject">
-              <el-option v-for="p in store.spaceProjects" :key="p.id" :value="p.id" :label="`${p.code} · ${p.name}`">
-                <span>{{ p.code }} · {{ p.name }}</span>
-                <span class="tag" :class="'l' + (p.level || '4').slice(1)" style="margin-left: 8px">{{ t(p.level || '未定级') }}</span>
-              </el-option>
-            </el-select>
-            <span class="tag" :class="'l' + (store.currentProject.level || '4').slice(1)">{{ t(store.currentProject.level || '未定级') }}</span>
-            <span class="tag">{{ t(store.currentProject.status) }}</span>
-            <span class="tag" :class="healthClass">{{ t(store.currentProject.health) }}灯</span>
-          </div>
-
-          <div class="row" style="gap: 10px">
-            <span class="dim">{{ t('app.currentIdentity') }}</span>
-            <el-select v-model="uid" size="small" style="width: 250px" filterable @change="onUser">
-              <el-option v-for="u in store.users" :key="u.id" :value="u.id" :label="`${u.name} · ${u.roleName}`" />
-            </el-select>
-            <el-button size="small" @click="store.reset()">{{ t('app.resetData') }}</el-button>
+          <div class="wt-end">
             <el-dropdown trigger="click" @command="onLocale">
               <el-button size="small">
                 {{ store.locale === 'en-US' ? 'EN' : '中' }}
@@ -163,6 +129,7 @@ import { ACCENT_KEYS, type AccentKey } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
 import { breakpointOf, sideModeOf, type Breakpoint } from '@/domain/mobilePortal'
 import { CP_DEFINITIONS } from '@/domain/controlPoints'
+import logoSrc from '@/assets/mocheng-logo.png'
 
 /** 主题色展示元数据（颜色 + 中文名） */
 const ACCENT_COLORS: Record<AccentKey, string> = {
@@ -177,9 +144,6 @@ const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 const open = ref<string[]>(['workbench'])
-const uid = ref(store.userId)
-const pid = ref(store.projectId)
-const sid = ref(store.spaceId)
 
 /** 顶部横向导航：工作中心分组；侧栏渲染其余分组 */
 const workbenchItems = computed(() => MENUS.find((m) => m.key === 'workbench')?.items ?? [])
@@ -213,7 +177,6 @@ onUnmounted(() => {
 })
 
 const isGroupActive = (key: string) => route.path.startsWith(`/${key}`)
-const healthClass = computed(() => ({ 绿: 'ok', 黄: 'cond', 红: 'fail', 灰: '' }[store.currentProject.health] || ''))
 watch(() => route.path, () => {
   const g = MENUS.find((m) => route.path.startsWith(`/${m.key}`))
   if (g && !open.value.includes(g.key)) open.value = [...open.value, g.key]
@@ -226,25 +189,6 @@ function toggle(key: string) {
 function go(path: string) {
   router.push(path)
   if (bp.value === 'mobile') drawerOpen.value = false
-}
-function onUser(v: string) {
-  store.selectUser(v)
-}
-function onProject(v: string) {
-  store.setProject(v)
-  store.notify('info', `${t('app.switchProject')}：${store.currentProject.code}`)
-}
-function onSpace(v: string) {
-  if (store.switchSpace(v)) {
-    sid.value = store.spaceId
-    pid.value = store.projectId
-  } else {
-    sid.value = store.spaceId
-  }
-}
-function spaceAccessible(s: { id: string }) {
-  // mySpaces 已做租户+角色双重过滤，此处对无权限项置灰（防御性兜底）
-  return store.mySpaces.some((x) => x.id === s.id)
 }
 function onLocale(l: 'zh-CN' | 'en-US') {
   store.setLocale(l)
@@ -261,37 +205,42 @@ function onTheme(cmd: string) {
 <style scoped>
 .shell { display: grid; grid-template-columns: 244px 1fr; height: 100vh; overflow: hidden; }
 .side { background: var(--side-bg); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
-.brand { display: flex; gap: 10px; align-items: center; padding: 14px 14px 10px; }
-.logo { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #fff; font-weight: 800; font-size: 12px; display: grid; place-items: center; letter-spacing: 0.5px; }
-.b1 { font-size: 13.5px; font-weight: 700; }
-.b2 { font-size: 10.5px; color: var(--text-3); }
-.tenant { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 12px 10px; }
+.brand { display: flex; gap: 10px; align-items: center; padding: 16px 14px 14px; background: var(--bg-3); border-bottom: 1px solid var(--line); }
+.brand-sep { width: 1px; height: 22px; background: var(--text-3); flex: none; opacity: 0.6; }
+.logo { width: 32px; height: 32px; flex: none; object-fit: cover; display: block; border-radius: 8px; }
+.b1 { font-size: 16px; font-weight: 700; }
 .menus { flex: 1; min-height: 0; padding: 0 8px; }
 .group { margin-bottom: 2px; }
 .ghead { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 7px; cursor: pointer; color: var(--text-2); }
 .ghead:hover { background: var(--item-hover); }
 .ghead.active { background: var(--group-active); color: var(--text-1); }
+.gicon { font-size: 14px; color: var(--brand); flex: none; }
+.ghead.active .gicon { color: var(--brand-2); }
 .gtitle { font-size: 12px; font-weight: 600; flex: 1; }
-.gcp { font-size: 9px; color: var(--text-3); }
 .caret { font-size: 9px; color: var(--text-3); }
-.items { padding: 2px 0 4px 6px; }
+.items { padding: 2px 0 4px 20px; }
 .item { display: flex; align-items: center; gap: 7px; padding: 5px 8px; border-radius: 6px; cursor: pointer; color: var(--text-2); font-size: 11.5px; }
 .item:hover { background: var(--item-hover); color: var(--text-1); }
 .item.on { background: linear-gradient(90deg, var(--item-active-a), var(--item-active-b)); color: var(--text-1); box-shadow: inset 2px 0 0 var(--brand); }
-.dot { width: 4px; height: 4px; border-radius: 50%; background: var(--text-3); flex: none; }
-.item.on .dot { background: var(--brand-2); }
+.iicon { font-size: 13px; color: var(--text-3); flex: none; transition: color 0.15s; }
+.item:hover .iicon { color: var(--text-2); }
+.item.on .iicon { color: var(--brand-2); }
 .t { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .badge { font-size: 9px; color: #ffd79a; border: 1px solid #5b3c14; border-radius: 4px; padding: 0 3px; }
 .foot { padding: 8px 14px; border-top: 1px solid var(--line-soft); font-size: 10px; }
 .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg-0); }
 .worktop { display: flex; align-items: center; gap: 16px; padding: 8px 18px; background: var(--top-bg); border-bottom: 1px solid var(--line-soft); }
-.wt-label { flex: none; font-size: 12px; font-weight: 700; color: var(--brand-2); letter-spacing: 0.5px; }
+.wt-label { flex: none; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--brand-2); letter-spacing: 0.5px; }
+.wt-gicon { font-size: 14px; color: var(--brand-2); }
 .wt-items { display: flex; flex-wrap: wrap; gap: 4px; }
-.wt-item { border: none; background: transparent; color: var(--text-2); font-size: 12px; padding: 5px 12px; border-radius: 7px; cursor: pointer; white-space: nowrap; }
+.wt-item { display: flex; align-items: center; gap: 5px; border: none; background: transparent; color: var(--text-2); font-size: 12px; padding: 5px 12px; border-radius: 7px; cursor: pointer; white-space: nowrap; }
+.wt-iicon { font-size: 13px; color: var(--text-3); flex: none; transition: color 0.15s; }
+.wt-item:hover .wt-iicon { color: var(--text-2); }
+.wt-item.on .wt-iicon { color: var(--brand-2); }
 .wt-item:hover { background: var(--item-hover); color: var(--text-1); }
 .wt-item.on { background: linear-gradient(90deg, var(--item-active-a), var(--item-active-b)); color: var(--text-1); box-shadow: inset 0 -2px 0 var(--brand); }
 .wt-t { display: inline-block; }
-.top { display: flex; align-items: center; justify-content: space-between; padding: 10px 18px; border-bottom: 1px solid var(--line); background: var(--top-bg); }
+.wt-end { margin-left: auto; display: flex; align-items: center; gap: 6px; }
 .dim { color: var(--text-3); font-size: 11px; }
 .content { flex: 1; overflow: auto; padding: 16px 18px 40px; }
 .toast { position: fixed; right: 22px; bottom: 22px; padding: 10px 14px; border-radius: 8px; font-size: 12px; max-width: 520px; box-shadow: var(--shadow); z-index: 3000; border: 1px solid var(--line); background: var(--bg-2); }
@@ -338,14 +287,11 @@ function onTheme(cmd: string) {
   transition: transform 0.25s;
 }
 .bp-mobile .side.side-open { transform: translateX(0); }
-.bp-mobile .top { padding-left: 56px; flex-wrap: wrap; row-gap: 8px; }
-.bp-mobile .top .row { flex-wrap: wrap; }
 .bp-mobile .worktop { padding-left: 56px; }
 .bp-tablet .shell { grid-template-columns: 64px 1fr; }
 .bp-tablet .side .brand > div:last-child,
-.bp-tablet .side .tenant,
+.bp-tablet .side .brand-sep,
 .bp-tablet .side .gtitle,
-.bp-tablet .side .gcp,
 .bp-tablet .side .caret,
 .bp-tablet .side .foot,
 .bp-tablet .side .items { display: none; }

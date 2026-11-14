@@ -31,51 +31,41 @@ export const API_V1_BASE =
   'http://127.0.0.1:8088'
 
 // ------------------------------------------------------------------
-// JWT（HS256）本地签发 —— 与后端 security/JwtService 对齐
+// JWT 令牌获取 —— 令牌仅后端签发（B2 整改：前端不持有密钥、不浏览器端自签）
 // ------------------------------------------------------------------
 
-const b64url = (input: ArrayBuffer | string): string => {
-  const bytes =
-    typeof input === 'string' ? new TextEncoder().encode(input) : new Uint8Array(input)
-  let bin = ''
-  bytes.forEach((b) => (bin += String.fromCharCode(b)))
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-async function hmacSha256(secret: string, message: string): Promise<ArrayBuffer> {
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  )
-  return crypto.subtle.sign('HMAC', key, new TextEncoder().encode(message))
+export interface TokenResult {
+  token?: string
+  expiresIn?: number
 }
 
 /**
- * 签发 HS256 JWT（与后端 JwtService.issue 对齐：载荷 {sub,role,tenant,exp}）。
- * 仅联调/开发用；生产由后端认证端点签发。
+ * 从后端认证端点换取访问令牌（POST /api/v1/auth/token）。
+ * 前端不再持有 JWT 签名密钥、不再浏览器端自签（SEC-001 / B2）。
+ * 后端密钥缺失已 fail-closed 拒绝启动，本端点返回失败时调用方不得伪造令牌。
  */
-export async function issueJwt(
+export async function requestToken(
   userId: string,
   roleCode: string,
   tenantId: string,
-  secret: string,
   ttlSeconds = 3600
-): Promise<string> {
-  const header = b64url('{"alg":"HS256","typ":"JWT"}')
-  const exp = Math.floor(Date.now() / 1000) + ttlSeconds
-  const payload = b64url(
-    `{"sub":"${userId}","role":"${roleCode}","tenant":"${tenantId}","exp":${exp}}`
-  )
-  const signingInput = `${header}.${payload}`
-  const sig = b64url(await hmacSha256(secret, signingInput))
-  return `${signingInput}.${sig}`
+): Promise<ApiResult<TokenResult>> {
+  return postJson<Record<string, unknown>>('/api/v1/auth/token', {
+    userId,
+    roleCode,
+    tenantId,
+    ttlSeconds
+  }).then((r) => {
+    if (r.ok && r.data) {
+      return {
+        ok: true,
+        status: r.status,
+        data: { token: String(r.data.token ?? ''), expiresIn: Number(r.data.expiresIn ?? ttlSeconds) }
+      }
+    }
+    return r
+  })
 }
-
-/** 联调默认密钥（与后端 application.yml 的本地默认值一致；生产须覆盖）。 */
-export const DEV_JWT_SECRET = 'mofeng-rdp-local-dev-secret-0123456789abcdef'
 
 // ------------------------------------------------------------------
 // 通用 POST 封装

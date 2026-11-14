@@ -38,7 +38,7 @@ describe('i18n 引擎（TEN-013）', () => {
       expect(translate('en-US', 'btn.save')).toBe('Save')
     })
     it('中文命中 zh-CN 字典', () => {
-      expect(translate('zh-CN', 'app.brand')).toBe('魔程化解研发管理平台')
+      expect(translate('zh-CN', 'app.brand')).toBe('魔程化解')
     })
     it('缺键回退中文再回退 key 本身', () => {
       expect(translate('en-US', 'lang.zh')).toBe('中文') // en-US 未覆盖，回退中文

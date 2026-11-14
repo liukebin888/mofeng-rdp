@@ -45,6 +45,22 @@ class ApplicationLayerSecurityArchitectureTest {
     private static final Set<String> VALID_ACTIONS =
             Set.of("view", "create", "update", "delete", "approve", "export");
 
+    /**
+     * 认证前端点白名单（SEC-001 / B2 整改）。
+     *
+     * <p>身份建立入口（令牌签发）本质必须匿名可达——若标 {@code @RequiresPermission}，
+     * 匿名调用方将永远无法换取令牌（无有效身份 → 401），认证闭环无法建立。</p>
+     *
+     * <p>故对「签发令牌」这一端点做<b>精确到方法</b>的显式豁免（类全名 + 方法名），
+     * 而非笼统豁免整个类/包，守住 E2 fail-closed 守护的初衷。任何新增的认证前端点
+     * 都必须在此显式登记并注明理由，否则仍被 fail-closed 扫描拦截。</p>
+     *
+     * <p>生产形态：本端点前置口令/凭据认证（对接 PasswordEngine 加盐哈希校验），
+     * 凭任意 userId 签发即等于伪造身份，见 {@code AuthController} 类注释。</p>
+     */
+    private static final Set<String> AUTH_PRE_ENDPOINTS = Set.of(
+            "com.mofeng.rdp.application.security.AuthController#token");
+
     private static com.tngtech.archunit.core.domain.JavaClasses applicationClasses;
 
     @BeforeAll
@@ -54,9 +70,15 @@ class ApplicationLayerSecurityArchitectureTest {
                 .importPackages("com.mofeng.rdp.application");
     }
 
+    /** 判定某方法是否为「认证前端点」（身份建立入口，匿名可达，豁免鉴权标注）。 */
+    private static boolean isAuthPreEndpoint(JavaClass cls, JavaMethod m) {
+        return AUTH_PRE_ENDPOINTS.contains(cls.getName() + "#" + m.getName());
+    }
+
     /**
      * E2-1（fail-closed）：每个 REST Controller 的写映射方法必须标注 {@code @RequiresPermission}。
      * 逐方法精确断言，避免「类级有任一标注即放行」的漏网。
+     * 例外：认证前端点（身份建立入口，见 {@link #AUTH_PRE_ENDPOINTS}）显式豁免。
      */
     @Test
     void eachWriteMappedMethodMustRequirePermission() {
@@ -64,7 +86,7 @@ class ApplicationLayerSecurityArchitectureTest {
             @Override
             public void check(JavaClass cls, ConditionEvents events) {
                 for (JavaMethod m : cls.getMethods()) {
-                    if (!isWriteMapped(m)) {
+                    if (!isWriteMapped(m) || isAuthPreEndpoint(cls, m)) {
                         continue;
                     }
                     boolean guarded = m.isAnnotatedWith(RequiresPermission.class);
@@ -80,6 +102,7 @@ class ApplicationLayerSecurityArchitectureTest {
 
     /**
      * E2-2：写方法标注的 {@code @RequiresPermission} 动作必须是合法动作，非法动作视为配置错误。
+     * 认证前端点同样豁免（不标注动作）。
      */
     @Test
     void writeMethodsMustUseValidPermissionActions() {
@@ -87,7 +110,7 @@ class ApplicationLayerSecurityArchitectureTest {
             @Override
             public void check(JavaClass cls, ConditionEvents events) {
                 for (JavaMethod m : cls.getMethods()) {
-                    if (!isWriteMapped(m)) {
+                    if (!isWriteMapped(m) || isAuthPreEndpoint(cls, m)) {
                         continue;
                     }
                     RequiresPermission ann = m.getAnnotationOfType(RequiresPermission.class);

@@ -51,6 +51,8 @@ import type {
   OrgNode,
   OrgMembership,
   Customer,
+  PurchasePlan,
+  Tender,
   ProductCategory,
   ProductLine,
   Product,
@@ -76,10 +78,13 @@ import { buildApprovalChain, DEFAULT_APPROVAL_ROLES, type ApprovalBinding } from
 import type { DeliverableApprovalBinding } from '@/domain/deliverableApproval'
 import { appendRecord, manifestHashOf, type ArchiveLayer, type ArchiveVolume } from '@/domain/archiveLayer'
 import { DEFAULT_REJECTION_POLICIES, type RejectionPolicyItem } from '@/domain/rejectionPolicy'
+import type { GoodsArrival } from '@/domain/goodsArrival'
 import type { QuoteCostSheet, QuoteCostLine } from '@/domain/quoteCost'
 import type { DesignArchiveTable, SampleReviewReport, DvTestReport } from '@/domain/otsApproval'
+import { DEFAULT_DESIGN_ARCHIVE } from '@/domain/otsApproval'
+import type { IssueLedgerItem, IssueAlertMail } from '@/domain/issueAlert'
 
-export const SEED_VERSION = 'mofeng.rdp.v1.0.32'
+export const SEED_VERSION = 'mofeng.rdp.v1.0.35'
 const TENANT = 'T-1001'
 
 export interface SeedUser {
@@ -157,17 +162,24 @@ function buildOrgNodes(): OrgNode[] {
   })
   // 9 个事业部（智能交互/控制/座舱/驾驶）各加硬件科 + 软件科，每科下硬件/软件一、二组
   const divisionDepts: string[] = ['ELEC-D1', 'ELEC-D2', 'ELEC-D3', 'ELEC-D4', 'ELEC-D5', 'ELEC-D6', 'ELEC-D7', 'ELEC-D8', 'ELEC-D9']
+  // 部门总监姓名（9 个事业部各一名，供「问题报警部门总监」定位）
+  const divisionDirectors: string[] = ['王建国', '李向阳', '张伟民', '刘志强', '陈海峰', '杨国华', '黄立军', '周文斌', '吴永刚']
+  // 科高级经理 / 组经理姓名（每事业部 2 科 × 2 组 = 6 个，用于「问题报警责任人上级」定位）
+  const sectionManagers: string[] = ['郑科文', '冯科林', '蒋科海', '沈科军', '韩科峰', '杨科明', '朱科强', '秦科勇', '许科刚']
+  const teamLeads: string[] = ['赵子龙', '钱学森', '孙悟明', '李元霸', '周星驰', '吴刚毅', '郑成功', '王小虎', '冯远征']
   const divisionNodes: OrgNode[] = []
-  divisionDepts.forEach((deptId) => {
+  divisionDepts.forEach((deptId, di) => {
     const hwId = `${deptId}-HW`
     const swId = `${deptId}-SW`
+    const sm = sectionManagers[di] ?? `科经理${di + 1}`
+    const tl = teamLeads[di] ?? `组经理${di + 1}`
     divisionNodes.push(
-      { id: hwId, name: '硬件科', level: 'section', parentId: deptId, leaderTitle: '高级经理', order: 1 },
-      { id: swId, name: '软件科', level: 'section', parentId: deptId, leaderTitle: '高级经理', order: 2 },
-      { id: `${hwId}-T1`, name: '硬件一组', level: 'team', parentId: hwId, leaderTitle: '经理', order: 1 },
-      { id: `${hwId}-T2`, name: '硬件二组', level: 'team', parentId: hwId, leaderTitle: '经理', order: 2 },
-      { id: `${swId}-T1`, name: '软件一组', level: 'team', parentId: swId, leaderTitle: '经理', order: 1 },
-      { id: `${swId}-T2`, name: '软件二组', level: 'team', parentId: swId, leaderTitle: '经理', order: 2 }
+      { id: hwId, name: '硬件科', level: 'section', parentId: deptId, leaderTitle: '高级经理', leaderName: sm, order: 1 },
+      { id: swId, name: '软件科', level: 'section', parentId: deptId, leaderTitle: '高级经理', leaderName: sm, order: 2 },
+      { id: `${hwId}-T1`, name: '硬件一组', level: 'team', parentId: hwId, leaderTitle: '经理', leaderName: `${tl}A`, order: 1 },
+      { id: `${hwId}-T2`, name: '硬件二组', level: 'team', parentId: hwId, leaderTitle: '经理', leaderName: `${tl}B`, order: 2 },
+      { id: `${swId}-T1`, name: '软件一组', level: 'team', parentId: swId, leaderTitle: '经理', leaderName: `${tl}C`, order: 1 },
+      { id: `${swId}-T2`, name: '软件二组', level: 'team', parentId: swId, leaderTitle: '经理', leaderName: `${tl}D`, order: 2 }
     )
   })
   return [
@@ -191,15 +203,15 @@ function buildOrgNodes(): OrgNode[] {
     c('ADM', '企业管理中心', '职能系统', 13, '顾晨'),
     c('EXEC', '总经办', '职能系统', 14, '沈雅'),
     // 部门（电子研发中心下属）
-    { id: 'ELEC-D1', name: '智能交互一部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 1 },
-    { id: 'ELEC-D2', name: '智能交互二部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 2 },
-    { id: 'ELEC-D3', name: '智能交互三部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 3 },
-    { id: 'ELEC-D4', name: '智能控制一部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 4 },
-    { id: 'ELEC-D5', name: '智能控制二部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 5 },
-    { id: 'ELEC-D6', name: '智能座舱一部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 6 },
-    { id: 'ELEC-D7', name: '智能座舱二部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 7 },
-    { id: 'ELEC-D8', name: '智能驾驶一部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 8 },
-    { id: 'ELEC-D9', name: '智能驾驶二部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 9 },
+    { id: 'ELEC-D1', name: '智能交互一部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', leaderName: '王建国', order: 1 },
+    { id: 'ELEC-D2', name: '智能交互二部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', leaderName: '李向阳', order: 2 },
+    { id: 'ELEC-D3', name: '智能交互三部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', leaderName: '张伟民', order: 3 },
+    { id: 'ELEC-D4', name: '智能控制一部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', leaderName: '刘志强', order: 4 },
+    { id: 'ELEC-D5', name: '智能控制二部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', leaderName: '陈海峰', order: 5 },
+    { id: 'ELEC-D6', name: '智能座舱一部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', leaderName: '杨国华', order: 6 },
+    { id: 'ELEC-D7', name: '智能座舱二部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', leaderName: '黄立军', order: 7 },
+    { id: 'ELEC-D8', name: '智能驾驶一部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', leaderName: '周文斌', order: 8 },
+    { id: 'ELEC-D9', name: '智能驾驶二部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', leaderName: '吴永刚', order: 9 },
     { id: 'ELEC-D10', name: '验证中心', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 10 },
     { id: 'ELEC-D11', name: '技术中心', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 11 },
     { id: 'ELEC-D12', name: '综合管理部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 12 },
@@ -540,14 +552,15 @@ export function buildSeed() {
   /**
    * OTS 认可三大条件附件（单一数据源）。
    * 三大条件结果只由这些附件数据自动导出（domain/otsApproval），视图不可手填。
-   * 平台为通用研发管理工具，不预置演示数据。
+   * 附件 A 预置三中心默认归档条目模板（DEFAULT_DESIGN_ARCHIVE：A-1 电子 10 项 / A-2 结构 2 项 / A-3 工艺 3 项），
+   * 后续可自行增删条目。
    */
   const otsAttachments: {
     archiveTable: DesignArchiveTable
     sampleReview: SampleReviewReport
     dvReport: DvTestReport
   } = {
-    archiveTable: { projectId: '', parts: [] },
+    archiveTable: { projectId: '', parts: DEFAULT_DESIGN_ARCHIVE.map((p) => ({ ...p, items: p.items.map((i) => ({ ...i })) })) },
     sampleReview: { projectId: '', sampleNo: '', reviewer: '', reviewedAt: '', items: [] },
     dvReport: { projectId: '', reportNo: '', hasMajorIssue: false, testBy: '', testedAt: '', items: [] }
   }
@@ -827,6 +840,12 @@ export function buildSeed() {
     reqs,
     links,
     suppliers,
+    /** 采购计划（采购管理域，空白模板：不预置演示数据） */
+    purchasePlans: [] as PurchasePlan[],
+    /** 招投标项目（采购管理域，空白模板：不预置演示数据） */
+    tenders: [] as Tender[],
+    /** 采购货物到货登记（采购管理域，空白模板：不预置演示数据） */
+    goodsArrivals: [] as GoodsArrival[],
     boms,
     risks,
     polarityRisks,
@@ -862,10 +881,14 @@ export function buildSeed() {
     messages,
     inboxItems,
     thresholdIssues: [] as ThresholdIssue[],
+    issueLedger: [] as IssueLedgerItem[],
+    issueAlertMails: [] as IssueAlertMail[],
     resourcePool,
     resourceShares,
     portalSections,
     drafts,
+    /** 文件传递协议已入账批次（FTP-001 幂等键） */
+    receivedBatchIds: [] as string[],
     audit,
     /** 15 年合规归档层（ARC-001：示例归档卷，含审批+输出物条目，保留期 15 年） */
     archiveLayer: buildSampleArchive(),
@@ -1146,6 +1169,31 @@ export function buildSeed() {
         version: 1
       },
       {
+        id: 'DEF-PRJ-EXP',
+        code: 'FLOW-PRJ-EXP',
+        name: '外购外协件认可',
+        formFields: [
+          { key: 'name', label: '项目名称' },
+          { key: 'category', label: '产品大类' },
+          { key: 'productLine', label: '产品线' },
+          { key: 'partName', label: '零件名称' },
+          { key: 'partNo', label: '零件号' },
+          { key: 'supplier', label: '供应商' },
+          { key: 'result', label: '认可结论' },
+          { key: 'conclusion', label: '结论说明' }
+        ],
+        startNodeId: 'ep1',
+        nodes: [
+          { id: 'ep1', name: '发起（质量工程师）', type: 'start' },
+          { id: 'ep2', name: '部门会签（并行）', type: 'sign', signMode: 'all', signRoles: ['质量中心', '试验中心', '制造中心'], slaHours: 72, escalateToRole: '质量总监' },
+          { id: 'ep3', name: '客户认可', type: 'approve', approverRole: '质量总监', slaHours: 48, escalateToRole: '总经理' },
+          { id: 'ep4', name: '总经理批准', type: 'approve', approverRole: '总经理', slaHours: 24 },
+          { id: 'ep5', name: '结束', type: 'end' }
+        ],
+        enabled: true,
+        version: 1
+      },
+      {
         id: 'DEF-PRJ-SOP',
         code: 'FLOW-PRJ-SOP',
         name: 'SOP（量产启动）',
@@ -1161,6 +1209,34 @@ export function buildSeed() {
           { id: 's2', name: '部门会签（并行）', type: 'sign', signMode: 'all', signRoles: ['制造中心', '计划物流中心', '质量中心'], slaHours: 72, escalateToRole: '总经理' },
           { id: 's3', name: '总经理批准', type: 'approve', approverRole: '总经理', slaHours: 24 },
           { id: 's4', name: '结束', type: 'end' }
+        ],
+        enabled: true,
+        version: 1
+      },
+      {
+        id: 'DEF-PRJ-SWREL',
+        code: 'FLOW-PRJ-SWREL',
+        name: '软件发布',
+        formFields: [
+          { key: 'name', label: '项目名称' },
+          { key: 'category', label: '产品大类' },
+          { key: 'productLine', label: '产品线' },
+          { key: 'version', label: '软件版本号' },
+          { key: 'compilerNameVersion', label: '编译器名称及版本' },
+          { key: 'mcuName', label: 'MCU 名称' },
+          { key: 'mcuModel', label: 'MCU 型号' },
+          { key: 'binarySize', label: '编译后文件容量' },
+          { key: 'reportNo', label: '测试报告编号' },
+          { key: 'result', label: '发布结论' },
+          { key: 'conclusion', label: '结论说明' }
+        ],
+        startNodeId: 'sw1',
+        nodes: [
+          { id: 'sw1', name: '发起（软件研发中心）', type: 'start' },
+          { id: 'sw2', name: '部门会签（并行）', type: 'sign', signMode: 'all', signRoles: ['软件研发中心', '质量中心'], slaHours: 72, escalateToRole: '质量总监' },
+          { id: 'sw3', name: '质量总监批准', type: 'approve', approverRole: '质量总监', slaHours: 48, escalateToRole: '总经理' },
+          { id: 'sw4', name: '总经理批准', type: 'approve', approverRole: '总经理', slaHours: 24 },
+          { id: 'sw5', name: '结束', type: 'end' }
         ],
         enabled: true,
         version: 1
@@ -1202,6 +1278,52 @@ export function buildSeed() {
           { id: 'pn3', name: '项目号管理专员编号确认', type: 'approve', approverRole: '项目号管理专员', slaHours: 24, escalateToRole: '产品总监' },
           { id: 'pn4', name: '标准化批准', type: 'approve', approverRole: '标准化专员', slaHours: 24, escalateToRole: '产品总监' },
           { id: 'pn5', name: '结束', type: 'end' }
+        ],
+        enabled: true,
+        version: 1
+      },
+      // 采购管理 · 采购计划审批（申请人发起 → 申请人部门总监审核 → 采购审核 → 财务审核 → 总经理批准）
+      {
+        id: 'DEF-PURCHASE-PLAN',
+        code: 'FLOW-PURCHASE-PLAN',
+        name: '采购计划审批',
+        formFields: [
+          { key: 'code', label: '计划编号' },
+          { key: 'purchaseCategory', label: '采购件类别' },
+          { key: 'supplier', label: '供应商' },
+          { key: 'amount', label: '计划金额（万元）' }
+        ],
+        startNodeId: 'pp1',
+        nodes: [
+          { id: 'pp1', name: '发起（申请人）', type: 'start' },
+          { id: 'pp2', name: '申请人部门总监审核', type: 'approve', approverRole: '部门总监', slaHours: 48, escalateToRole: '总经理' },
+          { id: 'pp3', name: '采购审核', type: 'approve', approverRole: '采购', slaHours: 48, escalateToRole: '总经理' },
+          { id: 'pp4', name: '财务审核', type: 'approve', approverRole: '财务', slaHours: 48, escalateToRole: '总经理' },
+          { id: 'pp5', name: '总经理批准', type: 'approve', approverRole: '总经理', slaHours: 24 },
+          { id: 'pp6', name: '结束', type: 'end' }
+        ],
+        enabled: true,
+        version: 1
+      },
+      // 采购管理 · 招投标审批（发起人 → 部门总监审核 → 采购审核 → 财务审核 → 总经理批准）
+      {
+        id: 'DEF-TENDER',
+        code: 'FLOW-TENDER',
+        name: '招投标审批',
+        formFields: [
+          { key: 'code', label: '招标编号' },
+          { key: 'method', label: '招标方式' },
+          { key: 'purchaseCategory', label: '采购件类别' },
+          { key: 'budget', label: '预算金额（万元）' }
+        ],
+        startNodeId: 'td1',
+        nodes: [
+          { id: 'td1', name: '发起（发起人）', type: 'start' },
+          { id: 'td2', name: '部门总监审核', type: 'approve', approverRole: '部门总监', slaHours: 48, escalateToRole: '总经理' },
+          { id: 'td3', name: '采购审核', type: 'approve', approverRole: '采购', slaHours: 48, escalateToRole: '总经理' },
+          { id: 'td4', name: '财务审核', type: 'approve', approverRole: '财务', slaHours: 48, escalateToRole: '总经理' },
+          { id: 'td5', name: '总经理批准', type: 'approve', approverRole: '总经理', slaHours: 24 },
+          { id: 'td6', name: '结束', type: 'end' }
         ],
         enabled: true,
         version: 1

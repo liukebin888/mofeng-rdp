@@ -1,19 +1,18 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import {
-  issueJwt,
+  requestToken,
   initiateProject,
   traceRequirements,
   submitEcr,
   submitSample,
   API_V1_BASE,
-  DEV_JWT_SECRET,
   type ApiResult
 } from '@/infra/apiV1'
 
 /**
  * apiV1 调用层测试（阶段 C 联调 F-2）。
  *
- * 聚焦：JWT HS256 签发格式正确 + 4 端点 URL/请求头/三态解包。
+ * 聚焦：令牌由后端签发（requestToken 走 /api/v1/auth/token）+ 4 端点 URL/请求头/三态解包。
  * 不重复验证领域引擎数值（由 domain 744 例锁定）。
  */
 
@@ -32,19 +31,23 @@ function mockFetchOnce(json: unknown, status = 200) {
   return fn
 }
 
-describe('issueJwt（HS256 签发）', () => {
-  it('签发三段式 JWT，载荷含 sub/role/tenant/exp', async () => {
-    const token = await issueJwt('u-1001', 'PM', 't-01', DEV_JWT_SECRET, 3600)
-    const parts = token.split('.')
-    expect(parts).toHaveLength(3)
-    // 解码 payload（base64url → base64 → atob）
-    const payload = JSON.parse(
-      atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))
-    )
-    expect(payload.sub).toBe('u-1001')
-    expect(payload.role).toBe('PM')
-    expect(payload.tenant).toBe('t-01')
-    expect(typeof payload.exp).toBe('number')
+describe('requestToken（后端签发令牌）', () => {
+  it('调用 POST /api/v1/auth/token 并解包 token', async () => {
+    const fn = mockFetchOnce({ code: 'OK', data: { token: 'a.b.c', expiresIn: 3600 } }, 200)
+    const r = await requestToken('u-1001', 'PM', 't-01', 3600)
+    const [url, init] = fn.mock.calls[0] as [string, { method?: string; body?: string }]
+    expect(url).toBe(`${API_V1_BASE}/api/v1/auth/token`)
+    expect(init.method).toBe('POST')
+    expect(r.ok).toBe(true)
+    expect(r.data?.token).toBe('a.b.c')
+    expect(r.data?.expiresIn).toBe(3600)
+  })
+
+  it('后端未签发（无 token）→ ok:false 不伪造', async () => {
+    mockFetchOnce({ code: 'UNAUTHORIZED', message: '未认证' }, 401)
+    const r = await requestToken('u-1001', 'PM', 't-01', 3600)
+    expect(r.ok).toBe(false)
+    expect(r.data?.token).toBeUndefined()
   })
 })
 

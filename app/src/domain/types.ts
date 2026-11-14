@@ -119,6 +119,8 @@ export interface WbsNode {
   planFinish: number
   actualStart?: number
   actualFinish?: number
+  /** 绝对完成日期（YYYY-MM-DD），用于交付物倒排日历回写等场景（可选，向后兼容） */
+  dueDate?: string
   percent: number
   weight: number
   isMilestone?: boolean
@@ -753,6 +755,8 @@ export type DraftObjectType =
   | 'PPAP提交'
   | 'SOP'
   | '零件号申请'
+  | '外购外协件认可'
+  | '软件发布'
 
 export interface FormDraft {
   id: string
@@ -1130,6 +1134,82 @@ export interface Customer {
   vehicleModels: string[]
   /** 简称 */
   shortName?: string
+}
+
+/** 采购计划（采购管理域：采购计划表模板） */
+export interface PurchasePlan {
+  id: string
+  /** 计划编号（PLT-PUR-xxx） */
+  code: string
+  /** 计划名称 */
+  name: string
+  /** 关联项目 */
+  projectName: string
+  /** 采购件类别：产品物料 / 研发工具 / 生产工具 / 日常办公用品 / 其它 */
+  purchaseCategory: string
+  /** 采购类型：长周期零件 / 试制样件 / 量产物料 / 其它 */
+  purchaseType: string
+  /** 供应商 */
+  supplier: string
+  /** 物料/零件名称 */
+  itemName: string
+  /** 物料编码（关联 BOM，到货验收合格后回补库存；无 BOM 关联时为空） */
+  materialCode?: string
+  /** 规格型号 */
+  spec: string
+  /** 数量 */
+  quantity: number
+  /** 单位 */
+  unit: string
+  /** 需求日期 */
+  needDate: string
+  /** 计划到货日期 */
+  planArriveDate: string
+  /** 计划金额（万元） */
+  amount: number
+  /** 编制人（申请人） */
+  creator: string
+  /** 状态：草稿 / 审批中 / 已批准 / 已驳回 / 执行中 / 已到货 / 已关闭 */
+  status: string
+  /** 关联的审批流实例 id（提交审批后写入） */
+  flowInstanceId?: string
+  /** 备注 */
+  remark?: string
+}
+
+/** 招投标项目（采购管理域：发起招投标表单） */
+export interface Tender {
+  id: string
+  /** 招标编号（TEN-xxx） */
+  code: string
+  /** 招标项目名称 */
+  name: string
+  /** 招标方式：公开招标 / 邀请招标 / 竞争性谈判 / 询价 / 单一来源 */
+  method: string
+  /** 采购内容/标的描述 */
+  subject: string
+  /** 采购件类别：产品物料 / 研发工具 / 生产工具 / 日常办公用品 / 其它 */
+  purchaseCategory: string
+  /** 预算金额（万元） */
+  budget: number
+  /** 关联项目 */
+  projectName: string
+  /** 发标日期 */
+  issueDate: string
+  /** 截标日期（投标截止） */
+  deadline: string
+  /** 开标日期 */
+  openDate: string
+  /** 评标方式：综合评分法 / 最低价法 / 性价比法 */
+  evaluationMethod: string
+  /** 编制人（发起人） */
+  creator: string
+  /** 状态：草稿 / 审批中 / 已批准 / 已驳回 / 招标中 / 已截标 / 已开标 / 已定标 / 已流标 / 已关闭 */
+  status: string
+  /** 关联的审批流实例 id（提交审批后写入） */
+  flowInstanceId?: string
+  /** 备注 */
+  remark?: string
 }
 
 /** 产品类别（一级：智能交互 / 智能控制 / 智能座舱 / 智能驾驶 / 动力能源 / 底盘控制 / 车载电器） */

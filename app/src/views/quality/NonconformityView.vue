@@ -94,6 +94,7 @@ import {
   overdueCount,
   overdueDaysOf,
   stayDaysOf,
+  NONCONFORMITY_SEED,
   type Nonconformity
 } from '@/domain/nonconformity'
 
@@ -102,25 +103,8 @@ const { te } = useI18n()
 
 const AS_OF = '2026-07-10'
 
-// 演示数据：对齐 A-SPICE 不符合项追踪表范例（BV0E52AACYWA 转向柱开关）
-const items: Nonconformity[] = [
-  { id: 'NC-1', checkReport: '系统需求分析过程QA检查报告', code: 'BV0E52AACYWA-E-SRAC-20251212-1.1-9', source: '需求工程', stage: 'CG2', type: '过程', description: '系统工程师未将利益相关方的需求及变更按照《系统需求规格书》格式要求定义系统需求', correctiveAction: '组织输出', urgency: '高', raisedAt: '2025-12-13', status: '关闭', owner: '陶伊乐', actionDate: '2025-12-13', requiredDate: '2025-12-20', actualDate: '2025-12-19', cause: '设计员自身原因', section: '交互1部产品3科', dept: '交互电子1部' },
-  { id: 'NC-2', checkReport: '系统需求分析过程QA检查报告', code: 'BV0E52AACYWA-E-SRAC-20251212-1.1-18', source: '需求工程', stage: 'CG2', type: '过程', description: '未将原始需求信息录入《系统需求跟踪矩阵表》建立系统需求与客户原始需求关联', correctiveAction: '组织输出', urgency: '高', raisedAt: '2025-12-13', status: '关闭', owner: '陶伊乐', actionDate: '2025-12-13', requiredDate: '2025-12-20', actualDate: '2025-12-19', cause: '设计员自身原因', section: '交互1部产品3科', dept: '交互电子1部' },
-  { id: 'NC-3', checkReport: '系统需求分析过程QA检查报告', code: 'BV0E52AACYWA-E-SRAC-20251212-1.1-19', source: '需求工程', stage: 'CG2', type: '过程', description: '未通过评审会议检查系统需求规格书与原始需求规格书的一致性', correctiveAction: '组织输出', urgency: '高', raisedAt: '2025-12-13', status: '关闭', owner: '陶伊乐', actionDate: '2025-12-13', requiredDate: '2025-12-20', actualDate: '2025-12-19', cause: '设计员自身原因', section: '交互1部产品3科', dept: '交互电子1部' },
-  { id: 'NC-4', checkReport: '硬件设计实现过程检查报告', code: 'BV0E52AACYWA-E-HTSL-20260109-1.1-21', source: '设计实现及集成', stage: 'CG3', type: '过程', description: '硬件工程师未完成《原理图设计检查表》并上传配置库', correctiveAction: '组织输出', urgency: '高', raisedAt: '2026-01-10', status: '关闭', owner: '华艳', actionDate: '2026-01-10', requiredDate: '2026-01-17', actualDate: '2026-01-15', cause: '设计员自身原因', section: '交互1部产品2科', dept: '交互电子1部' },
-  { id: 'NC-5', checkReport: '系统合格性测试过程QA检查报告', code: 'BV0E52AACYWA-E-SQTPC-20260306-1.1-2', source: '测试', stage: 'CG3', type: '过程', description: '未按照《测试进度计划》的时间编制《测试方案》', correctiveAction: '组织输出', urgency: '低', raisedAt: '2026-03-07', status: '关闭', owner: '郑博文', actionDate: '2026-03-07', requiredDate: '2026-03-14', actualDate: '2026-03-07', cause: '设计员自身原因', section: '智能验证开发3科', dept: '智能验证开发部' },
-  { id: 'NC-6', checkReport: '系统合格性测试过程QA检查报告', code: 'BV0E52AACYWA-E-SQTPC-20260306-1.1-7', source: '测试', stage: 'CG3', type: '过程', description: '工程师未更新《系统需求跟踪矩阵表》确保系统需求与测试用例可追溯', correctiveAction: '组织输出', urgency: '中', raisedAt: '2026-03-07', status: '关闭', owner: '郑博文', actionDate: '2026-03-07', requiredDate: '2026-03-14', actualDate: '2026-03-11', cause: '设计员自身原因', section: '智能验证开发3科', dept: '智能验证开发部' },
-  { id: 'NC-7', checkReport: '软件详细设计及单元构建（实现）过程QA检查单', code: 'BV0E52AACYWA-E-SDDC-20260313-1.1-17', source: '设计实现及集成', stage: 'CG3', type: '过程', description: '《CDD诊断文件》未纳入配置库', correctiveAction: '组织输出', urgency: '高', raisedAt: '2026-03-14', status: '关闭', owner: '王仙桃', actionDate: '2026-03-14', requiredDate: '2026-03-21', actualDate: '2026-03-20', cause: '设计员自身原因', section: '电子设计科', dept: '深圳研发中心' },
-  { id: 'NC-8', checkReport: '软件详细设计及单元构建（实现）过程QA检查单', code: 'BV0E52AACYWA-E-SDDC-20260313-2.3-2', source: '设计实现及集成', stage: 'CG3', type: '工作产品', description: '《ODXD》命名有误', correctiveAction: '修正', urgency: '高', raisedAt: '2026-03-14', status: '关闭', owner: '王仙桃', actionDate: '2026-03-14', requiredDate: '2026-03-21', actualDate: '2026-03-20', cause: '设计员自身原因', section: '电子设计科', dept: '深圳研发中心' },
-  { id: 'NC-9', checkReport: '软件详细设计及单元构建（实现）过程QA检查单', code: 'BV0E52AACYWA-E-SDDC-20260604-1.1-1', source: '设计实现及集成', stage: 'CG4', type: '过程', description: '未按照《软件架构设计》章节2软件元素划分确定《软件详细设计》', correctiveAction: '组织输出', urgency: '高', raisedAt: '2026-06-05', status: '关闭', owner: '王银丽', actionDate: '2026-06-05', requiredDate: '2026-06-12', actualDate: '2026-06-12', cause: '设计员自身原因', section: '交互1部产品1科', dept: '交互电子1部' },
-  { id: 'NC-10', checkReport: '硬件设计实现过程检查报告', code: 'BV0E52AACYWA-E-HTSL-20260612-1.1-54', source: '设计实现及集成', stage: 'CG4', type: '过程', description: '硬件工程师未根据EMC试验流程输出《EMC测试总结》并上传配置库', correctiveAction: '组织输出', urgency: '高', raisedAt: '2026-06-13', status: '关闭', owner: '华艳', actionDate: '2026-06-13', requiredDate: '2026-06-20', actualDate: '2026-07-01', cause: '设计员自身原因', section: '交互1部产品2科', dept: '交互电子1部' },
-  { id: 'NC-11', checkReport: '网络安全监控过程检查报告', code: 'BV0E52AACYWA-E-CMCT-20260626-1.1-6', source: '过程和产品质量保证', stage: 'CG4', type: '过程', description: '网络安全工程师未输出《网络安全监控表》（文件归档路径有误）', correctiveAction: '组织输出', urgency: '高', raisedAt: '2026-06-27', status: '问题描述', owner: '曹安迪', actionDate: '2026-06-27', requiredDate: '2026-07-04', actualDate: '', cause: '设计员自身原因', section: '交互1部产品3科', dept: '交互电子1部' },
-  { id: 'NC-12', checkReport: '软件架构设计过程QA检查报告', code: 'BV0E52AACYWA-E-SWADC-20260626-1.1-13', source: '设计实现及集成', stage: 'CG4', type: '过程', description: '软件工程师未编制《软件DFMEA》并输出同行评审报告', correctiveAction: '组织输出', urgency: '高', raisedAt: '2026-06-27', status: '关闭', owner: '姜继坤', actionDate: '2026-06-27', requiredDate: '2026-07-04', actualDate: '2026-07-02', cause: '设计员自身原因', section: '交互1部产品1科', dept: '交互电子1部' },
-  { id: 'NC-13', checkReport: '软件单元验证过程QA检查报告', code: 'BV0E52AACYWA-E-SUVC-20260626-1.1-1', source: '测试', stage: 'CG4', type: '过程', description: '软件工程师未根据软件进度计划编写《软件单元验证计划》', correctiveAction: '组织输出', urgency: '高', raisedAt: '2026-06-27', status: '关闭', owner: '姜继坤', actionDate: '2026-06-27', requiredDate: '2026-07-04', actualDate: '2026-07-02', cause: '设计员自身原因', section: '交互1部产品1科', dept: '交互电子1部' },
-  { id: 'NC-14', checkReport: '软件集成和集成测试过程QA检查报告', code: 'BV0E52AACYWA-E-SWITPC-20260626-1.1-7', source: '测试', stage: 'CG4', type: '过程', description: '代码集成后未完善软件信息输出《软件版本记录汇总表》', correctiveAction: '组织输出', urgency: '高', raisedAt: '2026-06-27', status: '关闭', owner: '徐柏泉', actionDate: '2026-06-27', requiredDate: '2026-07-04', actualDate: '2026-07-02', cause: '设计员自身原因', section: '交互1部产品1科', dept: '交互电子1部' },
-  { id: 'NC-15', checkReport: '软件合格性测试过程QA检查报告', code: 'BV0E52AACYWA-E-SWTPCL-20260626-1.1-12', source: '测试', stage: 'CG4', type: '过程', description: '未填写软件（工程）发布审批通知单', correctiveAction: '组织输出', urgency: '高', raisedAt: '2026-06-27', status: '关闭', owner: '徐柏泉', actionDate: '2026-06-27', requiredDate: '2026-07-04', actualDate: '2026-07-02', cause: '设计员自身原因', section: '交互1部产品1科', dept: '交互电子1部' },
-  { id: 'NC-16', checkReport: '配置管理过程检查报告', code: 'BV0E52AACYWA-E-CMPCL-20260710-1.1-20', source: '配置管理', stage: 'CG5', type: '过程', description: '配置管理员未将阶段变更数据填入阶段报告输出《配置管理阶段报告》', correctiveAction: '组织输出', urgency: '中', raisedAt: '2026-07-11', status: '问题描述', owner: '曹林', actionDate: '2026-07-11', requiredDate: '2026-07-18', actualDate: '', cause: '输入文件延迟输出', section: '标准化及体系科', dept: '技术管理部（1）' }
-]
+// 演示数据：复用 nonconformity 引擎单一权威种子（对齐 A-SPICE 不符合项追踪表范例）
+const items: Nonconformity[] = NONCONFORMITY_SEED
 
 const openCnt = computed(() => openCount(items))
 const highCnt = computed(() => highUrgencyCount(items))

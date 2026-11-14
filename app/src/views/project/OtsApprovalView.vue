@@ -84,19 +84,26 @@
 
           <!-- L2/L3/L4：问题清单及行动计划 -->
           <template v-if="levelResult.needIssuePlan">
-            <div class="sub-title">问题清单及行动计划（{{ levelResult.level }} 必填）</div>
+            <div class="sub-title">问题清单及行动计划（{{ levelResult.level }} 必填，问题全部关闭后方可偏差通过/认可）</div>
             <el-table :data="issuePlan" size="small" border>
-              <el-table-column label="问题描述" min-width="160">
+              <el-table-column label="问题描述" min-width="150">
                 <template #default="{ row }"><el-input v-model="row.issue" size="small" placeholder="问题描述" @input="markDirty" /></template>
               </el-table-column>
-              <el-table-column label="行动计划" min-width="160">
+              <el-table-column label="行动计划" min-width="150">
                 <template #default="{ row }"><el-input v-model="row.action" size="small" placeholder="行动计划" @input="markDirty" /></template>
               </el-table-column>
-              <el-table-column label="责任人" width="110">
+              <el-table-column label="责任人" width="100">
                 <template #default="{ row }"><el-input v-model="row.owner" size="small" placeholder="责任人" @input="markDirty" /></template>
               </el-table-column>
-              <el-table-column label="完成日期" width="150">
+              <el-table-column label="完成日期" width="140">
                 <template #default="{ row }"><el-date-picker v-model="row.dueDate" size="small" type="date" value-format="YYYY-MM-DD" placeholder="完成日期" style="width: 100%" @change="markDirty" /></template>
+              </el-table-column>
+              <el-table-column label="状态" width="130">
+                <template #default="{ row }">
+                  <el-select v-model="row.status" size="small" @change="markDirty">
+                    <el-option v-for="s in ISSUE_CHECKLIST_STATUSES" :key="s" :label="s" :value="s" />
+                  </el-select>
+                </template>
               </el-table-column>
               <el-table-column label="" width="60">
                 <template #default="{ $index }"><el-button link size="small" type="danger" @click="removeIssue($index)">删除</el-button></template>
@@ -148,6 +155,7 @@ import { useAppStore } from '@/store/app'
 import { newWorkflowForm, saveWorkflowForm } from '@/domain/workflowForm'
 import type { WorkflowForm } from '@/domain/workflowForm'
 import { determineConditions, determineLevel, validateIssuePlan, type IssueActionItem } from '@/domain/otsApproval'
+import { issueChecklistGate, ISSUE_CHECKLIST_STATUSES } from '@/domain/issueChecklist'
 
 const store = useAppStore()
 const router = useRouter()
@@ -210,7 +218,7 @@ function goAttachmentC() {
 }
 
 function addIssue() {
-  issuePlan.value.push({ id: `IS-${Date.now()}`, issue: '', action: '', owner: '', dueDate: '' })
+  issuePlan.value.push({ id: `IS-${Date.now()}`, issue: '', action: '', owner: '', dueDate: '', status: '问题描述' })
   markDirty()
 }
 function removeIssue(idx: number) {
@@ -288,6 +296,9 @@ function wfSubmit(customApprovers: import('@/domain/flowEngine').CustomApproverA
   if (levelResult.value.needIssuePlan) {
     const check = validateIssuePlan(issuePlan.value)
     if (!check.ok) blockers.push(`问题清单及行动计划不完整：${check.missing.join('、')}`)
+    // L2/L3 偏差/临时认可前提：问题全部关闭（统一问题清单引擎）
+    const gate = issueChecklistGate(issuePlan.value)
+    if (!gate.passed) blockers.push(gate.reason)
   }
   if (levelResult.value.needDueDate && !form.dueDate) {
     blockers.push('L3 临时认可须填写到期日期')

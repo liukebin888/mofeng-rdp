@@ -20,6 +20,8 @@
  */
 
 import type { PlanLevel } from './fourLevelPlan'
+import type { ApqpDeliverable, ApqpDeliverableNode } from './apqpDeliverable'
+import { APQP_DELIVERABLE_NODES } from './apqpDeliverable'
 
 /** 流程节点类型 */
 export type ApqpNodeKind = 'phase' | 'gate' | 'activity' | 'milestone'
@@ -59,6 +61,10 @@ export interface ApqpNode {
   defaultOwnerRole?: string
   /** 节点在阶段内的次序（1 起） */
   order: number
+  /** 归属质量门 code（CG0~CG7，八门视图；可选，仅细化流程节点携带） */
+  gateCode?: string
+  /** 该节点挂载的输出物清单（可选，活动节点携带，见 apqpDeliverable.ts） */
+  deliverables?: ApqpDeliverable[]
 }
 
 /** APQP 阶段定义 */
@@ -128,10 +134,10 @@ export const APQP_NODES: ApqpNode[] = [
   { id: 'APQ-P3-04', phase: 'P3', kind: 'gate', name: '过程闸门', code: 'GT-G3', level: 'L2', defaultOwnerRole: '项目经理', order: 4 },
 
   // —— P4 产品与过程确认 ——
-  { id: 'APQ-P4-01', phase: 'P4', kind: 'milestone', name: 'OTS 认可', code: 'MS-P4-01', level: 'L1', milestone: true, defaultOwnerRole: '项目经理', order: 1 },
-  { id: 'APQ-P4-02', phase: 'P4', kind: 'activity', name: '样件试制', code: 'CT-P4-02', level: 'L4', specialty: '试制线', defaultOwnerRole: '试制工程师', order: 2 },
-  { id: 'APQ-P4-03', phase: 'P4', kind: 'activity', name: '测试与验证', code: 'CT-P4-03', level: 'L4', specialty: '测试线', defaultOwnerRole: '测试工程师', order: 3 },
-  { id: 'APQ-P4-04', phase: 'P4', kind: 'activity', name: '试验验证', code: 'CT-P4-04', level: 'L4', specialty: '试验线', defaultOwnerRole: '试验工程师', order: 4 },
+  { id: 'APQ-P4-02', phase: 'P4', kind: 'activity', name: '样件试制', code: 'CT-P4-02', level: 'L4', specialty: '试制线', defaultOwnerRole: '试制工程师', order: 1 },
+  { id: 'APQ-P4-03', phase: 'P4', kind: 'activity', name: '测试与验证', code: 'CT-P4-03', level: 'L4', specialty: '测试线', defaultOwnerRole: '测试工程师', order: 2 },
+  { id: 'APQ-P4-04', phase: 'P4', kind: 'activity', name: '试验验证', code: 'CT-P4-04', level: 'L4', specialty: '试验线', defaultOwnerRole: '试验工程师', order: 3 },
+  { id: 'APQ-P4-01', phase: 'P4', kind: 'milestone', name: 'OTS 认可', code: 'MS-P4-01', level: 'L1', milestone: true, defaultOwnerRole: '项目经理', order: 4 },
   { id: 'APQ-P4-05', phase: 'P4', kind: 'gate', name: '样件闸门', code: 'GT-G4', level: 'L2', defaultOwnerRole: '项目经理', order: 5 },
 
   // —— P5 反馈评定与纠正 ——
@@ -142,13 +148,55 @@ export const APQP_NODES: ApqpNode[] = [
   { id: 'APQ-P5-05', phase: 'P5', kind: 'gate', name: '交付闸门', code: 'GT-G5', level: 'L2', defaultOwnerRole: '项目经理', order: 5 }
 ]
 
+/**
+ * 把清单活动节点（apqpDeliverable 的 59 项活动）投影为 APQP 流程节点。
+ *
+ * 语义（APQ-007 单一权威）：
+ *   - 清单 59 项活动是 APQP 主流程的「项目控制活动（L3）」细化来源，
+ *     每项活动挂载其输出物清单（deliverables，175 条）。
+ *   - 活动节点编码：`CT-{gateCode}-{seq}`（如 CG2 下 seq 8 → CT-CG2-08），
+ *     与骨架节点编码（CT-Px-xx）区分，体现「八门（CG）控制级活动」。
+ *   - 归属质量门 gateCode 透传，供「八门双视图」与模板分组使用。
+ */
+function activityNodesFromDeliverables(): ApqpNode[] {
+  return APQP_DELIVERABLE_NODES.map((d: ApqpDeliverableNode): ApqpNode => ({
+    id: d.id,
+    phase: d.phase,
+    kind: 'activity',
+    name: d.name,
+    code: `CT-${d.gateCode}-${String(d.seq).padStart(2, '0')}`,
+    level: d.level,
+    gateCode: d.gateCode,
+    deliverables: d.deliverables,
+    defaultOwnerRole: firstDeptRole(d.deliverables),
+    order: d.order
+  }))
+}
+
+/** 从输出物清单推导默认责任角色（取第一条输出物的负责人；为空回退项目经理） */
+function firstDeptRole(items: ApqpDeliverable[]): string {
+  const owner = items.find((x) => x.owner)?.owner
+  if (owner) return owner
+  const dept = items.find((x) => x.dept)?.dept
+  return dept || '项目经理'
+}
+
+/**
+ * 融合后的完整 APQP 流程节点集（APQ-007 单一权威）。
+ * = 骨架节点（里程碑/闸门/L4 专项，锚点 id 保持不变）+ 清单 59 项 L3 控制活动（带输出物）。
+ */
+export const APQP_FULL_NODES: ApqpNode[] = [
+  ...APQP_NODES,
+  ...activityNodesFromDeliverables()
+]
+
 export const APQP_FLOW: ApqpFlow = {
   id: 'FLOW-APQP',
   name: 'APQP 五阶段流程',
   tag: '汽车零部件',
-  version: 1,
+  version: 2,
   phases: APQP_PHASES,
-  nodes: APQP_NODES
+  nodes: APQP_FULL_NODES
 }
 
 // ---------------------------------------------------------------------------
@@ -210,14 +258,14 @@ export const CUT_RULES: CutRule[] = [
   {
     kind: 'A',
     name: 'A 模板（骨架级）',
-    desc: '仅里程碑 + 阶段闸门，最精简的主计划骨架（L1/L2）',
+    desc: '仅里程碑 + 阶段闸门，最精简的主计划骨架（L1/L2，11 节点）',
     keepKinds: ['milestone', 'gate'],
     l4Mode: 'none'
   },
   {
     kind: 'B',
     name: 'B 模板（控制级）',
-    desc: '骨架 + 项目控制活动（L3），含关键活动节点，不含 L4 专项',
+    desc: '骨架 + 项目控制活动（L3，含 APQP 清单 59 项活动 + 175 条输出物）',
     keepKinds: ['milestone', 'gate', 'activity'],
     l4Mode: 'none'
   },
@@ -295,3 +343,24 @@ export function apqpFlowHash(flow: ApqpFlow): string {
     }))
   })
 }
+
+// ---------------------------------------------------------------------------
+// 八门（CG0~CG7）+ 输出物 桥接（APQ-006 单一权威）
+//
+// APQP 主流程的「八门双视图」数据来源在 apqpDeliverable.ts：
+//   - CG_GATES：8 个质量门（前期交流→项目启动→工程发布→首次样件→工程认可→过程认可→生产件批准→项目验收）
+//   - APQP_DELIVERABLE_NODES：59 项 APQP 活动节点，每项挂 175 条输出物清单
+//   - 阶段映射：CG0/CG1→P1，CG2→P2，CG3→P3，CG4/CG5→P4，CG6/CG7→P5
+//
+// 此处统一 re-export，视图仅从 apqpFlow 单一入口导入即可。
+// ---------------------------------------------------------------------------
+
+export {
+  CG_GATES,
+  APQP_DELIVERABLE_NODES,
+  gateOf,
+  gatesByPhase,
+  nodesByGate,
+  deliverableCount
+} from './apqpDeliverable'
+export type { ApqpGate, ApqpDeliverableNode, ApqpDeliverableAttr } from './apqpDeliverable'

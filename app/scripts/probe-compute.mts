@@ -20,8 +20,11 @@ import { coverage, detectBreaks } from '@/domain/trace'
 import { verifyChain } from '@/domain/audit'
 
 const seed = buildSeed()
-const PROJECT_ID = 'P-001'
-const p = seed.projects.find((x) => x.id === PROJECT_ID)!
+// 空态优雅降级：seed 去演示化后 buildProjects() 返回 []，不预置任何项目。
+// 探针在无项目时仍须输出有效 JSON（计数归零），而非对 undefined 做非空断言后崩溃。
+// 仅当存在项目时选取首个项目作为跨视图同源基准；不存在则用空态占位对象。
+const p = seed.projects[0]
+const PROJECT_ID = p?.id ?? ''
 const wbs = seed.wbs.filter((w) => w.projectId === PROJECT_ID)
 const reqs = seed.reqs.filter((r) => r.projectId === PROJECT_ID)
 const links = seed.links.filter((l) => reqs.some((r) => r.id === l.srcId) || reqs.some((r) => r.id === l.dstId))
@@ -35,15 +38,20 @@ const hours = seed.hours.filter((h) => h.projectId === PROJECT_ID)
 const chain = verifyChain(seed.audit)
 const cpm = computeCpm(wbs)
 const quality = planQualityChecks(wbs)
-const completion = weightedCompletion(wbs, p.budget)
+// 无项目时 budget 归零，weightedCompletion 的权重和为零（weightSum=0），
+// 据此仍可产出合法结果；有项目时取项目预算。
+const completion = weightedCompletion(wbs, p?.budget ?? 0)
 // PV 唯一来源：与 store 同源，CPM 早时间 + 统计日算 BCWS（禁止 budget×0.66 自造比例）
-const pvInfo = plannedValue(wbs, p.budget, statusDayOf(wbs))
-const evm = computeEvm({ pv: pvInfo.pv, ev: (completion.weightedPercent / 100) * p.budget, ac: p.spent, bac: p.budget })
-const cpResults = evaluateControlPoints({
-  project: p, wbs, reqs, links, risks, ecrs, baselines,
-  suppliers: seed.suppliers, samples: seed.samples, boms: seed.boms,
-  docs, deliverables, hours, auditChainOk: chain.ok, flags: seed.flags
-})
+const pvInfo = plannedValue(wbs, p?.budget ?? 0, statusDayOf(wbs))
+const evm = computeEvm({ pv: pvInfo.pv, ev: (completion.weightedPercent / 100) * (p?.budget ?? 0), ac: p?.spent ?? 0, bac: p?.budget ?? 0 })
+// 控制点评估要求一个项目对象；空态下以空项目占位，评估结果随 wbs/reqs 为空而自然为空集。
+const cpResults = p
+  ? evaluateControlPoints({
+      project: p, wbs, reqs, links, risks, ecrs, baselines,
+      suppliers: seed.suppliers, samples: seed.samples, boms: seed.boms,
+      docs, deliverables, hours, auditChainOk: chain.ok, flags: seed.flags
+    })
+  : []
 const cpDist = strengthDistribution(cpResults)
 const frozen = baselines.some((b) => b.status === '已冻结')
 const gates: Record<string, { passed: boolean; okItems: number; total: number }> = {}
@@ -93,10 +101,10 @@ const out = {
     spi: evm.spi,
     cpi: evm.cpi,
     eac: evm.eac,
-    projectLevel: p.level,
-    projectCode: p.code,
-    projectName: p.name,
-    projectStatus: p.status,
+    projectLevel: p?.level ?? '',
+    projectCode: p?.code ?? '',
+    projectName: p?.name ?? '',
+    projectStatus: p?.status ?? '',
     safetyCoverage: cov.safety,
     overallCoverage: cov.overall,
     breaks: breaks.length,

@@ -14,8 +14,7 @@
 
 import type { ActorContext } from '@/domain/types'
 import {
-  issueJwt,
-  DEV_JWT_SECRET,
+  requestToken,
   initiateProject,
   traceRequirements,
   submitEcr,
@@ -73,8 +72,10 @@ export interface ProbeRow {
 // ------------------------------------------------------------------
 
 function withToken<T>(fn: (token: string) => Promise<T>): Promise<{ token: string; result: T }> {
-  // 探针固定使用 PM 角色（拥有 create/update/approve 权限），联调用
-  return issueJwt('u-probe', 'PM', 't-01', DEV_JWT_SECRET, 3600).then(async (token) => {
+  // 探针固定使用 PM 角色（拥有 create/update/approve 权限），联调用。
+  // 令牌统一由后端签发（B2：前端不持有密钥、不浏览器端自签）。
+  return requestToken('u-probe', 'PM', 't-01', 3600).then(async (r) => {
+    const token = r.data?.token ?? ''
     return { token, result: await fn(token) }
   })
 }

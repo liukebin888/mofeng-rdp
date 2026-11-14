@@ -21,6 +21,8 @@
  *   - fail-closed：缺任一附件或附件数据不完整时，对应条件判「不成立/待补充」，不静默放行。
  */
 
+import { validateIssueChecklist, type IssueChecklistItem } from './issueChecklist'
+
 /** —— 附件 A：设计文件归档汇总表（分三中心） —— */
 
 /** 设计文件归档中心（附件 A 的三部分） */
@@ -36,13 +38,71 @@ export interface DesignArchivePart {
   items: DesignArchiveItem[]
 }
 
+/**
+ * 附件 A 默认归档条目模板（单一权威）。
+ *
+ * 依据：OTS 认可条件 A「所有设计资料项均已归档」的标准归档清单，分三中心：
+ *   A-1 电子研发中心（10 项）、A-2 结构研发中心（2 项）、A-3 工艺技术中心（3 项）。
+ *
+ * 语义：新建项目时作为「设计文件归档汇总表」的标准条目预置，后续可自行增删；
+ *       归档齐全判定（isCenterArchived / isAllDesignArchived）仍按「该中心所有条目均已归档」fail-closed。
+ */
+export const DEFAULT_DESIGN_ARCHIVE: DesignArchivePart[] = [
+  {
+    center: '电子研发中心',
+    items: [
+      { code: 'ELEC-01', name: '原理图', archived: false, source: 'manual' },
+      { code: 'ELEC-02', name: 'PCB 图', archived: false, source: 'manual' },
+      { code: 'ELEC-03', name: '电子 E-BOM 表', archived: false, source: 'manual' },
+      { code: 'ELEC-04', name: '硬件设计概要', archived: false, source: 'manual' },
+      { code: 'ELEC-05', name: '硬件设计说明', archived: false, source: 'manual' },
+      { code: 'ELEC-06', name: '软件设计概要（含软件架构图）', archived: false, source: 'manual' },
+      { code: 'ELEC-07', name: '软件详细设计概要', archived: false, source: 'manual' },
+      { code: 'ELEC-08', name: '产品出厂检验规范', archived: false, source: 'manual' },
+      { code: 'ELEC-09', name: '电子 D-FMEA', archived: false, source: 'manual' },
+      { code: 'ELEC-10', name: '外购外协件认可报告汇总表', archived: false, source: 'manual' }
+    ]
+  },
+  {
+    center: '结构研发中心',
+    items: [
+      { code: 'STRU-01', name: '2D 图存档', archived: false, source: 'manual' },
+      { code: 'STRU-02', name: '结构 E-BOM', archived: false, source: 'manual' }
+    ]
+  },
+  {
+    center: '工艺技术中心',
+    items: [
+      { code: 'PROC-01', name: '过程计划', archived: false, source: 'manual' },
+      { code: 'PROC-02', name: 'P-FMEA', archived: false, source: 'manual' },
+      { code: 'PROC-03', name: '作业指导书', archived: false, source: 'manual' }
+    ]
+  }
+]
+
+/**
+ * 归档来源（两条路径，用户明确要求）：
+ *   - manual：标准化管理员手工填写归档；
+ *   - auto  ：研发管理系统中数据自动传递（关联交付物已提交/审批完成即自动归档）。
+ */
+export type ArchiveSource = 'manual' | 'auto'
+
 /** 设计文件归档条目（附件 A 的行） */
 export interface DesignArchiveItem {
   code: string
   name: string
   /** 是否已归档 */
   archived: boolean
-  /** 归档人 / 归档时间（已归档时应有） */
+  /** 归档来源：手工填写 / 系统自动 */
+  source: ArchiveSource
+  /**
+   * 自动传递绑定的交付物名称（与研发管理系统交付物 name 匹配）。
+   * 仅当 source === 'auto' 时有效；当该项目下存在「已有效提供」（审批链完成）的
+   * 同名交付物时，该条目被自动判定为已归档。
+   * 空串表示未绑定交付物（此时 auto 条目不参与自动判定，仅靠手工覆盖）。
+   */
+  deliverableName?: string
+  /** 归档人 / 归档时间（手工归档填标准化管理员；自动归档记为「系统」） */
   archivedBy?: string
   archivedAt?: string
 }
@@ -68,6 +128,71 @@ export function isCenterArchived(part: DesignArchivePart | undefined): boolean {
   if (!part) return false
   if (part.items.length === 0) return false
   return part.items.every((i) => i.archived)
+}
+
+/**
+ * 自动传递判定：给定「已有效提供的交付物名称集合」，返回某归档条目是否应被自动判定为已归档。
+ *
+ * 两条路径（用户明确要求）：
+ *   1. 标准化管理员手工填写 → 直接看 item.archived（人工勾选）；
+ *   2. 研发管理系统数据自动传递 → 条目 source='auto' 且其绑定的 deliverableName
+ *      命中了「已有效提供」的交付物名称，即视为已归档（归档人记「系统」）。
+ *
+ * 规则（单一权威，fail-closed）：
+ *   - 手工条目：仅以 item.archived 为准，不受交付物影响；
+ *   - 自动条目：只有 source='auto' 且绑定了 deliverableName 且该名称在 providedNames 中，
+ *     才判为已归档；未绑定或未命中一律未归档（不臆造）；
+ *   - 手工条目的 archived 优先级最高（即使同时绑定了交付物，人工显式归档仍生效）。
+ */
+export function resolveItemArchived(
+  item: DesignArchiveItem,
+  providedNames: ReadonlySet<string>
+): { archived: boolean; source: ArchiveSource; archivedBy?: string } {
+  if (item.source === 'manual') {
+    return item.archived
+      ? { archived: true, source: 'manual', archivedBy: item.archivedBy }
+      : { archived: false, source: 'manual' }
+  }
+  // auto：交付物已有效提供 → 自动归档
+  const hit = !!item.deliverableName && providedNames.has(item.deliverableName)
+  return hit
+    ? { archived: true, source: 'auto', archivedBy: '系统' }
+    : { archived: false, source: 'auto' }
+}
+
+/**
+ * 解析归档表：把「自动传递」条目的归档状态按交付物实际提供情况实时解算，
+ * 返回一份「生效」的归档表副本（自动条目 archived 被重算，手工条目保持不变）。
+ * 归档齐全判定必须基于本函数的输出，保证自动与手工两条路径一致生效。
+ */
+export function resolveArchiveTable(
+  table: DesignArchiveTable | null | undefined,
+  providedNames: ReadonlySet<string>
+): DesignArchiveTable | undefined {
+  if (!table) return undefined
+  return {
+    ...table,
+    parts: table.parts.map((p) => ({
+      ...p,
+      items: p.items.map((i) => {
+        const r = resolveItemArchived(i, providedNames)
+        return {
+          ...i,
+          archived: r.archived,
+          archivedBy: r.archivedBy ?? i.archivedBy,
+          archivedAt: r.archived ? i.archivedAt : undefined
+        }
+      })
+    }))
+  }
+}
+
+/** 附件 A 是否全部归档（三中心均齐）——按「生效」状态（含自动传递）判定 */
+export function isAllDesignArchivedResolved(
+  table: DesignArchiveTable | null | undefined,
+  providedNames: ReadonlySet<string>
+): boolean {
+  return isAllDesignArchived(resolveArchiveTable(table, providedNames))
 }
 
 /** 附件 A 是否全部归档（三中心均齐） */
@@ -386,31 +511,13 @@ export function determineLevel(input: OtsLevelInput): OtsLevelResult {
   }
 }
 
-/** 问题清单及行动计划条目（L2/L3/L4 提交） */
-export interface IssueActionItem {
-  id: string
-  /** 问题描述 */
-  issue: string
-  /** 行动计划 */
-  action: string
-  /** 责任人 */
-  owner: string
-  /** 完成日期 */
-  dueDate: string
-}
+/** 问题清单及行动计划条目（L2/L3/L4 提交，复用统一问题清单引擎 IssueChecklistItem） */
+export type IssueActionItem = IssueChecklistItem
 
 /**
  * 校验问题清单及行动计划（L2/L3/L4 强制）。
  * 需至少一条、且每条问题/行动/责任人/完成日期齐全。
  */
 export function validateIssuePlan(items: IssueActionItem[]): { ok: boolean; missing: string[] } {
-  const missing: string[] = []
-  if (items.length === 0) missing.push('问题清单及行动计划')
-  items.forEach((it, idx) => {
-    if (!it.issue.trim()) missing.push(`第 ${idx + 1} 条问题描述`)
-    if (!it.action.trim()) missing.push(`第 ${idx + 1} 条行动计划`)
-    if (!it.owner.trim()) missing.push(`第 ${idx + 1} 条责任人`)
-    if (!it.dueDate) missing.push(`第 ${idx + 1} 条完成日期`)
-  })
-  return { ok: missing.length === 0, missing }
+  return validateIssueChecklist(items)
 }

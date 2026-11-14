@@ -3,6 +3,7 @@ import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import en from 'element-plus/es/locale/lang/en'
+import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import 'element-plus/dist/index.css'
 import 'element-plus/theme-chalk/dark/css-vars.css'
 import './styles/tokens.css'
@@ -14,6 +15,11 @@ import { useAppStore } from './store/app'
 
 const app = createApp(App)
 app.use(createPinia())
+
+// 全局注册 Element Plus 图标（供侧边栏菜单组 icon 字段按名渲染）
+for (const [key, comp] of Object.entries(ElementPlusIconsVue)) {
+  app.component(key, comp)
+}
 
 // 先装 pinia，再读 store 以获取响应式 locale，用于 i18n 与 Element Plus 双语
 const store = useAppStore()

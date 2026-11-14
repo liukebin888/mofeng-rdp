@@ -77,6 +77,12 @@
           <el-table-column prop="ownerRole" label="责任角色" width="110" />
           <el-table-column label="工期" width="56"><template #default="{ row }"><span class="num">{{ row.duration }}</span></template></el-table-column>
           <el-table-column label="ES/EF" width="76"><template #default="{ row }"><span class="num">{{ row.es }}/{{ row.ef }}</span></template></el-table-column>
+          <el-table-column label="完成日期" width="105">
+            <template #default="{ row }">
+              <span v-if="row.dueDate" class="mono">{{ row.dueDate }}</span>
+              <span v-else class="dim">—</span>
+            </template>
+          </el-table-column>
           <el-table-column label="总浮时" width="70">
             <template #default="{ row }"><span class="num" :style="{ color: row.totalFloat <= 0 ? '#f87171' : 'var(--text-2)' }">{{ row.totalFloat }}</span></template>
           </el-table-column>
