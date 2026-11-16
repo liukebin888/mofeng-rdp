@@ -29,6 +29,29 @@ const path = require('node:path')
 const crypto = require('node:crypto')
 const { execFile } = require('node:child_process')
 
+// —— 极简 .env 加载（零第三方依赖，保持 server 开箱即跑）——
+// 启动时读取 server/.env，把 KEY=VALUE 注入 process.env（已存在的环境变量优先，不覆盖）。
+// 支持：# 注释、空行、KEY=VALUE、KEY="VALUE"、export KEY=VALUE。不做变量展开/引号内转义。
+function loadDotEnv(filePath) {
+  if (!fs.existsSync(filePath)) return
+  const lines = fs.readFileSync(filePath, 'utf8').split(/\r?\n/)
+  for (let raw of lines) {
+    const line = raw.trim()
+    if (!line || line.startsWith('#')) continue
+    if (line.startsWith('export ')) raw = line.slice(7).trim()
+    const eq = raw.indexOf('=')
+    if (eq <= 0) continue
+    const key = raw.slice(0, eq).trim()
+    let val = raw.slice(eq + 1).trim()
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+      val = val.slice(1, -1)
+    }
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) continue
+    if (process.env[key] === undefined) process.env[key] = val
+  }
+}
+loadDotEnv(path.join(__dirname, '.env'))
+
 const PORT = Number(process.env.PORT || 8787)
 const HOST = process.env.HOST || '127.0.0.1'
 const DATA_DIR = path.join(__dirname, 'data')
@@ -44,7 +67,11 @@ const DEFAULT_TENANT = 'T-1001'
 // ---------------------------------------------------------------------------
 
 const AI_WATERMARK = '【AI 生成 · 待人工复核 · 不作为放行依据】'
-const AI_ENDPOINT = process.env.AI_ENDPOINT || 'https://api.codebuddy.tencent.com/v1'
+// WMA（WorkBuddy Managed Agents）调用契约：端点与 agent_id 均以控制台「发布管理」展示为准，
+// 此处提供默认值 + 环境变量覆盖（AI_ENDPOINT / AI_AGENT_ID / AI_MODEL），避免写死错误端点。
+const AI_ENDPOINT = process.env.AI_ENDPOINT || 'https://api.workbuddy.dev/v1'
+const AI_AGENT_ID = process.env.AI_AGENT_ID || ''
+const AI_MODEL = process.env.AI_MODEL || 'mofeng-rdp-assistant'
 const CLASS_RANK = { L1: 1, L2: 2, L3: 3, L4: 4 }
 
 /** 越权前置过滤：租户/项目/密级任一不符即剔除（越权命中须为 0） */
@@ -227,23 +254,29 @@ function readBody(req) {
 
 // —— AI 网关辅助：真实模型调用（WorkBuddy OpenAPI）与占位降级 ——
 
-/** 调用 WorkBuddy OpenAPI（Agent Key 鉴权，流式解析 SSE），返回完整文本 */
+/** 调用 WorkBuddy WMA OpenAPI（Agent Key 鉴权，流式解析 SSE），返回完整文本 */
 async function callWorkbuddyOpenApi(apiKey, prompt, onDelta) {
-  // 端点与鉴权遵循 WMA OpenAPI：Authorization 携带 Agent Key，流式返回 SSE
-  const resp = await fetch(`${AI_ENDPOINT}/chat/completions`, {
+  // WMA 契约：端点 = AI_ENDPOINT + /agent/chat/completions；鉴权 = Authorization: Bearer <API_KEY>。
+  // 请求体优先用 agent_id（AI_AGENT_ID），否则回退 model（AI_MODEL），以控制台「发布管理」为准。
+  const payload = {
+    messages: [{ role: 'user', content: prompt }],
+    stream: true
+  }
+  if (AI_AGENT_ID) payload.agent_id = AI_AGENT_ID
+  else payload.model = AI_MODEL
+
+  const resp = await fetch(`${AI_ENDPOINT}/agent/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`
     },
-    body: JSON.stringify({
-      model: 'mofeng-rdp-assistant',
-      messages: [{ role: 'user', content: prompt }],
-      stream: true
-    })
+    body: JSON.stringify(payload)
   })
   if (!resp.ok) {
-    throw new Error(`WorkBuddy OpenAPI 返回 ${resp.status}`)
+    let detail = ''
+    try { detail = await resp.text() } catch { /* 忽略 */ }
+    throw new Error(`WorkBuddy WMA 返回 ${resp.status}${detail ? '：' + detail.slice(0, 200) : ''}`)
   }
   if (!resp.body) {
     // 非流式兜底：直接读 JSON
@@ -266,11 +299,11 @@ async function callWorkbuddyOpenApi(apiKey, prompt, onDelta) {
     for (const line of lines) {
       const s = line.trim()
       if (!s.startsWith('data:')) continue
-      const payload = s.slice(5).trim()
-      if (payload === '[DONE]') continue
+      const payload2 = s.slice(5).trim()
+      if (payload2 === '[DONE]') continue
       try {
-        const obj = JSON.parse(payload)
-        const delta = obj?.choices?.[0]?.delta?.content || obj?.choices?.[0]?.text || ''
+        const obj = JSON.parse(payload2)
+        const delta = obj?.choices?.[0]?.delta?.content || obj?.choices?.[0]?.text || obj?.text || ''
         if (delta) {
           text += delta
           onDelta?.(delta)
