@@ -119,14 +119,6 @@ export const MENUS: MenuGroup[] = [
     ]
   },
   {
-    key: 'delivery', title: '交付管理', icon: 'Van', stage: 'P6', role: '项目经理 / 物流', cp: 'K12 K13',
-    items: [
-      { path: '/delivery/deliverables', title: '交付物清单', desc: '缺件率 0 方可提交（C-19）', icon: 'List', comp: v('delivery/DeliverableView') },
-      { path: '/delivery/ship', title: '样件发运与签收', desc: '签收后转已交付（HW-016）', icon: 'Van', comp: v('delivery/DeliverableView') },
-      { path: '/delivery/soft', title: '软件交付台账', desc: '版本与刷写记录', icon: 'Monitor', comp: v('delivery/SoftDeliverView') }
-    ]
-  },
-  {
     key: 'quality', title: '质量管理', icon: 'CircleCheck', stage: 'P2–P7', role: '质量工程师 / 质量总监', cp: 'K14 C-07',
     items: [
       { path: '/quality/risk', title: '风险台账', desc: 'RPN 与红区强制策略', icon: 'Warning', comp: v('quality/RiskView') },
@@ -190,7 +182,10 @@ export const MENUS: MenuGroup[] = [
       { path: '/supply/portal', title: '门户与代录', desc: '代录标记来源（SUP-014）', icon: 'Monitor', comp: v('supply/PortalView') },
       { path: '/supply/purchase-plan', title: '采购计划', desc: '采购计划编制与跟踪（长周期零件）', icon: 'Tickets', comp: v('supply/PurchasePlanView') },
       { path: '/supply/tender', title: '招投标', desc: '招标立项/投标评审/开标定标留痕', icon: 'Document', comp: v('supply/TenderView') },
-      { path: '/supply/sample-purchase', title: '样件采购管理', desc: '试制样件采购需求/下单/到货/验收', icon: 'Box', comp: v('supply/SamplePurchaseView') }
+      { path: '/supply/sample-purchase', title: '样件采购管理', desc: '试制样件采购需求/下单/到货/验收', icon: 'Box', comp: v('supply/SamplePurchaseView') },
+      { path: '/supply/deliverables', title: '交付物清单', desc: '缺件率 0 方可提交（C-19）', icon: 'List', comp: v('delivery/DeliverableView') },
+      { path: '/supply/ship', title: '样件发运与签收', desc: '签收后转已交付（HW-016）', icon: 'Van', comp: v('delivery/DeliverableView') },
+      { path: '/supply/soft', title: '软件交付台账', desc: '版本与刷写记录', icon: 'Monitor', comp: v('delivery/SoftDeliverView') }
     ]
   },
   {
