@@ -13,7 +13,7 @@
 - **后端 Java 环境（本机已定位）**：JDK 21 `C:\jdk\jdk-21.0.2`，Maven `C:\maven\apache-maven-3.9.9`（均未进 PATH，须 export）。跑测试：`export JAVA_HOME="C:/jdk/jdk-21.0.2" && export PATH="$JAVA_HOME/bin:/c/Windows/System32:/c/maven/apache-maven-3.9.9/bin:$PATH"` 后 `mvn test -pl mofeng-domain`（375+ 例）、`mvn test -pl mofeng-application -am`（90 例）。java.exe 须含 `C:/Windows/System32` 否则 vcruntime140_1.dll 缺失。
 - 四层架构：views → application(store) → domain ← infra。domain 零 DOM/vue/pinia，可 vitest 直接调用。
 - **Git**：main 分支，origin=https://github.com/liukebin888/mofeng-rdp.git，提交身份留总 <liuzong@mofeng.com>。
-- **Git push 踩坑**：本机走代理 `https_proxy=http://127.0.0.1:7814`，已设 `git config --global http.sslBackend openssl`；push 前须 `unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY` 否则报 `OpenSSL SSL_read unexpected eof`。
+- **Git push 踩坑（2026-11-16 更新）**：本机出网**必须走透明代理 `http://127.0.0.1:13775`**（会话注入的 https_proxy，非旧记忆里的 7814）。push 正确姿势：`git -c http.proxy=http://127.0.0.1:13775 push origin main`（`github.com` 主站走该代理可通；`unset` 代理后直连会 `Could not connect`，curl 直接测 `github.com` 返回 000 是误判，实际 git 走该代理能通）。已设 `git config --global http.sslBackend openssl`。沙箱内 `reg.exe` 在黑名单，探测注册表协议会被拦，改走 `tasklist` 探测进程。
 - **部署（Docker）**：server/Dockerfile + deploy/Dockerfile.web + docker-compose.yml（前端:8080 + 后端内网 + 命名卷 mofeng-data）；后端构建 context=./server。手册 docs/DEPLOYMENT.md。
 
 ## 门禁铁律（六门禁全过才算闭环）
