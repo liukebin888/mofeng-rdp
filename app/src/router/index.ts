@@ -23,7 +23,7 @@ export interface MenuGroup {
 const viewModules = import.meta.glob('../views/**/*.vue')
 const v = (p: string) => viewModules[`../views/${p}.vue`] as () => Promise<unknown>
 
-/** 18 个一级菜单，与 SOLUTION 11.1 一一对应；二级页标注 P0/P1 批次 */
+/** 19 个一级菜单，与 SOLUTION 11.1 一一对应；二级页标注 P0/P1 批次 */
 export const MENUS: MenuGroup[] = [
   {
     key: 'workbench', title: '工作中心', icon: 'Grid', stage: 'P1–P7', role: '全员', cp: '—',
@@ -209,10 +209,15 @@ export const MENUS: MenuGroup[] = [
     ]
   },
   {
+    key: 'admin', title: '行政管理', icon: 'OfficeBuilding', stage: '全阶段', role: '租户管理员 / 人事', cp: 'C-29 C-36',
+    items: [
+      { path: '/admin/org', title: '组织与用户', desc: '18 角色用户与租户', icon: 'User', comp: v('system/OrgView') },
+      { path: '/admin/roles', title: '角色权限', desc: '18×6 矩阵 + SOD-01~07', icon: 'Key', comp: v('system/RolesView') }
+    ]
+  },
+  {
     key: 'system', title: '系统管理', icon: 'Setting', stage: '全阶段', role: '租户管理员', cp: 'C-29 C-36',
     items: [
-      { path: '/system/org', title: '组织与用户', desc: '18 角色用户与租户', icon: 'User', comp: v('system/OrgView') },
-      { path: '/system/roles', title: '角色权限', desc: '18×6 矩阵 + SOD-01~07', icon: 'Key', comp: v('system/RolesView') },
       { path: '/system/audit', title: '审计日志', desc: '七元组 + 哈希链', icon: 'Document', comp: v('system/AuditLogView') },
       { path: '/system/dict', title: '分类码与 UDF', desc: '自定义字段扩展点', icon: 'Collection', comp: v('system/DictView') },
       { path: '/system/rejection', title: '拦截策略配置', desc: '服务端拒绝三档可配置（硬拒绝/可配置/只读披露）', icon: 'Switch', comp: v('system/RejectionPolicyView') },

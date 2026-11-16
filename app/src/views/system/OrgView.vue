@@ -193,9 +193,9 @@ const { te } = useI18n()
 
 const activeTab = ref('org')
 
-/** 本组件被 2 个菜单复用：组织与用户 / 数据与版本（同一「系统管理」域） */
+/** 本组件被 2 个菜单复用：组织与用户（行政管理）/ 数据与版本（系统管理） */
 const tabs = [
-  { path: '/system/org', label: '组织与用户' },
+  { path: '/admin/org', label: '组织与用户' },
   { path: '/system/data', label: '数据与版本' }
 ]
 

@@ -118,7 +118,7 @@ const VIEWS = [
     kpis: { '规则总数': 'counts.namingRules' }
   },
   {
-    route: '/system/org', page: '组织与用户',
+    route: '/admin/org', page: '组织与用户',
     kpis: {
       '组织节点': 'counts.orgNodes',
       '用户': 'counts.users'
