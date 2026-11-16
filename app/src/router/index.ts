@@ -49,7 +49,7 @@ export const MENUS: MenuGroup[] = [
     ]
   },
   {
-    key: 'project', title: '项目执行', icon: 'Flag', stage: 'P3–P6', role: '项目经理 / 质量', cp: 'K3 K9 K10 K12',
+    key: 'project', title: '项目管理', icon: 'Flag', stage: 'P3–P6', role: '项目经理 / 质量', cp: 'K3 K9 K10 K12',
     items: [
       { path: '/project/task', title: '项目任务书', desc: '任务目标/交付物/里程碑，项目经理发起→研发副总审核→总经理批准', icon: 'Notebook', comp: v('project/ProjectTaskView') },
       { path: '/project/plan', title: '项目主计划', desc: 'RMP 式主计划表达：项目上下文 + RAG + 5 KPI + 等级工时 + 集成整体视图（统一时间轴/里程碑矩阵/分计划投影），数据实时映射四级计划', icon: 'Histogram', comp: v('project/ProjectMasterPlanView') },
@@ -69,7 +69,7 @@ export const MENUS: MenuGroup[] = [
     ]
   },
   {
-    key: 'plan', title: '项目计划与进度', icon: 'Calendar', stage: 'P3', role: '项目经理', cp: 'K3 K15 K16',
+    key: 'plan', title: '计划与进度', icon: 'Calendar', stage: 'P3', role: '项目经理', cp: 'K3 K15 K16',
     items: [
       { path: '/plan/list', title: '项目台账', desc: '项目全景与健康度', icon: 'Grid', comp: v('plan/ProjectListView') },
       { path: '/plan/wbs', title: 'WBS 与任务', desc: '四类依赖 + CPM 关键路径', icon: 'Operation', comp: v('plan/WbsView') },
@@ -243,7 +243,7 @@ const routes: RouteRecordRaw[] = [
         path: 'project/master-plan-editor',
         name: '/project/master-plan-editor',
         component: v('project/ProjectMasterPlanEditorView'),
-        meta: { title: '新建项目主计划', desc: '从空白板开始创建新的项目主计划', group: 'project', groupTitle: '项目执行', batch: 'P0' }
+        meta: { title: '新建项目主计划', desc: '从空白板开始创建新的项目主计划', group: 'project', groupTitle: '项目管理', batch: 'P0' }
       }
     ]
   },

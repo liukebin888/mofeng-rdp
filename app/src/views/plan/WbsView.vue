@@ -136,7 +136,7 @@ import { computeCpm, CyclicDependencyError } from '@/domain/schedule'
 const store = useAppStore()
 const { te } = useI18n()
 
-/** 本组件被 2 个菜单复用：WBS 与任务 / 权重体系（同一「项目计划与进度」域） */
+/** 本组件被 2 个菜单复用：WBS 与任务 / 权重体系（同一「计划与进度」域） */
 const tabs = [
   { path: '/plan/wbs', label: 'WBS 与任务' },
   { path: '/plan/weight', label: '权重体系' }

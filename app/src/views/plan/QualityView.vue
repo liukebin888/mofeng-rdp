@@ -89,7 +89,7 @@ import { useI18n } from '@/infra/i18nPlugin'
 const store = useAppStore()
 const { te } = useI18n()
 
-/** 本组件被 2 个菜单复用：13 项质量检查 / 里程碑与关键节点（同一「项目计划与进度」域） */
+/** 本组件被 2 个菜单复用：13 项质量检查 / 里程碑与关键节点（同一「计划与进度」域） */
 const tabs = [
   { path: '/plan/quality', label: '13 项质量检查' },
   { path: '/plan/milestone', label: '里程碑与关键节点' }

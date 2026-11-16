@@ -65,8 +65,8 @@ export const zhCN: Dict = {
   // —— 一级菜单 ——
   'menu.group.workbench': '工作中心',
   'menu.group.presale': '项目前期',
-  'menu.group.project': '项目执行',
-  'menu.group.plan': '项目计划与进度',
+  'menu.group.project': '项目管理',
+  'menu.group.plan': '计划与进度',
   'menu.group.dev': '研发过程',
   'menu.group.trial': '样件试制',
   'menu.group.quality': '质量管理',
@@ -286,7 +286,7 @@ export const enUS: Dict = {
   // —— 一级菜单 ——
   'menu.group.workbench': 'Work Center',
   'menu.group.presale': 'Pre-Sale',
-  'menu.group.project': 'Project Execution',
+  'menu.group.project': 'Project Management',
   'menu.group.plan': 'Plan & Schedule',
   'menu.group.dev': 'R&D Process',
   'menu.group.trial': 'Sample Trial',
