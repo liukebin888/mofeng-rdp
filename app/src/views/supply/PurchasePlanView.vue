@@ -46,7 +46,7 @@
           <template #default="{ row }"><span class="tag">{{ row.purchaseCategory }}</span></template>
         </el-table-column>
         <el-table-column prop="purchaseType" label="采购类型" width="105" />
-        <el-table-column prop="supplier" label="供应商" min-width="110" />
+        <el-table-column prop="supplier" label="推荐供应商" min-width="110" />
         <el-table-column prop="itemName" label="物料/零件" min-width="130" />
         <el-table-column label="数量" width="78" align="right">
           <template #default="{ row }">{{ row.quantity }} {{ row.unit }}</template>
@@ -303,8 +303,8 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="供应商" required>
-              <el-select v-model="form.supplier" filterable allow-create placeholder="选择或输入供应商" style="width: 100%">
+            <el-form-item label="推荐供应商">
+              <el-select v-model="form.supplier" filterable allow-create clearable placeholder="可选填，从供应商库推荐" style="width: 100%">
                 <el-option v-for="s in supplierOptions" :key="s" :value="s" :label="s" />
               </el-select>
             </el-form-item>
@@ -512,7 +512,6 @@ function validate(): boolean {
   if (!form.name.trim()) { store.notify('warning', '请填写计划名称'); return false }
   if (!form.purchaseCategory) { store.notify('warning', '请选择采购件类别'); return false }
   if (!form.purchaseType) { store.notify('warning', '请选择采购类型'); return false }
-  if (!form.supplier.trim()) { store.notify('warning', '请选择供应商'); return false }
   if (!form.itemName.trim()) { store.notify('warning', '请填写物料/零件名称'); return false }
   if (form.quantity < 1) { store.notify('warning', '数量须 ≥ 1'); return false }
   return true
