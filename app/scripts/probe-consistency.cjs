@@ -91,7 +91,7 @@ const VIEWS = [
     kpis: { '审计记录': 'counts.audit' }
   },
   {
-    route: '/portfolio/score', page: '评分与排序',
+    route: '/cost/score', page: '评分与排序',
     kpis: {
       '在册项目': 'counts.projects',
       '最高分': 'shared.topScore'

@@ -23,7 +23,7 @@ export interface MenuGroup {
 const viewModules = import.meta.glob('../views/**/*.vue')
 const v = (p: string) => viewModules[`../views/${p}.vue`] as () => Promise<unknown>
 
-/** 16 个一级菜单，与 SOLUTION 11.1 一一对应；二级页标注 P0/P1 批次 */
+/** 18 个一级菜单，与 SOLUTION 11.1 一一对应；二级页标注 P0/P1 批次 */
 export const MENUS: MenuGroup[] = [
   {
     key: 'workbench', title: '工作中心', icon: 'Grid', stage: 'P1–P7', role: '全员', cp: '—',
@@ -66,16 +66,6 @@ export const MENUS: MenuGroup[] = [
     items: [
       { path: '/issue-risk/issue', title: '问题管理', desc: '临界值自动触发问题 + 不符合项追踪（NTTT 四态）', icon: 'QuestionFilled', comp: v('project/IssueView') },
       { path: '/issue-risk/risk', title: '风险管理', desc: 'RPN 风险登记 + 漏洞台账 + 机会型风险 + 风险量化与储备', icon: 'WarningFilled', comp: v('quality/RiskView') }
-    ]
-  },
-  {
-    key: 'portfolio', title: '组合与投资', icon: 'TrendCharts', stage: 'P1–P7', role: 'PMO / 研发副总', cp: 'C-43 C-44',
-    items: [
-      { path: '/portfolio/score', title: '评分与排序', desc: '40/35/25 三维加权 ×20', icon: 'Rank', comp: v('portfolio/ScoreView') },
-      { path: '/portfolio/capacity', title: '优选与容量', desc: '容量缺口三建议（PFM-019）', icon: 'Odometer', comp: v('portfolio/ScoreView') },
-      { path: '/portfolio/analysis', title: '组合分析', desc: 'ROI/决策留痕/What-if', icon: 'TrendCharts', comp: v('portfolio/AnalysisView') },
-      { path: '/portfolio/eps', title: 'EPS 节点树', desc: '四级树逐层汇总', icon: 'Share', comp: v('portfolio/EpsView') },
-      { path: '/portfolio/gate-consistency', title: '闸门一致性', desc: '跨项目判据集统一（PFM-011）', icon: 'Switch', comp: v('portfolio/GateConsistencyView') }
     ]
   },
   {
@@ -136,7 +126,12 @@ export const MENUS: MenuGroup[] = [
     items: [
       { path: '/cost/budget', title: '成本归集表', desc: '8 列归集表 + 四类单据', icon: 'Money', comp: v('cost/CostSheetView') },
       { path: '/cost/deviation', title: '成本偏差', desc: 'CPI 0.95/0.90 判读', icon: 'TrendCharts', comp: v('resource/EvmView') },
-      { path: '/cost/hours', title: '工时归集', desc: '工时→成本归集', icon: 'Timer', comp: v('resource/EvmView') }
+      { path: '/cost/hours', title: '工时归集', desc: '工时→成本归集', icon: 'Timer', comp: v('resource/EvmView') },
+      { path: '/cost/score', title: '评分与排序', desc: '40/35/25 三维加权 ×20', icon: 'Rank', comp: v('portfolio/ScoreView') },
+      { path: '/cost/capacity', title: '优选与容量', desc: '容量缺口三建议（PFM-019）', icon: 'Odometer', comp: v('portfolio/ScoreView') },
+      { path: '/cost/analysis', title: '组合分析', desc: 'ROI/决策留痕/What-if', icon: 'TrendCharts', comp: v('portfolio/AnalysisView') },
+      { path: '/cost/eps', title: 'EPS 节点树', desc: '四级树逐层汇总', icon: 'Share', comp: v('portfolio/EpsView') },
+      { path: '/cost/gate-consistency', title: '闸门一致性', desc: '跨项目判据集统一（PFM-011）', icon: 'Switch', comp: v('portfolio/GateConsistencyView') }
     ]
   },
   {
