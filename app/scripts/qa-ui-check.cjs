@@ -154,7 +154,7 @@ async function goto(page, route) {
   cmp('audit', '最近审计表格行数（应为 10）', auditRows, 10)
 
   // ---------- 7. EVM 页 vs 控制点 C-05 口径交叉核对 ----------
-  await goto(page, '/resource/evm')
+  await goto(page, '/cost/evm')
   k = await kpis(page)
   cmp('evm', 'PV 计划值（store 口径 0.66×预算）', pick(k, 'PV计划值').value, exp.evm.pv)
   cmp('evm', 'EV 挣值', pick(k, 'EV挣值').value, exp.evm.ev)

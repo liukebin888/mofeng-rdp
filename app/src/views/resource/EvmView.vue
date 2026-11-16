@@ -93,12 +93,12 @@ import { exportCsv as toCsv } from '@/utils/exportCsv'
 const store = useAppStore()
 const { te } = useI18n()
 
-/** 本组件被 4 个菜单复用：成本偏差 / 工时归集 / 四值挣值 / 供需超分配（同一「资源与成本」域的不同视角） */
+/** 本组件被 4 个菜单复用：成本偏差 / 工时归集 / 四值与挣值报表（成本管理）/ 供需与超分配（行政管理） */
 const tabs = [
-  { path: '/resource/evm', label: '四值与挣值报表' },
-  { path: '/resource/overload', label: '供需与超分配' },
   { path: '/cost/deviation', label: '成本偏差' },
-  { path: '/cost/hours', label: '工时归集' }
+  { path: '/cost/hours', label: '工时归集' },
+  { path: '/cost/evm', label: '四值与挣值报表' },
+  { path: '/admin/overload', label: '供需与超分配' }
 ]
 const budgets = [
   { subject: '设计开发费', wbsCode: '1.1', budget: 260 },

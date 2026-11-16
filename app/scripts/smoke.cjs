@@ -55,7 +55,7 @@ const routes = parseRoutes()
     ['/dev/gate', 'gate'],
     ['/dev/grading', 'grading'],
     ['/dev/trace', 'trace'],
-    ['/resource/evm', 'evm'],
+    ['/cost/evm', 'evm'],
     ['/report/rules', 'rules']
   ]
   if (!fs.existsSync('shots')) fs.mkdirSync('shots')

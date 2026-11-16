@@ -59,7 +59,7 @@ const VIEWS = [
     }
   },
   {
-    route: '/resource/evm', page: '挣值',
+    route: '/cost/evm', page: '挣值',
     kpis: {
       'EAC完工估算': 'shared.eac'
     }

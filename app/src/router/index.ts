@@ -23,7 +23,7 @@ export interface MenuGroup {
 const viewModules = import.meta.glob('../views/**/*.vue')
 const v = (p: string) => viewModules[`../views/${p}.vue`] as () => Promise<unknown>
 
-/** 19 个一级菜单，与 SOLUTION 11.1 一一对应；二级页标注 P0/P1 批次 */
+/** 18 个一级菜单，与 SOLUTION 11.1 一一对应；二级页标注 P0/P1 批次 */
 export const MENUS: MenuGroup[] = [
   {
     key: 'workbench', title: '工作中心', icon: 'Grid', stage: 'P1–P7', role: '全员', cp: '—',
@@ -127,19 +127,12 @@ export const MENUS: MenuGroup[] = [
       { path: '/cost/budget', title: '成本归集表', desc: '8 列归集表 + 四类单据', icon: 'Money', comp: v('cost/CostSheetView') },
       { path: '/cost/deviation', title: '成本偏差', desc: 'CPI 0.95/0.90 判读', icon: 'TrendCharts', comp: v('resource/EvmView') },
       { path: '/cost/hours', title: '工时归集', desc: '工时→成本归集', icon: 'Timer', comp: v('resource/EvmView') },
+      { path: '/cost/evm', title: '四值与挣值报表', desc: 'SPI/CPI/EAC/TCPI/VAC', icon: 'DataAnalysis', comp: v('resource/EvmView') },
       { path: '/cost/score', title: '评分与排序', desc: '40/35/25 三维加权 ×20', icon: 'Rank', comp: v('portfolio/ScoreView') },
       { path: '/cost/capacity', title: '优选与容量', desc: '容量缺口三建议（PFM-019）', icon: 'Odometer', comp: v('portfolio/ScoreView') },
       { path: '/cost/analysis', title: '组合分析', desc: 'ROI/决策留痕/What-if', icon: 'TrendCharts', comp: v('portfolio/AnalysisView') },
       { path: '/cost/eps', title: 'EPS 节点树', desc: '四级树逐层汇总', icon: 'Share', comp: v('portfolio/EpsView') },
       { path: '/cost/gate-consistency', title: '闸门一致性', desc: '跨项目判据集统一（PFM-011）', icon: 'Switch', comp: v('portfolio/GateConsistencyView') }
-    ]
-  },
-  {
-    key: 'resource', title: '资源与成本', icon: 'User', stage: 'P3–P7', role: '资源经理 / 财务 BP', cp: 'K17 C-22~C-24 C-40 C-41',
-    items: [
-      { path: '/resource/evm', title: '四值与挣值报表', desc: 'SPI/CPI/EAC/TCPI/VAC', icon: 'DataAnalysis', comp: v('resource/EvmView') },
-      { path: '/resource/overload', title: '供需与超分配', desc: '>110% 标红与裁决', icon: 'Histogram', comp: v('resource/EvmView') },
-      { path: '/resource/pool', title: '资源池与技能', desc: '技能矩阵与派工', icon: 'User', comp: v('resource/PoolView') }
     ]
   },
   {
@@ -212,7 +205,9 @@ export const MENUS: MenuGroup[] = [
     key: 'admin', title: '行政管理', icon: 'OfficeBuilding', stage: '全阶段', role: '租户管理员 / 人事', cp: 'C-29 C-36',
     items: [
       { path: '/admin/org', title: '组织与用户', desc: '18 角色用户与租户', icon: 'User', comp: v('system/OrgView') },
-      { path: '/admin/roles', title: '角色权限', desc: '18×6 矩阵 + SOD-01~07', icon: 'Key', comp: v('system/RolesView') }
+      { path: '/admin/roles', title: '角色权限', desc: '18×6 矩阵 + SOD-01~07', icon: 'Key', comp: v('system/RolesView') },
+      { path: '/admin/overload', title: '供需与超分配', desc: '>110% 标红与裁决', icon: 'Histogram', comp: v('resource/EvmView') },
+      { path: '/admin/pool', title: '资源池与技能', desc: '技能矩阵与派工', icon: 'User', comp: v('resource/PoolView') }
     ]
   },
   {
