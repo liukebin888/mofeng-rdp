@@ -37,7 +37,7 @@ import { computeEvm } from '@/domain/evm'
 import { rankProjects } from '@/domain/portfolio'
 import { coverage, detectBreaks } from '@/domain/trace'
 import type { ActorContext, Baseline, GateDef, GateRun, Level, WbsNode, ThresholdIssue, RiskItem } from '@/domain/types'
-import { can, type ActionKey } from '@/domain/rbac'
+import { canAny, canOperateAny, dataScopeOfRoles, roleOf, applyFieldPolicy, type ActionKey, type FieldPolicySurface } from '@/domain/rbac'
 import { guardTenant, visibleInTenant, groupDrillDown, type TenantContext } from '@/domain/tenant'
 import { canAccessSpace, visibleInSpace, accessibleSpaces, describeSwitch, type Space, type SpaceContext } from '@/domain/spaceEngine'
 import { advanceThroughBranch, applyCustomApprovers, approveNode, availableActions, escalate, getNode, isOverdue, rejectNode, startFlow, addSigner, transferNode, signNode, type FlowDefinition, type CustomApproverAddition } from '@/domain/flowEngine'
@@ -61,6 +61,9 @@ import { summarizeAnnotations, type DocAnnotation } from '@/domain/docAnnotation
 import { appendRemoteAudit, checkBackend, loadRemoteState, saveRemoteState, seedRemoteAudit, repoBase } from '@/infra/repo'
 import { requestToken, savePlan, listPlan, scanPlanAlerts as scanPlanAlertsApi, type PlanSavePayload, type PlanSaveData, type PlanAlertScanData, type PlanNodeDto } from '@/infra/apiV1'
 import { knowledgeStats, markReused, nextLessonCode, pushToLibrary, searchLessons as searchLessonsEngine, validateLesson } from '@/domain/lessonEngine'
+import { validateLightTask, transitionTask, groupByStatus, completionRate as lightTaskCompletionRate, type LightTask, type LightTaskStatus } from '@/domain/lightTask'
+import { validateCustomFieldDef, validateCustomValue, type CustomFieldDef } from '@/domain/customField'
+import { buildKanban, type KanbanBoard } from '@/domain/kanban'
 import {
   advanceSupervise as advanceSuperviseEngine,
   answerSendAudit as answerSendAuditEngine,
@@ -213,9 +216,30 @@ export const useAppStore = defineStore('app', () => {
   const issueLedger = computed<IssueLedgerItem[]>(() => (data.value.issueLedger ?? []) as IssueLedgerItem[])
   /** 报警邮件记录（站内邮件，责任人/上级/部门总监） */
   const issueAlertMails = computed<IssueAlertMail[]>(() => (data.value.issueAlertMails ?? []) as IssueAlertMail[])
+  /** 轻量任务（GEN-001 通用 PM：独立于 WBS/CPM/挣值的简化任务模型） */
+  const lightTasks = computed<LightTask[]>(() => (data.value.lightTasks ?? []) as LightTask[])
+  /** 自定义字段定义（GEN-002 通用 PM：Jira 式自定义字段，配置驱动） */
+  const customFieldDefs = computed<CustomFieldDef[]>(() => (data.value.customFieldDefs ?? []) as CustomFieldDef[])
+  /** 看板分列（GEN-003：轻量任务按状态分列聚合） */
+  const lightKanban = computed<KanbanBoard>(() => buildKanban(lightTasks.value))
 
   const users = computed<SeedUser[]>(() => data.value.users)
   const currentUser = computed(() => users.value.find((u) => u.id === userId.value) || users.value[0])
+  /** PRJ-013：当前用户全部角色（主角色 + 兼任），权限判定取并集 */
+  const currentUserRoles = computed<string[]>(() => {
+    const u = currentUser.value
+    if (!u) return []
+    return u.roleCodes && u.roleCodes.length > 0 ? u.roleCodes : [u.roleCode]
+  })
+  /** PRJ-013：当前用户全部角色名（用于展示与审计） */
+  const currentUserRoleNames = computed<string[]>(() => {
+    const u = currentUser.value
+    if (!u) return []
+    const codes = currentUserRoles.value
+    return codes.map((c) => roleOf(c)?.name || c)
+  })
+  /** SEC-002：当前用户数据作用域（多角色取最广并集） */
+  const currentDataScope = computed(() => dataScopeOfRoles(currentUserRoles.value))
 
   // —— 组织架构（TEN-009 六级组织树 + 岗位序列 + 人员挂靠）——
   const orgNodes = computed(() => (data.value.orgNodes ?? []) as import('@/domain/types').OrgNode[])
@@ -586,12 +610,26 @@ export const useAppStore = defineStore('app', () => {
     return true
   }
 
-  /** 权限校验入口（三层取交集：角色 × 作用域 × 字段策略） */
+  /** 权限校验入口（三层取交集：角色 × 作用域 × 字段策略；PRJ-013 多角色并集） */
   function guard(action: ActionKey): boolean {
-    const r = can(currentUser.value.roleCode, action)
+    const r = canAny(currentUserRoles.value, action)
     if (!r.allowed) notify('error', r.reason)
     else if (r.conditional) notify('warning', r.reason)
     return r.allowed
+  }
+
+  /** 对象级权限守卫（SEC-001：角色 × 动作 × 对象类型，多角色并集） */
+  function guardOperate(action: ActionKey, objType: string): boolean {
+    const r = canOperateAny(currentUserRoles.value, action, objType)
+    if (!r.allowed) notify('error', r.reason)
+    else if (r.conditional) notify('warning', r.reason)
+    return r.allowed
+  }
+
+  /** 字段策略守卫（SEC-003 三处落地）：按角色多并集解析字段策略并应用到值 */
+  function applyField(objType: string, field: string, value: unknown, surface: FieldPolicySurface = 'page') {
+    const roleName = currentUser.value.roleName
+    return applyFieldPolicy(roleName, objType, field, value, surface)
   }
 
   function log(action: string, objType: string, objId: string, after?: unknown, before?: unknown, result: 'OK' | 'DENY' = 'OK') {
@@ -2219,6 +2257,82 @@ export const useAppStore = defineStore('app', () => {
     Object.assign(l, updated)
     log('REUSE', '经验', lessonId, { byProject: targetProjectId })
   }
+
+  // —— GEN 通用 PM 能力（轻量任务 / 自定义字段 / 看板，通用项目管理底座）——
+
+  /** GEN-001：新增轻量任务（标题/负责人必填，fail-closed） */
+  function addLightTask(input: { title: string; assignee: string; priority: LightTask['priority']; dueDate?: string; tags?: string[] }): boolean {
+    const errors = validateLightTask({ title: input.title, assignee: input.assignee, status: '待办', priority: input.priority })
+    if (errors.length) {
+      notify('error', `轻量任务创建被拒：${errors.join('；')}（GEN-001）`)
+      return false
+    }
+    const id = 'LT' + (data.value.lightTasks.length + 1)
+    const now = todayStr()
+    data.value.lightTasks.push({
+      id,
+      title: input.title.trim(),
+      assignee: input.assignee.trim(),
+      status: '待办',
+      priority: input.priority,
+      dueDate: input.dueDate,
+      tags: (input.tags ?? []).filter((t) => t.trim()),
+      customValues: {},
+      createdAt: now,
+      updatedAt: now
+    })
+    log('CREATE', '轻量任务', id, { title: input.title.trim(), assignee: input.assignee })
+    notify('success', `轻量任务「${input.title.trim()}」已创建`)
+    return true
+  }
+
+  /** GEN-001：流转轻量任务状态（复用 lightTask 状态机，非法流转拒绝） */
+  function updateLightTaskStatus(taskId: string, to: LightTaskStatus): boolean {
+    const t = data.value.lightTasks.find((x) => x.id === taskId)
+    if (!t) return false
+    const { task, ok } = transitionTask(t, to, new Date().toISOString().slice(0, 10))
+    if (!ok) {
+      notify('error', `非法流转：${t.status} → ${to}（GEN-001 状态机拒绝）`)
+      return false
+    }
+    Object.assign(t, task)
+    log('UPDATE', '轻量任务', taskId, { status: to })
+    notify('success', `「${t.title}」已流转为「${to}」`)
+    return true
+  }
+
+  /** GEN-002：新增自定义字段定义（key 唯一、下拉必填选项） */
+  function addCustomFieldDef(def: CustomFieldDef): boolean {
+    const errors = validateCustomFieldDef(def, customFieldDefs.value)
+    if (errors.length) {
+      notify('error', `自定义字段创建被拒：${errors.join('；')}（GEN-002）`)
+      return false
+    }
+    data.value.customFieldDefs.push({ ...def })
+    log('CREATE', '自定义字段', def.key, { name: def.name, type: def.type })
+    notify('success', `自定义字段「${def.name}」已创建`)
+    return true
+  }
+
+  /** GEN-002：为轻量任务填写自定义字段值（必填/数字/下拉校验，fail-closed） */
+  function setLightTaskCustomValue(taskId: string, fieldKey: string, value: string): boolean {
+    const def = customFieldDefs.value.find((d) => d.key === fieldKey)
+    if (!def) return false
+    const errors = validateCustomValue(def, value)
+    if (errors.length) {
+      notify('error', `填值被拒：${errors.join('；')}（GEN-002）`)
+      return false
+    }
+    const t = data.value.lightTasks.find((x) => x.id === taskId)
+    if (!t) return false
+    t.customValues[fieldKey] = value.trim()
+    t.updatedAt = new Date().toISOString().slice(0, 10)
+    log('UPDATE', '轻量任务', taskId, { customValue: { [fieldKey]: value.trim() } })
+    return true
+  }
+
+  /** GEN-001：轻量任务完成率（已完成数 / 未取消总数） */
+  const lightTaskCompletion = computed(() => lightTaskCompletionRate(lightTasks.value))
 
   // —— COM 协同沟通域（会议决议 / 送审件 / 督办，FUN-024）——
 
@@ -4143,6 +4257,9 @@ export const useAppStore = defineStore('app', () => {
     accent,
     users,
     currentUser,
+    currentUserRoles,
+    currentUserRoleNames,
+    currentDataScope,
     currentProject,
     actor,
     orgNodes,
@@ -4425,6 +4542,8 @@ export const useAppStore = defineStore('app', () => {
     setProject,
     cloneProjectStructure,
     guard,
+    guardOperate,
+    applyField,
     log,
     saveWbs,
     updateTaskProgress,
@@ -4515,6 +4634,14 @@ export const useAppStore = defineStore('app', () => {
     docAddComment,
     docResolveComment,
     docDownload,
-    docSearch
+    docSearch,
+    lightTasks,
+    customFieldDefs,
+    lightKanban,
+    lightTaskCompletion,
+    addLightTask,
+    updateLightTaskStatus,
+    addCustomFieldDef,
+    setLightTaskCustomValue
   }
 })

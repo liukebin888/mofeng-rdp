@@ -1,0 +1,17 @@
+{
+  "name": "mofeng-rdp-assistant",
+  "version": "0.1.0",
+  "private": true,
+  "description": "魔程化解研发助手 —— WorkBuddy Managed Agents 托管 Agent（阶段一：定义 + SDK 封装）",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@tencent-ai/agent-sdk": "^0.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vitest": "^2.1.9"
+  }
+}

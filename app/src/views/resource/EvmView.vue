@@ -4,6 +4,8 @@
       <template #actions><el-button size="small" @click="exportCsvFile">导出报表（带口径元数据）</el-button></template>
     </PageHeader>
 
+    <SemanticTabs :tabs="tabs" />
+
     <div class="grid grid-5" style="margin-bottom: 12px">
       <KpiCard label="PV 计划值" :value="store.evm.pv" unit="万元" sub="BCWS" />
       <KpiCard label="EV 挣值" :value="store.evm.ev" unit="万元" sub="BCWP" zone="brand" />
@@ -31,6 +33,11 @@
 
       <div class="panel">
         <div class="panel-title">成本科目与预算（C-10：无预算不得开工）</div>
+        <div class="src-note" style="margin-bottom: 8px">
+          挣值四值与成本归集表同源，前往
+          <el-button link type="primary" size="small" @click="$router.push('/cost/budget')">成本归集表</el-button>
+          查看 8 列归集与四类单据。
+        </div>
         <div v-for="b in budgets" :key="b.subject" class="brow">
           <span>{{ b.subject }}</span>
           <span class="mono dim">{{ b.wbsCode }}</span>
@@ -78,12 +85,21 @@
 import { computed } from 'vue'
 import PageHeader from '@/components/PageHeader.vue'
 import KpiCard from '@/components/KpiCard.vue'
+import SemanticTabs from '@/components/SemanticTabs.vue'
 import { useAppStore } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
 import { exportCsv as toCsv } from '@/utils/exportCsv'
 
 const store = useAppStore()
 const { te } = useI18n()
+
+/** 本组件被 4 个菜单复用：成本偏差 / 工时归集 / 四值挣值 / 供需超分配（同一「资源与成本」域的不同视角） */
+const tabs = [
+  { path: '/resource/evm', label: '四值与挣值报表' },
+  { path: '/resource/overload', label: '供需与超分配' },
+  { path: '/cost/deviation', label: '成本偏差' },
+  { path: '/cost/hours', label: '工时归集' }
+]
 const budgets = [
   { subject: '设计开发费', wbsCode: '1.1', budget: 260 },
   { subject: '样件与工装费', wbsCode: '5.2', budget: 420 },

@@ -5,7 +5,7 @@
         <span class="batch p1">{{ t('status.registered') + batch }}</span>
       </div>
       <h2>{{ titleText }}</h2>
-      <p v-if="desc">{{ desc }}</p>
+      <p v-if="descText">{{ descText }}</p>
     </div>
     <div class="row"><slot name="actions" /></div>
   </header>
@@ -21,6 +21,9 @@ const { t } = useI18n()
 // 标题优先按当前路由 path 取菜单词条（menu.item.<path>），保证语言切换后同步翻译；
 // 兜底用 props.title 原文（非路由驱动的页面）
 const titleText = computed(() => t('menu.item.' + route.path) !== 'menu.item.' + route.path ? t('menu.item.' + route.path) : props.title)
+// 描述优先按当前路由 path 取菜单描述词条（menu.desc.<path>），用于多菜单复用同一组件时区分定位；
+// 兜底用 props.desc 原文（未配置词条的页面）
+const descText = computed(() => t('menu.desc.' + route.path) !== 'menu.desc.' + route.path ? t('menu.desc.' + route.path) : props.desc)
 const batch = computed(() => String(route.meta.batch || 'P0'))
 </script>
 

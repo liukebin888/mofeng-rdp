@@ -2,6 +2,7 @@
   <div>
     <PageHeader title="供应商管理" desc="供应商准入、定点、PPAP 与绩效评估：状态机受控流转（SUP-002），绩效四维评分联动暂停/淘汰预警">
       <template #actions>
+        <el-button size="small" @click="$router.push('/trial/samples')">查看试制需求</el-button>
         <el-button size="small" type="primary" @click="openScore">绩效评分</el-button>
       </template>
     </PageHeader>

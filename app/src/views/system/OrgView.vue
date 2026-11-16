@@ -4,6 +4,8 @@
       <template #actions><el-button size="small" @click="store.reset()">重置演示数据</el-button></template>
     </PageHeader>
 
+    <SemanticTabs :tabs="tabs" />
+
     <div class="grid grid-4" style="margin-bottom: 12px">
       <KpiCard label="租户" :value="store.data.tenant.name" :sub="`${store.data.tenant.code} · ${store.data.tenant.isolation}`" />
       <KpiCard label="组织节点" :value="orgNodeCount" unit="个" sub="六级层级，含研发/制造/职能系统" />
@@ -180,6 +182,7 @@ import { computed, ref, reactive } from 'vue'
 import PageHeader from '@/components/PageHeader.vue'
 import KpiCard from '@/components/KpiCard.vue'
 import PersonSelect from '@/components/PersonSelect.vue'
+import SemanticTabs from '@/components/SemanticTabs.vue'
 import { useAppStore } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
 import { buildOrgTree, POST_TRACKS, LEVEL_LEADER_TITLE, trackOf, countBySystem } from '@/domain/org'
@@ -189,6 +192,12 @@ const store = useAppStore()
 const { te } = useI18n()
 
 const activeTab = ref('org')
+
+/** 本组件被 2 个菜单复用：组织与用户 / 数据与版本（同一「系统管理」域） */
+const tabs = [
+  { path: '/system/org', label: '组织与用户' },
+  { path: '/system/data', label: '数据与版本' }
+]
 
 /** 组织树（嵌套） */
 const orgTree = computed(() => buildOrgTree(store.orgNodes as any))

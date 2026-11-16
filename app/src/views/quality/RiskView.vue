@@ -2,6 +2,8 @@
   <div>
     <PageHeader title="风险台账" desc="四要素齐全方可登记（C-13）；RPN = S×O×D，≥200 红区强制量化与策略（C-14）；关闭须评估残余风险并按级别签署（C-15）" />
 
+    <SemanticTabs :tabs="tabs" />
+
     <div class="grid grid-4" style="margin-bottom: 12px">
       <KpiCard label="风险总数" :value="store.projectRisks.length" unit="条" />
       <KpiCard label="红区（RPN≥200）" :value="red.length" unit="条" :zone="red.length ? 'danger' : 'ok'" />
@@ -14,6 +16,7 @@
       <div class="crow" style="border-bottom: none; padding-top: 2px">
         <el-button size="small" type="primary" @click="openRiskForm()">+ 新增风险</el-button>
         <el-button size="small" @click="scanEscalation()">扫描风险报警升级</el-button>
+        <el-button size="small" @click="$router.push('/dev/gate')">查看受影响门禁</el-button>
         <span class="dim">登记自动派生问题并报警；推进「开放→缓解中→残余评估→关闭」；关闭须残余评估 + 按级别签署（C-15）</span>
       </div>
 
@@ -256,6 +259,7 @@
 import { computed, reactive, ref } from 'vue'
 import PageHeader from '@/components/PageHeader.vue'
 import KpiCard from '@/components/KpiCard.vue'
+import SemanticTabs from '@/components/SemanticTabs.vue'
 import { useAppStore } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
 import { closeCheck, completeness, rpn, zone, ZONE_LABEL } from '@/domain/risk'
@@ -265,6 +269,13 @@ import type { RiskItem } from '@/domain/types'
 
 const store = useAppStore()
 const { te } = useI18n()
+
+/** 本组件被 3 个菜单复用：风险管理 / 风险台账 / 漏洞台账（风险与漏洞为两类不同对象，同域展示） */
+const tabs = [
+  { path: '/issue-risk/risk', label: '风险管理' },
+  { path: '/quality/risk', label: '风险台账' },
+  { path: '/quality/vuln', label: '漏洞台账' }
+]
 const rows = computed(() => store.projectRisks.map((r) => ({ ...r })))
 const red = computed(() => store.projectRisks.filter((r) => rpn(r) >= 200))
 const noStrategy = computed(() => red.value.filter((r) => !r.strategy))

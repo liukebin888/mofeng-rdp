@@ -2,6 +2,7 @@
   <div>
     <PageHeader title="项目主计划">
       <template #actions>
+        <el-button size="small" @click="$router.push('/plan/wbs')">查看 WBS 与任务</el-button>
         <el-button size="small" type="primary" @click="tplDialog = true">新建</el-button>
         <el-button size="small" @click="onOpen">打开</el-button>
       </template>

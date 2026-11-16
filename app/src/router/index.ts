@@ -32,15 +32,15 @@ export const MENUS: MenuGroup[] = [
       { path: '/workbench/tasks', title: '我的任务', desc: '我的 WBS 任务与回执', icon: 'List', comp: v('wb/TodayView') },
       { path: '/workbench/todos', title: '我的待办', desc: '与流程中心同源（RPT-013）', icon: 'Tickets', comp: v('flow/ApprovalsView') },
       { path: '/workbench/messages', title: '消息与收件箱', desc: '已读回执 + 三类来件（POR-006/008）', icon: 'Message', comp: v('wb/InboxView') },
-      { path: '/workbench/hours', title: '我的工时单', desc: '工时填报与审核（POR-009/010）', icon: 'Timer', comp: v('wb/HoursView') }
+      { path: '/workbench/hours', title: '我的工时单', desc: '工时填报与审核（POR-009/010）', icon: 'Timer', comp: v('wb/HoursView') },
+      { path: '/workbench/light-task-board', title: '通用任务看板', desc: '轻量任务列表/看板/甘特三态 + 自定义字段（GEN-001/002/003 通用 PM）', icon: 'Grid', comp: v('wb/LightTaskBoardView') }
     ]
   },
   {
     key: 'presale', title: '项目前期', icon: 'Document', stage: 'P1–P2', role: '项目经理 / 研发副总', cp: 'K1 K2',
     items: [
       { path: '/presale/presale-apply', title: '前期交流申请', desc: '客户/产品线/预估金额，市场总监审核→三中心会签→总经理批准', icon: 'ChatLineRound', comp: v('presale/PresaleApplyView') },
-      { path: '/presale/quote-apply', title: '项目/产品报价', desc: '报价唯一权威：四角色并行填报成本→财务汇总→总经理批准，报价单清单与金额汇总', icon: 'Money', comp: v('presale/QuoteApplyView') },
-      { path: '/presale/quote-cost', title: '报价费用明细', desc: '八类报价费用明细行填报（材料/制造/研发/工装/设备/试验/合规/包装），自动汇总引入报价单', icon: 'Coin', comp: v('presale/QuoteCostView') },
+      { path: '/presale/quote-apply', title: '项目成本', desc: '报价唯一权威：四角色并行填报成本→财务汇总→总经理批准；含八类费用明细填报与报价测算', icon: 'Money', comp: v('presale/QuoteApplyView') },
       { path: '/presale/scheme', title: '技术方案（TR）', desc: '技术方案版本管理 + TR 技术评审审批流（评审委员会→总经理，C-02 技术输入）', icon: 'Document', comp: v('presale/SchemeView') },
       { path: '/presale/apply', title: '立项申请', desc: '五项分级输入定级 + 审批链同前期交流申请（市场总监审核→三中心会签→总经理批准）', icon: 'Files', comp: v('presale/ApplyView') },
       { path: '/presale/review', title: '立项评审', desc: '人工+AI 四维度评估（进度/资源/技术/成本）+ 参考结论与图表', icon: 'View', comp: v('presale/ProjectReviewView') },

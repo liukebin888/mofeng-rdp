@@ -6,6 +6,8 @@
       </template>
     </PageHeader>
 
+    <SemanticTabs :tabs="tabs" />
+
     <div class="grid grid-4" style="margin-bottom: 12px">
       <KpiCard label="受控文档" :value="docs.length" unit="份" />
       <KpiCard label="已发布" :value="published.length" unit="份" zone="ok" />
@@ -146,6 +148,7 @@
 import { computed, reactive, ref } from 'vue'
 import PageHeader from '@/components/PageHeader.vue'
 import KpiCard from '@/components/KpiCard.vue'
+import SemanticTabs from '@/components/SemanticTabs.vue'
 import { useAppStore } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
 import { isSignoffComplete } from '@/domain/docEngine'
@@ -154,6 +157,13 @@ import { ANNOTATION_COLORS } from '@/domain/docAnnotation'
 const store = useAppStore()
 const { te } = useI18n()
 const query = ref('')
+
+/** 本组件被 3 个菜单复用：文档库与版本 / MDR-TDR 齐套 / 会签工作台（同一「文档受控生命周期」域） */
+const tabs = [
+  { path: '/doc/library', label: '文档库与版本' },
+  { path: '/doc/mdr', label: 'MDR/TDR 齐套' },
+  { path: '/doc/signoff', label: '会签工作台' }
+]
 const searchState = reactive<{ hits: { doc: any; fields: string[] }[]; dupGroups: any[][] }>({ hits: [], dupGroups: [] })
 
 const docs = computed(() => store.projectDocs)

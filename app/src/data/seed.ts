@@ -87,197 +87,274 @@ import type { DesignArchiveTable, SampleReviewReport, DvTestReport } from '@/dom
 import { DEFAULT_DESIGN_ARCHIVE } from '@/domain/otsApproval'
 import type { OtsApprovalRecord } from '@/domain/otsClosure'
 import type { IssueLedgerItem, IssueAlertMail } from '@/domain/issueAlert'
+import type { LightTask } from '@/domain/lightTask'
+import type { CustomFieldDef } from '@/domain/customField'
 
-export const SEED_VERSION = 'mofeng.rdp.v1.0.36'
+export const SEED_VERSION = 'mofeng.rdp.v1.0.40'
 const TENANT = 'T-1001'
 
 export interface SeedUser {
   id: string
   name: string
+  /** 主角色（附录 D 角色 code，用于展示与审计主身份） */
   roleCode: string
   roleName: string
+  /** PRJ-013：一人多角色，权限取并集（缺省仅含主角色） */
+  roleCodes?: string[]
   dept: string
   account: string
 }
 
+// ============ 组织与人员规模定义（供 buildUsers / buildOrgNodes / buildOrgMemberships 共用） ============
+
+/** 中心定义：id / 名称 / 所属系统 / 负责人 / 部门列表 */
+interface CenterSpec {
+  id: string
+  name: string
+  system: '研发系统' | '制造系统' | '职能系统'
+  leader: string
+  /** 每中心至少 2 个部门；研发/制造系统部门多、职能系统部门少 */
+  departments: string[]
+}
+
+/** 14 个中心：研发 5 + 制造 2 + 职能 7，每个中心 ≥2 个部门 */
+const CENTER_SPECS: CenterSpec[] = [
+  // —— 研发系统（人员多一点：每中心 2 部门）——
+  { id: 'ELEC', name: '电子研发中心', system: '研发系统', leader: '周立群', departments: ['智能交互部', '智能控制部'] },
+  { id: 'STRU', name: '结构研发中心', system: '研发系统', leader: '吴敏', departments: ['结构设计部', '结构分析部'] },
+  { id: 'PROC', name: '工艺技术中心', system: '研发系统', leader: '赵启明', departments: ['工艺工程部', '工装设计部', '自动化部'] },
+  { id: 'MOLD', name: '模具中心', system: '研发系统', leader: '钱伟', departments: ['模具设计部', '模具制造部'] },
+  { id: 'PMO', name: '项目管理中心', system: '研发系统', leader: '孙烨', departments: ['项目管理部', '计划管理部'] },
+  // —— 制造系统（人员多一点：每中心 2 部门）——
+  { id: 'MFG', name: '制造中心', system: '制造系统', leader: '李文杰', departments: ['生产制造部', '设备管理部'] },
+  { id: 'LOG', name: '计划物流中心', system: '制造系统', leader: '郑昊', departments: ['生产计划部', '物流仓储部'] },
+  // —— 职能系统（每中心 2 部门）——
+  { id: 'MKT', name: '市场中心', system: '职能系统', leader: '王琳', departments: ['市场部', '销售部'] },
+  { id: 'PUR', name: '采购中心', system: '职能系统', leader: '冯磊', departments: ['采购部', '供应链部'] },
+  { id: 'QA', name: '质量中心', system: '职能系统', leader: '何晓东', departments: ['质量管理部', '检验检测部'] },
+  { id: 'FIN', name: '财务中心', system: '职能系统', leader: '徐宁', departments: ['财务部', '成本管理部'] },
+  { id: 'HR', name: '人力资源中心', system: '职能系统', leader: '马强', departments: ['人事部', '培训发展部'] },
+  { id: 'ADM', name: '企业管理中心', system: '职能系统', leader: '顾晨', departments: ['行政部', '企业管理部'] },
+  { id: 'EXEC', name: '总经办', system: '职能系统', leader: '沈雅', departments: ['总经办', '战略规划部'] }
+]
+
+/** 每中心 2 部门 × 2 科室 × 2 小组，小组人数按系统差异化（研发/制造 5 人，职能 3 人） */
+const TEAM_SIZE: Record<CenterSpec['system'], number> = { 研发系统: 5, 制造系统: 5, 职能系统: 3 }
+
+/** 每个部门下的科室名（统一两科） */
+const SECTION_NAMES = ['第一科室', '第二科室']
+/** 每个科室下的小组名（统一两组） */
+const TEAM_NAMES = ['第一小组', '第二小组']
+
+/** 各系统的人员岗位序列与等级（用于生成普通员工挂靠） */
+const SYSTEM_POSTS: Record<CenterSpec['system'], { track: OrgMembership['track']; level: string; roleCode: string; roleName: string }[]> = {
+  研发系统: [
+    { track: 'tech', level: '工程师', roleCode: 'SE', roleName: '系统工程师' },
+    { track: 'software', level: '软件工程师', roleCode: 'SE', roleName: '系统工程师' },
+    { track: 'tech', level: '高级工程师', roleCode: 'SE', roleName: '系统工程师' }
+  ],
+  制造系统: [
+    { track: 'tech', level: '工程师', roleCode: 'PE', roleName: '工艺工程师' },
+    { track: 'project', level: '项目助理工程师', roleCode: 'PE', roleName: '工艺工程师' }
+  ],
+  职能系统: [
+    { track: 'project', level: '项目管理员', roleCode: 'QE', roleName: '质量工程师' },
+    { track: 'tech', level: '助理工程师', roleCode: 'QE', roleName: '质量工程师' }
+  ]
+}
+
+/** 姓名库：百家姓 + 双字名，程序化组合生成唯一姓名 */
+const SURNAMES = ['王', '李', '张', '刘', '陈', '杨', '黄', '赵', '周', '吴', '徐', '孙', '马', '朱', '胡', '郭', '何', '高', '林', '罗', '郑', '梁', '谢', '宋', '唐', '许', '韩', '冯', '邓', '曹', '彭', '曾', '萧', '田', '董', '袁', '潘', '于', '蒋', '蔡', '余', '杜', '叶', '程', '苏', '魏', '吕', '丁', '任', '沈', '姚', '卢', '姜', '崔', '钟', '谭', '陆', '汪', '范', '金', '石', '廖', '贾', '夏', '韦', '傅', '方', '白', '邹', '孟', '熊', '秦', '邱', '江', '尹', '薛', '闫', '段', '雷', '侯', '龙', '史', '陶', '黎', '贺', '顾', '毛', '郝', '龚', '邵', '万', '钱', '严', '覃', '武', '戴', '莫', '孔', '向', '汤']
+const GIVEN_NAMES = ['志远', '晓峰', '建华', '文博', '海涛', '永刚', '国平', '雪梅', '志明', '伟东', '永强', '海峰', '建国', '文静', '晓东', '丽华', '海燕', '文博', '国华', '志强', '晓明', '春燕', '永平', '文静', '海龙', '卫东', '文君', '国栋', '志刚', '晓华', '永昌', '海霞', '晓燕', '永红', '文军', '国梁', '志鹏', '晓龙', '永峰', '海波', '文杰', '国伟', '志军', '晓辉', '永斌', '海英', '志敏', '文强', '国斌', '晓琳', '永刚', '海玲', '志华', '文霞', '国明', '晓光', '永亮', '海琴', '志丹', '文慧', '国峰', '晓丹', '永利', '海峰', '志勇', '文婷', '国瑞', '晓兰', '永明', '海珍', '志杰', '文丽', '国军', '晓红', '永辉', '海云', '志远', '文娟', '国权', '晓静', '永胜', '海丽', '志辉', '文芳', '国雄', '晓霞', '永康', '海燕', '志斌', '文青', '国清', '晓峰', '永杰', '海涛', '志刚', '文娟', '国梁', '晓雪', '永华', '海风', '志国', '文兰', '国宁', '晓艳', '永军', '海梅']
+
+/** 姓名生成器：按序生成唯一姓名（姓 × 名循环），返回 { name, id } */
+/** 18 名基础用户姓名（各级负责人，姓名与视图/审批映射/测试硬编码保持一致） */
+const BASE_USER_NAMES = [
+  '陈志远', '林静', '周立群', '吴敏', '赵启明', '钱伟', '孙烨', '李文杰', '郑昊', '王琳',
+  '冯磊', '何晓东', '徐宁', '马强', '顾晨', '沈雅', '许国栋', '唐峰'
+]
+
+function makeNameGenerator(): () => string {
+  // 预占基础用户姓名，避免员工姓名与负责人重名
+  const used = new Set<string>(BASE_USER_NAMES)
+  let idx = 0
+  return () => {
+    let name = ''
+    do {
+      const s = SURNAMES[idx % SURNAMES.length]
+      const g = GIVEN_NAMES[Math.floor(idx / SURNAMES.length) % GIVEN_NAMES.length]
+      name = s + g
+      idx++
+    } while (used.has(name))
+    used.add(name)
+    return name
+  }
+}
+
+/**
+ * PRJ-013 多角色并集：部分负责人叠加第二角色，演示权限并集。
+ * 键 = 基础用户序号（0 起，对应 ROLES 数组下标），值 = 附加角色 code 列表。
+ */
+const MULTI_ROLE_ASSIGN: Record<number, string[]> = {
+  0: ['TENANT_ADMIN'], // 系统管理员 兼任 租户管理员
+  2: ['QE'], // 研发项目经理 兼任 质量工程师
+  6: ['SQE'], // 质量总监 兼任 SQE
+  16: ['PM'] // 研发副总 兼任 研发项目经理
+}
+
 function buildUsers(): SeedUser[] {
-  const names = [
-    '陈志远',
-    '林静',
-    '周立群',
-    '吴敏',
-    '赵启明',
-    '钱伟',
-    '孙烨',
-    '李文杰',
-    '郑昊',
-    '王琳',
-    '冯磊',
-    '何晓东',
-    '徐宁',
-    '马强',
-    '顾晨',
-    '沈雅',
-    '许国栋',
-    '唐峰'
-  ]
-  const base = ROLES.map((r, i) => ({
-    id: `U${String(i + 1).padStart(3, '0')}`,
-    name: names[i] || `用户${i + 1}`,
-    roleCode: r.code,
-    roleName: r.name,
-    dept: ['项目管理部', '研发中心', '质量部', '采购部', '制造部', 'IT'][i % 6],
-    account: `user.${r.code.toLowerCase()}`
-  }))
-  // 新增 36 名工程师（U019~U054），对应 9 个事业部 × 4 个小组（硬件一组/二组、软件一组/二组）
-  const engNames = [
-    '韩晓峰', '罗建华', '蒋文博', '曹志强',
-    '邓海涛', '梁永刚', '谢国平', '韩雪梅',
-    '唐志明', '袁伟东', '崔永强', '龙海峰',
-    '曾志远', '彭建国', '蔡文静', '潘晓东',
-    '董丽华', '苏志强', '魏海涛', '叶国华',
-    '田文博', '万晓峰', '石志明', '于海燕',
-    '邵建国', '孟晓东', '秦文静', '段志强',
-    '郝海涛', '侯国华', '邹晓峰', '武志明',
-    '廖海燕', '龚建国', '姚晓东', '冯文静'
-  ]
-  const engs = engNames.map((n, i) => {
-    const idx = ROLES.length + i + 1
+  // —— 18 名基础用户（U001~U018）：覆盖附录 D 全部 18 种 RBAC 角色 ——
+  const base = ROLES.map((r, i) => {
+    const extra = MULTI_ROLE_ASSIGN[i] || []
     return {
-      id: `U${String(idx).padStart(3, '0')}`,
-      name: n,
-      roleCode: 'SE',
-      roleName: '系统工程师',
-      dept: '研发中心',
-      account: `user.eng${String(i + 1).padStart(2, '0')}`
+      id: `U${String(i + 1).padStart(3, '0')}`,
+      name: BASE_USER_NAMES[i] || `用户${i + 1}`,
+      roleCode: r.code,
+      roleName: r.name,
+      roleCodes: [r.code, ...extra],
+      dept: ['项目管理部', '研发中心', '质量部', '采购部', '制造部', 'IT'][i % 6],
+      account: `user.${r.code.toLowerCase()}`
     }
   })
-  return [...base, ...engs]
+
+  // —— 程序化生成各中心普通员工（挂靠到小组）——
+  const gen = makeNameGenerator()
+  const employees: SeedUser[] = []
+  let seq = ROLES.length + 1 // U019 起
+  CENTER_SPECS.forEach((center) => {
+    center.departments.forEach((deptName) => {
+      SECTION_NAMES.forEach((secName) => {
+        TEAM_NAMES.forEach((teamName) => {
+          const size = TEAM_SIZE[center.system]
+          const posts = SYSTEM_POSTS[center.system]
+          for (let k = 0; k < size; k++) {
+            const post = posts[k % posts.length]
+            const idx = seq
+            seq++
+            employees.push({
+              id: `U${String(idx).padStart(3, '0')}`,
+              name: gen(),
+              roleCode: post.roleCode,
+              roleName: post.roleName,
+              dept: `${center.name}/${deptName}`,
+              account: `user.u${String(idx).padStart(3, '0')}`
+            })
+          }
+        })
+      })
+    })
+  })
+
+  return [...base, ...employees]
 }
 
 /**
  * 组织架构（TEN-009 六级组织：集团→公司→中心→部门→科室→小组）
- * 中心归属：电子/结构/工艺/模具/项目管理 5 中心 → 研发系统；制造/计划物流 2 中心 → 制造系统；
- * 市场/采购/质量/财务/人力资源/企业管理/总经办 → 职能系统。
+ * 数据驱动：由 CENTER_SPECS 统一生成 14 个中心的「2 部门 × 2 科室 × 2 小组」完整层级，
+ * 保证每个中心都有可下钻的组织树，供调试与权限演示。
+ * 节点 ID 规则：部门={centerId}-D{n}、科室={deptId}-S{n}、小组={sectionId}-T{n}。
  */
 function buildOrgNodes(): OrgNode[] {
-  const c = (id: string, name: string, system: string, order: number, leaderName?: string): OrgNode => ({
-    id, name, level: 'center', parentId: 'C', system, leaderTitle: '执行总监', leaderName, order
-  })
-  // 9 个事业部（智能交互/控制/座舱/驾驶）各加硬件科 + 软件科，每科下硬件/软件一、二组
-  const divisionDepts: string[] = ['ELEC-D1', 'ELEC-D2', 'ELEC-D3', 'ELEC-D4', 'ELEC-D5', 'ELEC-D6', 'ELEC-D7', 'ELEC-D8', 'ELEC-D9']
-  // 部门总监姓名（9 个事业部各一名，供「问题报警部门总监」定位）
-  const divisionDirectors: string[] = ['王建国', '李向阳', '张伟民', '刘志强', '陈海峰', '杨国华', '黄立军', '周文斌', '吴永刚']
-  // 科高级经理 / 组经理姓名（每事业部 2 科 × 2 组 = 6 个，用于「问题报警责任人上级」定位）
-  const sectionManagers: string[] = ['郑科文', '冯科林', '蒋科海', '沈科军', '韩科峰', '杨科明', '朱科强', '秦科勇', '许科刚']
-  const teamLeads: string[] = ['赵子龙', '钱学森', '孙悟明', '李元霸', '周星驰', '吴刚毅', '郑成功', '王小虎', '冯远征']
-  const divisionNodes: OrgNode[] = []
-  divisionDepts.forEach((deptId, di) => {
-    const hwId = `${deptId}-HW`
-    const swId = `${deptId}-SW`
-    const sm = sectionManagers[di] ?? `科经理${di + 1}`
-    const tl = teamLeads[di] ?? `组经理${di + 1}`
-    divisionNodes.push(
-      { id: hwId, name: '硬件科', level: 'section', parentId: deptId, leaderTitle: '高级经理', leaderName: sm, order: 1 },
-      { id: swId, name: '软件科', level: 'section', parentId: deptId, leaderTitle: '高级经理', leaderName: sm, order: 2 },
-      { id: `${hwId}-T1`, name: '硬件一组', level: 'team', parentId: hwId, leaderTitle: '经理', leaderName: `${tl}A`, order: 1 },
-      { id: `${hwId}-T2`, name: '硬件二组', level: 'team', parentId: hwId, leaderTitle: '经理', leaderName: `${tl}B`, order: 2 },
-      { id: `${swId}-T1`, name: '软件一组', level: 'team', parentId: swId, leaderTitle: '经理', leaderName: `${tl}C`, order: 1 },
-      { id: `${swId}-T2`, name: '软件二组', level: 'team', parentId: swId, leaderTitle: '经理', leaderName: `${tl}D`, order: 2 }
-    )
-  })
-  return [
+  const nodes: OrgNode[] = [
     { id: 'G', name: '集团总部', level: 'group', parentId: null, leaderTitle: '总裁', leaderName: '陈志远', system: '集团', order: 1 },
-    { id: 'C', name: '研发制造公司', level: 'company', parentId: 'G', leaderTitle: '总经理', leaderName: '林静', order: 1 },
-    // 研发系统（5 中心）
-    c('ELEC', '电子研发中心', '研发系统', 1, '周立群'),
-    c('STRU', '结构研发中心', '研发系统', 2, '吴敏'),
-    c('PROC', '工艺技术中心', '研发系统', 3, '赵启明'),
-    c('MOLD', '模具中心', '研发系统', 4, '钱伟'),
-    c('PMO', '项目管理中心', '研发系统', 5, '孙烨'),
-    // 制造系统（2 中心）
-    c('MFG', '制造中心', '制造系统', 6, '李文杰'),
-    c('LOG', '计划物流中心', '制造系统', 7, '郑昊'),
-    // 职能系统（7 中心）
-    c('MKT', '市场中心', '职能系统', 8, '王琳'),
-    c('PUR', '采购中心', '职能系统', 9, '冯磊'),
-    c('QA', '质量中心', '职能系统', 10, '何晓东'),
-    c('FIN', '财务中心', '职能系统', 11, '徐宁'),
-    c('HR', '人力资源中心', '职能系统', 12, '马强'),
-    c('ADM', '企业管理中心', '职能系统', 13, '顾晨'),
-    c('EXEC', '总经办', '职能系统', 14, '沈雅'),
-    // 部门（电子研发中心下属）
-    { id: 'ELEC-D1', name: '智能交互一部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', leaderName: '王建国', order: 1 },
-    { id: 'ELEC-D2', name: '智能交互二部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', leaderName: '李向阳', order: 2 },
-    { id: 'ELEC-D3', name: '智能交互三部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', leaderName: '张伟民', order: 3 },
-    { id: 'ELEC-D4', name: '智能控制一部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', leaderName: '刘志强', order: 4 },
-    { id: 'ELEC-D5', name: '智能控制二部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', leaderName: '陈海峰', order: 5 },
-    { id: 'ELEC-D6', name: '智能座舱一部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', leaderName: '杨国华', order: 6 },
-    { id: 'ELEC-D7', name: '智能座舱二部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', leaderName: '黄立军', order: 7 },
-    { id: 'ELEC-D8', name: '智能驾驶一部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', leaderName: '周文斌', order: 8 },
-    { id: 'ELEC-D9', name: '智能驾驶二部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', leaderName: '吴永刚', order: 9 },
-    { id: 'ELEC-D10', name: '验证中心', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 10 },
-    { id: 'ELEC-D11', name: '技术中心', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 11 },
-    { id: 'ELEC-D12', name: '综合管理部', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 12 },
-    { id: 'ELEC-D13', name: 'AI 实验室', level: 'department', parentId: 'ELEC', leaderTitle: '总监', order: 13 },
-    // 事业部科室 + 小组（9 部 × 硬件科/软件科 × 硬件/软件一、二组）
-    ...divisionNodes,
-    // 科室（技术中心下）
-    { id: 'ELEC-D11-S1', name: '标准化科', level: 'section', parentId: 'ELEC-D11', leaderTitle: '高级经理', order: 1 },
-    { id: 'ELEC-D11-S2', name: '体系科', level: 'section', parentId: 'ELEC-D11', leaderTitle: '高级经理', order: 2 },
-    { id: 'ELEC-D11-S3', name: '原器件科', level: 'section', parentId: 'ELEC-D11', leaderTitle: '高级经理', order: 3 },
-    // 科室（综合管理部下）
-    { id: 'ELEC-D12-S1', name: '项目管理科', level: 'section', parentId: 'ELEC-D12', leaderTitle: '高级经理', order: 1 },
-    { id: 'ELEC-D12-S2', name: '行政管理科', level: 'section', parentId: 'ELEC-D12', leaderTitle: '高级经理', order: 2 },
-    { id: 'STRU-D1', name: '结构设计部', level: 'department', parentId: 'STRU', leaderTitle: '总监', order: 1 },
-    { id: 'PROC-D1', name: '工艺工程部', level: 'department', parentId: 'PROC', leaderTitle: '总监', order: 1 },
-    { id: 'MKT-D1', name: '销售部', level: 'department', parentId: 'MKT', leaderTitle: '总监', order: 1 }
+    { id: 'C', name: '研发制造公司', level: 'company', parentId: 'G', leaderTitle: '总经理', leaderName: '林静', order: 1 }
   ]
+
+  // 各级负责人姓名生成器（部门总监 / 科高级经理 / 组经理，与员工姓名库隔离避免混淆）
+  const directorNames = ['王建国', '李向阳', '张伟民', '刘志强', '陈海峰', '杨国华', '黄立军', '周文斌', '吴永刚', '郑国栋', '冯伟强', '蒋志明', '沈海峰', '韩永刚', '朱建华', '秦文博', '许国平', '何志远', '高晓峰', '罗建华', '梁文杰', '谢志强', '宋永刚', '唐海涛', '韩雪峰', '邓文博', '曹志明', '彭国华']
+  const sectionManagerNames = ['郑科文', '冯科林', '蒋科海', '沈科军', '韩科峰', '杨科明', '朱科强', '秦科勇', '许科刚', '何科伟', '高科华', '罗科明', '梁科峰', '谢科海', '宋科军', '唐科峰', '韩科明', '邓科强', '曹科勇', '彭科刚']
+  const teamLeadNames = ['赵子龙', '钱学森', '孙悟明', '李元霸', '周星驰', '吴刚毅', '郑成功', '王小虎', '冯远征', '陈云龙', '褚思远', '卫建国', '蒋文杰', '沈志强', '韩海峰', '杨永刚', '朱建华', '秦文博']
+
+  let dirIdx = 0
+  let smIdx = 0
+  let tlIdx = 0
+
+  CENTER_SPECS.forEach((center, ci) => {
+    // 中心节点
+    nodes.push({
+      id: center.id,
+      name: center.name,
+      level: 'center',
+      parentId: 'C',
+      system: center.system,
+      leaderTitle: '执行总监',
+      leaderName: center.leader,
+      order: ci + 1
+    })
+    // 部门 → 科室 → 小组
+    center.departments.forEach((deptName, di) => {
+      const deptId = `${center.id}-D${di + 1}`
+      nodes.push({ id: deptId, name: deptName, level: 'department', parentId: center.id, leaderTitle: '总监', leaderName: directorNames[dirIdx++ % directorNames.length], order: di + 1 })
+      SECTION_NAMES.forEach((secName, si) => {
+        const sectionId = `${deptId}-S${si + 1}`
+        nodes.push({ id: sectionId, name: `${deptName}·${secName}`, level: 'section', parentId: deptId, leaderTitle: '高级经理', leaderName: sectionManagerNames[smIdx++ % sectionManagerNames.length], order: si + 1 })
+        TEAM_NAMES.forEach((teamName, ti) => {
+          const teamId = `${sectionId}-T${ti + 1}`
+          nodes.push({ id: teamId, name: teamName, level: 'team', parentId: sectionId, leaderTitle: '经理', leaderName: teamLeadNames[tlIdx++ % teamLeadNames.length], order: ti + 1 })
+        })
+      })
+    })
+  })
+
+  return nodes
 }
 
-/** 人员挂靠（跨组织兼职 + 岗位序列；U-004 吴敏主职智能座舱一部 + 兼职制造中心） */
+/** 人员挂靠（跨组织兼职 + 岗位序列）：
+ *  - 18 名基础用户挂靠到集团/公司/中心（各级负责人，与 CENTER_SPECS.leader 姓名对应）；
+ *  - 其余员工按「中心→部门→科室→小组」顺序挂靠，与 buildUsers 的员工生成顺序严格一致。 */
 function buildOrgMemberships(users: SeedUser[]): OrgMembership[] {
   const u = (id: string) => users.find((x) => x.id === id)!
   const m = (userId: string, orgId: string, track: OrgMembership['track'], postLevel: string, primary = false): OrgMembership => ({
     userId, userName: u(userId).name, orgId, track, postLevel, primary, active: true
   })
-  // 9 个事业部 × 4 个小组（硬件一组/二组、软件一组/二组）各 1 名工程师，U019~U054
-  const divisionDepts: string[] = ['ELEC-D1', 'ELEC-D2', 'ELEC-D3', 'ELEC-D4', 'ELEC-D5', 'ELEC-D6', 'ELEC-D7', 'ELEC-D8', 'ELEC-D9']
-  const engineerMemberships: OrgMembership[] = []
-  divisionDepts.forEach((deptId, di) => {
-    const base = 19 + di * 4 // U019 起
-    const hwId = `${deptId}-HW`
-    const swId = `${deptId}-SW`
-    const uid = (o: number) => `U${String(base + o).padStart(3, '0')}`
-    engineerMemberships.push(
-      m(uid(0), `${hwId}-T1`, 'tech', '硬件工程师', true),
-      m(uid(1), `${hwId}-T2`, 'tech', '硬件工程师', true),
-      m(uid(2), `${swId}-T1`, 'software', '软件工程师', true),
-      m(uid(3), `${swId}-T2`, 'software', '软件工程师', true)
-    )
-  })
-  return [
+
+  // —— 18 名基础用户（U001~U018）：各级负责人挂靠（含 U004 跨组织兼职演示）——
+  const baseMemberships: OrgMembership[] = [
     m('U001', 'G', 'tech-mgmt', '首席总工', true),
     m('U002', 'C', 'tech-mgmt', '总工', true),
-    m('U003', 'ELEC', 'tech', '资深高级工程师', true),
-    m('U004', 'ELEC-D6', 'tech', '高级工程师', true),
+    m('U003', 'ELEC', 'tech-mgmt', '执行总监', true),
+    m('U004', 'STRU', 'tech-mgmt', '执行总监', true),
     m('U004', 'MFG', 'project', '项目工程师', false), // 跨组织兼职
-    m('U005', 'STRU', 'tech', '工程师', true),
-    m('U006', 'PROC', 'tech', '高级工程师', true),
-    m('U007', 'MOLD', 'tech', '资深工程师', true),
-    m('U008', 'PMO', 'project', '项目工程师', true),
-    m('U009', 'QA', 'tech-mgmt', '主任工程师', true),
-    m('U010', 'PUR', 'tech', '工程师', true),
-    m('U011', 'MFG', 'tech', '工程师', true),
-    m('U012', 'FIN', 'tech-mgmt', '主管工程师', true),
-    m('U013', 'HR', 'software', '系统工程', true),
-    m('U014', 'LOG', 'project', '项目助理工程师', true),
-    m('U015', 'MKT', 'project', '项目管理员', true),
-    m('U016', 'ADM', 'tech-mgmt', '主任工程师', true),
-    m('U017', 'EXEC', 'software', '架构师', true),
-    m('U018', 'ELEC-D4', 'software', '网络工程师', true),
-    ...engineerMemberships
+    m('U005', 'PROC', 'tech-mgmt', '执行总监', true),
+    m('U006', 'MOLD', 'tech-mgmt', '执行总监', true),
+    m('U007', 'PMO', 'tech-mgmt', '执行总监', true),
+    m('U008', 'MFG', 'tech-mgmt', '执行总监', true),
+    m('U009', 'LOG', 'tech-mgmt', '执行总监', true),
+    m('U010', 'MKT', 'tech-mgmt', '执行总监', true),
+    m('U011', 'PUR', 'tech-mgmt', '执行总监', true),
+    m('U012', 'QA', 'tech-mgmt', '执行总监', true),
+    m('U013', 'FIN', 'tech-mgmt', '执行总监', true),
+    m('U014', 'HR', 'tech-mgmt', '执行总监', true),
+    m('U015', 'ADM', 'tech-mgmt', '执行总监', true),
+    m('U016', 'EXEC', 'tech-mgmt', '执行总监', true),
+    m('U017', 'PMO', 'software', '架构师', true),
+    m('U018', 'ELEC-D1', 'software', '网络工程师', true)
   ]
+
+  // —— 员工挂靠（U019 起，与 buildUsers 生成顺序一致）——
+  const employeeMemberships: OrgMembership[] = []
+  let seq = ROLES.length + 1 // U019 起
+  CENTER_SPECS.forEach((center) => {
+    center.departments.forEach((deptName, di) => {
+      const deptId = `${center.id}-D${di + 1}`
+      SECTION_NAMES.forEach((secName, si) => {
+        const sectionId = `${deptId}-S${si + 1}`
+        TEAM_NAMES.forEach((teamName, ti) => {
+          const teamId = `${sectionId}-T${ti + 1}`
+          const size = TEAM_SIZE[center.system]
+          const posts = SYSTEM_POSTS[center.system]
+          for (let k = 0; k < size; k++) {
+            const post = posts[k % posts.length]
+            const userId = `U${String(seq).padStart(3, '0')}`
+            seq++
+            employeeMemberships.push(m(userId, teamId, post.track, post.level, true))
+          }
+        })
+      })
+    })
+  })
+
+  return [...baseMemberships, ...employeeMemberships]
 }
 
 /** 客户（车厂）主数据：名称 + 编号 + 车型 */
@@ -884,6 +961,10 @@ export function buildSeed() {
     baselines,
     retros,
     lessons,
+    /** 轻量任务（GEN-001 通用 PM：独立于 WBS 的简化任务模型，空白模板不预置演示数据） */
+    lightTasks: [] as LightTask[],
+    /** 自定义字段定义（GEN-002 通用 PM：Jira 式自定义字段，空白模板不预置演示数据） */
+    customFieldDefs: [] as CustomFieldDef[],
     deviations,
     meetings,
     resolutions,
@@ -1009,7 +1090,7 @@ export function buildSeed() {
         enabled: true,
         version: 1
       },
-      // ⑥ 项目前期 · 项目/产品报价（并行填报 + 财务汇总 + 总经理批准）
+      // ⑥ 项目前期 · 项目/产品报价（内部审批流程：并行填报 + 财务汇总 + 总经理批准，不经客户确认）
       {
         id: 'DEF-PRE-2',
         code: 'FLOW-PRE-2',
@@ -1037,7 +1118,7 @@ export function buildSeed() {
         enabled: true,
         version: 1
       },
-      // ⑥a 项目前期 · 技术方案（TR）（报价前置技术输入，C-02：评审委员会评审 → 总经理批准）
+      // ⑥a 项目前期 · 技术方案（TR）（报价前置技术输入，C-02：附件提交 → 多人会签签审意见 → 技术部门总监批准）
       {
         id: 'DEF-PRE-5',
         code: 'FLOW-PRE-5',
@@ -1045,17 +1126,20 @@ export function buildSeed() {
         formFields: [
           { key: 'name', label: '方案名称' },
           { key: 'version', label: '方案版本' },
+          { key: 'productLine', label: '产品线' },
+          { key: 'summary', label: '方案说明' },
+          { key: 'attachments', label: '技术方案附件' },
           { key: 'trResult', label: 'TR 评审结论' }
         ],
         startNodeId: 'tr1',
         nodes: [
           { id: 'tr1', name: '发起（技术负责人）', type: 'start' },
-          { id: 'tr2', name: 'TR 技术评审', type: 'approve', approverRole: '评审委员会', slaHours: 72, escalateToRole: '总经理' },
-          { id: 'tr3', name: '总经理批准', type: 'approve', approverRole: '总经理', slaHours: 24 },
+          { id: 'tr2', name: 'TR 技术评审会签', type: 'sign', signMode: 'all', signRoles: ['电子研发工程师', '结构研发工程师', '工艺技术工艺师', '采购部'], slaHours: 72, escalateToRole: '执行总监' },
+          { id: 'tr3', name: '技术部门总监批准', type: 'approve', approverRole: '执行总监', slaHours: 24 },
           { id: 'tr4', name: '结束', type: 'end' }
         ],
         enabled: true,
-        version: 1
+        version: 2
       },
       // ⑦ 项目前期 · 立项申请（市场客户经理发起 → 市场总监审核 → 三中心总监会签 → 总经理批准，与前期交流申请同审批链）
       {

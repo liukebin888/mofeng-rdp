@@ -1,9 +1,9 @@
 # 前后端 REST 契约与统一错误码表（OpenAPI 3.1 权威依据）
 
 > 文档编号：MOFENG-RDP-CONTRACT-002
-> 日期：2026-11-04
-> 定位：锁定 Java 后端（`mofeng-application` 9 个 Controller、16 个端点）与前端（`app/src/infra/apiV1.ts`）联调的字段契约与**统一错误码表**，满足 INT-005「所有对外接口须提供 OpenAPI 3.1 描述与统一错误码表，未提供契约的接口视为未交付」。
-> 变更：CONTRACT-001（仅 4 端点）→ 本版覆盖全部 16 端点，并**补齐 `FORBIDDEN` 错误码**（403 与 422 在 code 层分离）。
+> 日期：2026-11-16（CONTRACT-002 修订）
+> 定位：锁定 Java 后端（`mofeng-application` 10 个 Controller、17 个端点）与前端（`app/src/infra/apiV1.ts`）联调的字段契约与**统一错误码表**，满足 INT-005「所有对外接口须提供 OpenAPI 3.1 描述与统一错误码表，未提供契约的接口视为未交付」。
+> 变更：CONTRACT-001（仅 4 端点）→ 本版覆盖全部 17 端点（补齐 `FORBIDDEN` 错误码 + `POST /api/v1/auth/token` JWT 签发端点 + B2「令牌仅后端签发」修正）。
 
 ---
 
@@ -75,7 +75,7 @@
 
 ---
 
-## 3. 端点总览（16 端点）
+## 3. 端点总览（17 端点）
 
 | # | 方法 | 路径 | 权限 action | Controller | 说明 |
 |---|---|---|---|---|---|
@@ -95,6 +95,7 @@
 | 14 | POST | `/api/v1/rules` | update | RuleController | 规则版本保存 |
 | 15 | GET | `/api/v1/rules/versions` | view | RuleController | 规则版本查询 |
 | 16 | GET | `/api/v1/rules/effective` | view | RuleController | 生效规则查询 |
+| 17 | POST | `/api/v1/auth/token` | —（匿名签发） | AuthController | JWT 令牌签发 |
 
 ---
 
@@ -439,14 +440,45 @@
 | JWT 载荷 | `{ sub: userId, role: roleCode, tenant: tenantId, exp }` |
 | 签名 | HMAC-SHA256（HS256），密钥 `mofeng.security.jwt.secret`（生产须环境变量覆盖） |
 
-> 前端签发 JWT 需与后端同一密钥；`role` 必须为 18 角色矩阵中的 code（如 `PM`/`SE`/`SYS_ADMIN`），否则 403。
+> **B2 整改铁律（令牌仅后端签发）**：JWT 签名密钥只存在于后端 `JwtService`，前端**不持有密钥、不在浏览器端自签**。前端须通过 `POST /api/v1/auth/token` 端点换取令牌（见第 16 节），后续携带 `Authorization: Bearer <token>` 调用受保护领域端点。`role` 必须为 18 角色矩阵中的 code（如 `PM`/`SE`/`SYS_ADMIN`），否则 403。
+
+### 13.1 令牌签发端点 `POST /api/v1/auth/token`（SEC-001 · 联调形态）
+
+> ⚠️ 当前为阶段 C 联调形态：直接以 `userId / roleCode / tenantId` 签发。**生产必须在本端点前置口令/凭据认证（对接 PasswordEngine 加盐哈希校验）**，凭任意 userId 签发即等于伪造身份。本端点**不加** `@RequiresPermission`（匿名无法取令牌），真正的权限判定由下游受保护方法经 `PermissionAspect` 承载。
+
+**请求体 `AuthTokenRequest`**
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `userId` | string | 是 | 用户 ID（`@NotBlank`） |
+| `roleCode` | string | 是 | 角色 code（18 角色矩阵，`@NotBlank`） |
+| `tenantId` | string | 是 | 租户 ID（`@NotBlank`） |
+| `ttlSeconds` | long | 否 | 令牌有效期（秒）；≤0 或缺省时默认 **3600** |
+
+**响应体（在 `data` 内）**
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `token` | string | 签发的 JWT（HS256） |
+| `expiresIn` | long | 有效期（秒），回显请求/默认值 |
+
+**示例**
+
+```json
+// 请求
+POST /api/v1/auth/token
+{ "userId": "u-pm-001", "roleCode": "PM", "tenantId": "T-1001", "ttlSeconds": 3600 }
+
+// 响应 200
+{ "code": "OK", "message": "ok", "data": { "token": "eyJhbGciOiJIUzI1NiJ9...", "expiresIn": 3600 } }
+```
 
 ---
 
 ## 14. 前端调用约定（`apiV1.ts` 实现依据）
 
 1. `REST_BASE` 复用 `VITE_API_BASE`，默认改指 `http://127.0.0.1:8088`（Java 后端）。
-2. 请求头带 `Authorization: Bearer <token>`，token 由前端从登录态/开发种子签发（联调期用固定密钥本地签发）。
+2. 请求头带 `Authorization: Bearer <token>`，token 由前端经 `POST /api/v1/auth/token` 端点换取（B2：令牌仅后端签发，前端不自签）。
 3. 响应统一解包 `ApiResponse{code,message,data}`：
    - `code==='OK'` → `{ ok: true, data }`；
    - `code==='BLOCKED'` → `{ ok: false, blocked: true, data }`（显示阻断详情）；

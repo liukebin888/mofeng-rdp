@@ -1,109 +1,57 @@
 # MOFENG-RDP 项目长期记忆
 
 ## 项目定位（强制规则，务必遵守）
-- **平台品牌名固定为「魔程化解」（英文 MOFENG-RDP），任何情况下都不得擅自更改**。品牌名在 `app/src/domain/locale.ts` 的 `app.brand`（中文「魔程化解」/ 英文「MOFENG-RDP」）与 `app/index.html` 的 `<title>` 处，渲染于侧边栏 Logo。注意：2026-11-09 用户明确将品牌名从「魔程化解研发管理平台」精简为「魔程化解」（字体 16px），此为本名，不得改回「魔程化解研发管理平台」。2026-11-08 曾因「去公司化」误改品牌名被点名批评——品牌名只能由用户本人定，AI 严禁擅自增删改。
-- 这是面向泛化研发项目（立项/计划/申请/审批/流程等通用能力）的研发管理平台，但「去公司化/去演示化」**仅针对演示数据与示例公司名**（如「演示科技有限公司」「示例电子有限公司」「魔程科技」等 seed 数据），**绝不涉及品牌名本身**。
-- **严禁乱改/新增名称、标题、文案**：任何名称、标题、菜单、文案的增删改都必须先经用户确认，禁止 AI 自作主张。尤其是品牌名、平台名、页面标题等用户明确命名的内容，一律不动。
-- 所有工作流（任务/计划/申请/立项等）统一采用「新增(空白模板)/保存/关闭/提交」四按钮方案（WF-001）。「新增」必须打开**空白模板**，字段全部由用户新填写，不得带入任何已有项目/单据数据。
-- **菜单增删改必须经用户确认**：任何新增/删除/重命名侧边栏菜单（router/index.ts 菜单组）都必须先征得用户同意，禁止 AI 自行新增菜单项（2026-11-08 用户明确定规）。
-- 技术栈：纯前端 Vue3+Pinia+Element Plus + Node.js 后端（R2 起）。依据 SRS V1.4 / 技术方案 V4.0。
+- **品牌名固定「魔程化解」（英文 MOFENG-RDP），任何情况不得擅自更改**。位于 `app/src/domain/locale.ts` 的 `app.brand` 与 `app/index.html` `<title>`，渲染侧边栏 Logo。2026-11-09 从「魔程化解研发管理平台」精简为「魔程化解」（16px），不得改回。品牌名只能由用户本人定，AI 严禁擅自增删改（2026-11-08 曾因「去公司化」误改被点名批评）。
+- 「去公司化/去演示化」**仅针对演示数据与示例公司名**，绝不涉及品牌名。
+- **严禁乱改/新增名称、标题、菜单、文案**：任何增删改都须先经用户确认。菜单增删改（router/index.ts）尤其须确认（2026-11-08 定规）。
+- 工作流统一「新增(空白模板)/保存/关闭/提交」四按钮（WF-001），「新增」必须开空白模板，不带入已有数据。
+- 技术栈：前端 Vue3+Pinia+Element Plus + Node 后端（R2 起）。依据 SRS V1.4 / 技术方案 V4.0。
 
 ## 关键路径
-- 根目录 `app/`（前端）、`server/`（Node 后端 index.js，零依赖，端口 8787）、`backend/`（Java 后端，端口 8787 起）、`spec/`（SRS）、`docs/`（架构/测试报告/规格冲突清单）。
-- 前端 dev 端口 5178，preview/e2e 端口 4180，Node 后端 8787（本机被 WorkBuddy 占用时用 8788）。
-- **后端 Java 验证环境（本机已定位，务必记住）**：JDK 21 在 `C:\jdk\jdk-21.0.2`，Maven 3.9.9 在 `C:\maven\apache-maven-3.9.9`（均未进 PATH，须手动 export）。跑后端测试：
-  `export JAVA_HOME="C:/jdk/jdk-21.0.2" && export PATH="$JAVA_HOME/bin:/c/Windows/System32:/c/maven/apache-maven-3.9.9/bin:$PATH"`
-  然后 `mvn test -pl mofeng-domain`（375 例）、`mvn test -pl mofeng-application -am`（90 例，须带 -am 构建依赖）。注意：java.exe 需 `C:/jdk/jdk-21.0.2/bin` 在 PATH 且含 `C:/Windows/System32`，否则报 vcruntime140_1.dll 缺失。
-- 四层架构：views → application(store) → domain ← infra。domain 零 DOM/零 vue/pinia，可被 vitest 直接调用。
-- **Git 仓库**：已建立，分支 main，远程 origin = https://github.com/liukebin888/mofeng-rdp.git（已跟踪 origin/main）。提交身份 留总 <liuzong@mofeng.com>（项目级）。.gitignore 排除 node_modules/dist/server/data/.env/密钥/`.workbuddy/backup/`。后续 `git add -A && git commit && git push` 即可。
-- **Git 推送踩坑（务必记住）**：本机走环境代理 `https_proxy=http://127.0.0.1:7814`，且 git 默认 schannel 后端与该代理握手会报 `CONNECT tunnel failed, response 502` 或 `schannel: server closed abruptly`。**已设 `git config --global http.sslBackend openssl`**。但即便 openssl，若环境变量代理仍在，push 会报 `OpenSSL SSL_read unexpected eof`——**push 前须 `unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY`**，否则代理拦截失败。
-- **部署（Docker 化）**：server/Dockerfile（Node 20-alpine 零依赖、非 root、HEALTHCHECK、数据卷）、deploy/Dockerfile.web（多阶段 vite→nginx + SPA 回退 + /api 反代）、deploy/nginx.conf、docker-compose.yml（前端:8080 + 后端仅内网 + 命名卷 mofeng-data）、.dockerignore。部署手册 docs/DEPLOYMENT.md。启动 `docker compose up -d --build`。后端构建上下文 context=./server（非根目录）。
+- 根目录 `app/`（前端）、`server/`（Node 后端 index.js，端口 8787）、`backend/`（Java 后端，Spring Boot 多模块）、`spec/`、`docs/`。
+- 前端 dev 5178、preview/e2e 4180、Node 后端 8787（被占用用 8788）。
+- **后端 Java 环境（本机已定位）**：JDK 21 `C:\jdk\jdk-21.0.2`，Maven `C:\maven\apache-maven-3.9.9`（均未进 PATH，须 export）。跑测试：`export JAVA_HOME="C:/jdk/jdk-21.0.2" && export PATH="$JAVA_HOME/bin:/c/Windows/System32:/c/maven/apache-maven-3.9.9/bin:$PATH"` 后 `mvn test -pl mofeng-domain`（375+ 例）、`mvn test -pl mofeng-application -am`（90 例）。java.exe 须含 `C:/Windows/System32` 否则 vcruntime140_1.dll 缺失。
+- 四层架构：views → application(store) → domain ← infra。domain 零 DOM/vue/pinia，可 vitest 直接调用。
+- **Git**：main 分支，origin=https://github.com/liukebin888/mofeng-rdp.git，提交身份留总 <liuzong@mofeng.com>。
+- **Git push 踩坑**：本机走代理 `https_proxy=http://127.0.0.1:7814`，已设 `git config --global http.sslBackend openssl`；push 前须 `unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY` 否则报 `OpenSSL SSL_read unexpected eof`。
+- **部署（Docker）**：server/Dockerfile + deploy/Dockerfile.web + docker-compose.yml（前端:8080 + 后端内网 + 命名卷 mofeng-data）；后端构建 context=./server。手册 docs/DEPLOYMENT.md。
 
-## 门禁铁律（完成六门禁才算闭环）
+## 门禁铁律（六门禁全过才算闭环）
 1. `npx vue-tsc --noEmit` 0 error
 2. `npx vitest run --no-file-parallelism` 全绿
 3. `npx vite build` 成功
-4. `npm run smoke` 71/71（placeholder 0、bad 0）
-5. `npm run e2e` 31 PASS / 0 FAIL
-6. 审计链一致性（服务端=本地，chainOk true）
+4. `npm run smoke` 108/108（placeholder 0、bad 0）
+5. `npm run e2e` 33 PASS / 0 FAIL
+6. 审计链一致性（服务端=本地，`GET /api/audit` 返回 chainOk true）
 
-## 规格落空治理铁律（R1→R3 持续收口）
-1. **同源判定**：凡规格声明规则，实现必须"判定逻辑 + 控制点评估"两处同源，禁止一处真数据、一处静态 flag。
-2. **配置驱动 ≠ 视图硬编码**：可配置/不发版生效的能力，必须是"数据定义 + 引擎求值"两段，禁止视图内手写或用 computed 假配置。
-3. **审计链权威在服务端**：append-only + 哈希链连续性由服务端结构保证，禁止依赖前端自觉。
-4. **降级不得淹没业务反馈**：持久化静默降级只在无其他业务提示时补一句。
-5. **seed 版本升级是合法迁移**：前后端 schema 版本不一致时，携带后端当前 rev 覆盖写入，不是 expectedRev:0 硬播种。
-6. **hash 单一权威可跨端复刻**：前端 domain/hash.ts 与服务端复刻须逐字节一致。
+## 规格落空治理铁律
+1. **同源判定**：规则须「判定逻辑 + 控制点评估」两处同源，禁止一处真数据一处静态 flag。
+2. **配置驱动 ≠ 视图硬编码**：可配置能力须「数据定义 + 引擎求值」两段。
+3. **审计链权威在服务端**：append-only + 哈希链由服务端结构保证。
+4. **降级不得淹没业务反馈**。
+5. **seed 版本升级是合法迁移**：携带后端当前 rev 覆盖写入，非 expectedRev:0 硬播种。
+6. **hash 单一权威可跨端复刻**：前端 domain/hash.ts 与服务端逐字节一致。
 
-## 关键实现落点
-- `domain/flowEngine.ts`：可配置流程引擎（节点/条件分支/会签或签/加签转签/超时升级）。
-- `domain/tenant.ts`：租户隔离引擎（guardTenant/visibleInTenant/groupDrillDown/tenantCacheKey，TEN-004 单一权威）。
-- `domain/docEngine.ts`：文档受控生命周期引擎（四态状态机 + 会签齐备才发布 + 否决条目化 + 版本链 + 检入检出 + 全文检索 + 下载审计，DOC-001~010 单一权威）。
-- `domain/lessonEngine.ts`：经验教训登记与复用检索引擎（COM-010 / C-35 单一权威：登记主题+阶段必填校验、按项目/阶段/问题类型/关键词四维检索、回存资料库幂等去重+推送记录、复用标记与统计）。
-- `domain/collabEngine.ts`：协同沟通引擎（COM-001~009 / FUN-024 单一权威：决议条目化缺责任人/期限拒保存、决议转任务幂等、无证据关闭拒、决议/送审件/督办逾期升级、会议策划四要素、送审件版本必填+答复留痕、督办四态状态机）。
-- `domain/portfolioFinance.ts`：组合财务引擎（PFM-022/024 单一权威：NPV/IRR/回收期三指标可复算、缺收益计划不出结论、折现率只读带下发来源、金额无币种拒保存、汇率快照折算）。
-- `domain/whatif.ts`：What-if 模拟引擎（PFM-025/026 单一权威：模拟副本隔离不碰主计划、四类差异对比、草稿→待审批→已合并状态机、未经审批合并入口不存在）。
-- `domain/calendarEngine.ts`：三层日历引擎（TEN-015 单一权威：企业/项目/资源继承链、例外日覆盖、workdaysBetween/endDateAfter 排程按最细日历、affectedPlans 按后代集合判重算提示、validateException）。
-- `domain/myWorkEngine.ts`：我的工作引擎（POR-004/005 单一权威：四类任务聚合 WBS/审批/决议/督办、四段待办分组逾期/今日/本周/未来 + 逾期置顶）。
-- `domain/governanceConfig.ts`：治理配置引擎（TEN-016 单一权威：分类码可配可筛+新增不追溯、UDF 六类目标可建可校验+填值权、步骤模板完成度+版本化）。
-- `domain/messageCenter.ts`：消息中心引擎（POR-006/008 单一权威：未读/已读回执幂等/24h 事件去重、收件箱三类聚合/批量审批逐条留痕/退回必填意见）。
-- `domain/resourceShare.ts`：跨节点资源共享引擎（PFM-016 单一权威：未审批不得占用 isOccupied、审批后生效、到期自动释放+告警 expireOverdue、续期/手动释放/提交审批状态机、activeShares 共享关系可见）。
-- `domain/portalConfig.ts`：门户区块可配置引擎（POR-003 单一权威：isSectionVisible 空=全角色、visibleSections 按 order+越权过滤、resetSections 恢复默认、toggleSection/setSectionRoles）。
-- `domain/draftEngine.ts`：草稿跨端续写引擎（POR-007 单一权威：upsertDraft 同 key 覆盖保留 createdAt、isDraftExpired/expiredDrafts 超期提示不删除、clearDraft 提交后清除、draftKey 跨端一致）。
-- `domain/i18n.ts` + `domain/locale.ts` + `domain/enumDict.ts`：多语言引擎（TEN-013 单一权威：normalizeLocale/translate/translateEnum/t/localeInvariant，语言只改展示层、权限判定层硬隔离；键位映射零数据迁移，缺键回退原文）。
-- `domain/mobilePortal.ts`：移动端门户引擎（POR-012 单一权威：breakpointOf 三档断点、enqueueWrite/settleWrite/dedupeQueue 弱网排队去重、stampCache/isCacheStale/cacheBadge 缓存时间戳只读标识）。
-- `domain/resourceConflict.ts`：资源冲突识别引擎（PRJ-016 单一权威：按 userId+week 聚合工时、>110% 判冲突并给时段、草稿不计入）。
-- `domain/projectClone.ts`：项目结构复制引擎（PRJ-022 单一权威：仅复制 WBS/Gate 定义/交付物清单、业务数据清零、标记 sourceTemplateVersion）。
-- `domain/shareLink.ts`：文件交换外链引擎（SUP-016 单一权威：默认 7 天失效、撤销立即不可访问、internal 不可外链）。
-- `domain/quota.ts`：租户配额与降级引擎（TEN-012 单一权威：四类配额独立判定、仅拒新增、读永远放行）。
-- `domain/resourceCapacity.ts`：资源净可用工时引擎（RES-003 单一权威：净可用=工作日×日工时−请假，复用 calendarEngine.isWorkday，请假登记即联动）。
-- `domain/supplyDemand.ts`：需求能力供需分析引擎（RES-004 单一权威：按角色按周聚合，缺口/盈余/平衡三态，缺口五选一补充路径，跨4周预测）。
-- `domain/overallocation.ts`：超分配三级识别引擎（RES-005 单一权威：L1<120%/L2 120~150%/L3>150%，草稿不计入，未处置 L2/L3 阻断闸门 C-40）。
-- `domain/leveling.ts`：资源平衡与平滑引擎（RES-006/007 单一权威：平衡延后非关键活动但里程碑/HARD 零移动，平滑完工日期不变，差异清单可回退 revert）。
-- `domain/bottleneck.ts`：关键资源瓶颈引擎（RES-012 单一权威：占用率≥90% 且位于关键路径才判瓶颈，用 nodes[].critical 标记而非 criticalPath 数组）。
-- `domain/riskQuant.ts` + `domain/simulation.ts` + `domain/contingency.ts`：风险量化域（RQA-001~012 单一权威：PERT 三点估算、蒙特卡洛可复现、风险关联、储备复算、动用审批分级、门禁联动 C-44）。
-- `domain/riskLifecycle.ts`：风险受控生命周期引擎（问题风险深化四项：受控状态机开放→缓解中→残余评估→已关闭、问题↔风险双向联动、风险报警升级、评审决策留痕；`RiskItem.status` 已扩展为四态，`RiskItem.dueDate` 用于超期判定）。
-- `domain/supplierPerformance.ts`：供应商绩效评估引擎（采购深化单一权威：四维评分 质量30/交付30/成本20/响应20 加权、等级 优秀≥90/良好≥75/合格≥60/需改进、联动判定 综合分<40 或及时率<60% 建议淘汰 + 连续2期需改进或高风险件需改进建议暂停）；`Supplier.status?` 状态机字段 + `Tender.bids?` 招投标闭环 + `SamplePurchase` 样件采购单。
-- `domain/otsClosure.ts`：OTS 认可闭环引擎（单一权威：`OtsApprovalRecord` 认可台账 + `flowInstanceId` 绑定审批流；`CustomerConclusion` 客户三态 认可/有条件认可/拒收（L4 须拒收 fail-closed）；`evaluateExpiry` L3 到期 无到期/未到期/临期≤7天/已过期；`determineClosureStatus` 闭环状态机 进行中→待整改→已过期→需复评→已闭环；`evaluateUpgrade` L2→L1 复评升级准入 仅L2+审批完成+问题全关+非拒收；`summarizeClosure` 汇总）。store 回写点：`submitWorkflowForm` 提交 defCode=DEF-PRJ-OTS 时 ensureOtsApprovalRecord 建台账，`approveFlow` 完成时 finalizeOtsApproval 回写 approved+联动样件状态；`syncOtsIssuesToLedger` 偏差问题同步问题台账、`scanOtsExpiry` L3 到期升级 P2 问题、`upgradeOtsApproval` 复评升级。
-- `domain/resourcePool.ts` + `domain/resourcePlan.ts`：资源域剩余（RES-001/002/008/009/010/011/013/014/015/016 单一权威：三层资源池/技能/派工承诺/工时回填/外部产能/效率系数/费率/情景）。
-- `domain/reportLibrary.ts` + `domain/interop.ts` + `domain/dataQuality.ts`：报表与互操作（EXA-001~010 单一权威：报表库/口径绑定/订阅/导出/互操作/集成网关/事件订阅/数据质量/三处同值）。
-- `domain/extensionPoint.ts` + `domain/accessibility.ts`：扩展点与可访问性（ARC-020 四类扩展点 + NFR-017 WCAG 对比度/键盘可达/表单标签）。
-- `domain/stateMachine.ts`：六类对象五元组（需求/项目/供应商/样件/ECR/软件版本）。
-- `domain/grading.ts`：附录 C 14 行真值表（裁决增行后），GRADING_TABLE_VERSION=APX-C-2026.11。
-- `domain/controlPoints.ts`：48 控制点，48 点强度分布 29/10/7/2（以逐行表为准）。
-- `server/index.js`：GET/PUT /api/state（rev 乐观锁 + tenant 分文件）+ GET/POST /api/audit（append-only 服务端算哈希，按租户分文件）。
-- `infra/repo.ts`：RestRepo ↔ LocalRepo 双通道，2~4s 超时静默降级。
+## 关键实现落点（索引，详见各引擎文件头部注释）
+- 流程 flowEngine / 租户 tenant / 文档 docEngine / 经验 lessonEngine / 协同 collabEngine
+- 组合财务 portfolioFinance / What-if whatif / 三层日历 calendarEngine / 我的工作 myWorkEngine
+- 治理配置 governanceConfig / 消息 messageCenter / 资源共享 resourceShare / 门户配置 portalConfig / 草稿 draftEngine
+- 多语言 i18n+locale+enumDict / 移动门户 mobilePortal
+- 资源：resourceConflict / projectClone / shareLink / quota / resourceCapacity / supplyDemand / overallocation / leveling / bottleneck / resourcePool / resourcePlan
+- 风险：riskQuant+simulation+contingency / riskLifecycle
+- 采购：supplierPerformance / otsClosure（认可闭环，回写点 submitWorkflowForm/approveFlow）
+- 报表：reportLibrary+interop+dataQuality / 扩展点 extensionPoint+accessibility
+- 通用 PM：lightTask / customField / kanban / stateMachine / grading / controlPoints(48)
+- 权限四维（本轮新增）：`domain/rbac.ts` 对象级矩阵 OBJECT_SCOPES+canOperate / 多角色并集 canAny+canOperateAny / 数据范围四级 dataScopeOfRole(s)+coversScope / 字段策略 applyFieldPolicy 三处落地。`RoleDef` 增 roleType/dataScope；`SeedUser` 增 roleCodes；store 增 currentUserRoles/currentDataScope/guardOperate/applyField。
+- server/index.js（/api/state 乐观锁 + /api/audit append-only 服务端算哈希）/ infra/repo.ts（RestRepo↔LocalRepo 双通道）。
+- data/seed.ts 组织用户数据驱动（CENTER_SPECS 14 中心 + makeNameGenerator 预占 BASE_USER_NAMES）。规模约 486 用户/219 节点。
+- **WorkBuddy AI 集成（本轮新增）**：`agent/` 目录（ADK Agent 定义，独立于主代码）+ `server/index.js` 的 `POST /api/ai/chat`（越权前置过滤 + SSE 流式 + AI_CALL 审计）+ `views/ai/AiChatPanel.vue` 对话面板（嵌 AiAssistView 的「WorkBuddy 对话」tab，未新增菜单）。SDK 包名 `@tencent-ai/agent-sdk`（`query()` 流式），OpenAPI `https://api.codebuddy.tencent.com/v1` + Agent Key。Agent Key 未就绪，降级占位响应；配置 `CODEBUDDY_API_KEY` 后切真实模型。同源语义（越权过滤/水印/红线）在 agent/src/assistant.ts 与 server/index.js 双端复刻。
 
 ## 需求方裁决
-- REQ-CONF-2026-1101-01：三处冲突已裁决（48 点分布 29/10/7/2；QM+CAL3~4+无自研软件判 L2 增行；冻结基线全量传播+打标）。
+- REQ-CONF-2026-1101-01：48 点分布 29/10/7/2；QM+CAL3~4+无自研软件判 L2 增行；冻结基线全量传播+打标。
 
-## 剩余方向（R3）
-- 流程引擎完整化 ✅
-- 多租户分表演进 ✅（分文件隔离 + 隔离引擎 + 对象存储面 TEN-005 + 异步任务面 ARC-009 全收官）
-- 文档受控生命周期 ✅（DOC-001~010 引擎 + PMC-037 齐套联动）
-- 经验教训登记与复用检索 ✅（COM-010 / C-35：lessonEngine 引擎 + 登记校验 + 四维检索 + 资料库回存幂等 + 推送记录 + 复用统计；KnowledgeView 重写）
-- 协同沟通域 ✅（COM-001~009 / FUN-024：collabEngine 引擎 + 会议决议条目化 + 送审件 + 督办四态；PortalView/SuperviseView 去硬编码假数据）
-- 组合与投资域 ✅（PFM-020/022/024/025/026 / FUN-023：portfolioFinance + whatif 引擎 + ROI 三指标 + 决策留痕 + What-if 模拟；AnalysisView 独立）
-- 三层日历 ✅（TEN-015：calendarEngine 引擎 + 三层继承/例外日/排程计算 + CalendarView 独立页）
-- 我的工作中心 ✅（POR-004/005：myWorkEngine 引擎 + 四类聚合 + 四段分组；TodayView 重写）
-- 治理配置 ✅（TEN-016：governanceConfig 引擎 + 分类码/UDF/步骤模板；DictView 重写去硬编码）
-- 消息与收件箱 ✅（POR-006/008：messageCenter 引擎 + 已读回执/24h 去重/三类来件；InboxView 新增）
-- 跨节点资源共享 ✅（PFM-016：resourceShare 引擎 + 未审批不占用/到期释放/共享可见；PoolView 重写去硬编码 + ResourceView 叠加共享列）
-- 门户区块可配置 ✅（POR-003：portalConfig 引擎 + 按角色可见/越权不渲染/恢复默认；PortalView 加配置对话框）
-- 我的草稿跨端续写 ✅（POR-007：draftEngine 引擎 + 跨端续写/超期提示/提交清除；InboxView 加草稿面板）
-- 多语言界面与内容 ✅（TEN-013：i18n+locale+enumDict 引擎 + 中英双语/枚举键位映射/语言切换数据权限不变；语言切换器 + 菜单/核心视图枚举走 t()/te()）
-- 移动端门户同源同权限 ✅（POR-012：mobilePortal 引擎 + 响应式三档断点/弱网排队去重/缓存时间戳只读标识；AppLayout 响应式 + 待写队列 + 缓存标识）
-- 剩余视图枚举双语收口 ✅（42 视图全量枚举渲染点走 te()，translateEnum/te 放宽接受 null/undefined 空值回退空串）
-- 资源冲突识别 ✅（PRJ-016：resourceConflict 引擎 + 按人按周 >110% 判冲突给时段；ResourceView 加人员冲突面板）
-- 项目结构复制 ✅（PRJ-022：projectClone 引擎 + 业务清零/模板版本标记；ProjectListView 加复制结构按钮）
-- 文件交换外链 ✅（SUP-016：shareLink 引擎 + 7 天失效/撤销立即不可访问/内外分离；DocView 加外链面板）
-- 租户配额与降级 ✅（TEN-012：quota 引擎 + 四类配额独立判定/仅拒新增/读永远放行；OrgView 加配额面板）
-- 资源域核心 6 项 ✅（RES-003 净可用工时 + RES-004 供需分析 + RES-005 超分配三级 + RES-006 平衡 + RES-007 平滑 + RES-012 瓶颈；5 引擎 + ResourceView 加供需/超分配/瓶颈面板 + 平衡/平滑操作）
-- RQA 风险量化 12 项 ✅（RQA-001~012：riskQuant + simulation + contingency 3 引擎，三点估算/蒙特卡洛/储备/动用审批/门禁联动；RiskView 加定量面板）
-- RES 资源域剩余 10 项 ✅（RES-001/002/008/009/010/011/013/014/015/016：resourcePool + resourcePlan 2 引擎，三层资源池/技能/派工/工时回填/外部产能/效率系数/费率/情景；PoolView 加面板）
-- EXA 报表与互操作 10 项 ✅（EXA-001~010：reportLibrary + interop + dataQuality 3 引擎，报表库/自助分析/订阅/导出/互操作/集成网关/事件订阅/财务人力/数据质量/三处同值；DashboardView 加面板）
-- NFR-017 可访问性 + ARC-020 扩展点 ✅（extensionPoint + accessibility 2 引擎，四类扩展点/钩子失败不阻断/WCAG对比度/键盘可达/表单标签；DictView 加标签页）
-- 界面（接口）计划 ✅（SCH-022：interfacePlan 引擎 + 跨项目四要素/下游延误传播/清单导出；InterfacePlanView 独立页 + /plan/interface 路由）
-- 组合闸门一致性 ✅（PFM-011：gateConsistency 引擎 + 跨项目判据集版本统一/例外登记/合规率复算；GateConsistencyView 独立页 + /portfolio/gate-consistency 路由）
-- OpenAPI 契约 + 统一错误码表 ✅（INT-005：补 FORBIDDEN code 分离 403/422 + 重写 REST-CONTRACT.md=CONTRACT-002 覆盖 16 端点/6 传输层 code/14 领域语义码；后端 app 测试 88→90）
-- R3 六门禁当前基线：前端 vitest 1002/1002、smoke 91/91（placeholder 0/bad 0）、build 成功；后端 mvn test domain 375 + application 90；e2e 56 PASS / 5 FAIL（5 处为既有历史失败：分级判定留痕文案 + 研发阶段推进探针，与本次无关）
+## 最新进度（R3 收官）
+- 全部 R3 方向已完成（流程/租户/文档/经验/协同/组合/日历/我的工作/治理/消息/共享/门户/草稿/多语言/移动门户/资源/风险/采购/报表/通用PM/接口计划/闸门一致性/OpenAPI 契约/菜单导航）。
+- 本轮（细化角色权限）四维权限已落地：对象级矩阵 + 多角色并集 + 数据范围四级 + 字段策略三处，前后端（TS + Java RbacEngine）一致，rbac.spec.ts 15 例 + RbacEngineTest 9 例。
+- 六门禁基线：vitest 1608/1608、smoke 107/107（删「报价费用明细」菜单项后 108→107）、e2e 33/33、build 成功、chainOk true。
+- 本轮（引入 WorkBuddy AI 协助）三阶段完成：agent/ 定义层 + 后端 /api/ai/chat 网关 + 前端对话面板，六门禁全绿。Agent Key ⏸ 待就绪。

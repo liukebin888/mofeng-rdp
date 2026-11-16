@@ -6,6 +6,8 @@
       </template>
     </PageHeader>
 
+    <SemanticTabs :tabs="tabs" />
+
     <div class="hero">
       <div>
         <div class="dim">{{ store.currentProject.code }}</div>
@@ -121,6 +123,7 @@
 import { computed, defineComponent, h, ref } from 'vue'
 import PageHeader from '@/components/PageHeader.vue'
 import SvgLine from '@/components/SvgLine.vue'
+import SemanticTabs from '@/components/SemanticTabs.vue'
 import { useAppStore } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
 import { rpn } from '@/domain/risk'
@@ -132,6 +135,13 @@ const store = useAppStore()
 const { te } = useI18n()
 const configVisible = ref(false)
 const roleOptions = ROLES.map((r) => ({ code: r.code, name: r.name }))
+
+/** 本组件被 3 个菜单复用：项目门户 / 送审件 / 会议与决议（同一「门户与协同」域） */
+const tabs = [
+  { path: '/collab/portal', label: '项目门户' },
+  { path: '/collab/review', label: '送审件' },
+  { path: '/collab/meeting', label: '会议与决议' }
+]
 
 /** POR-003：区块按当前角色可见（越权不渲染） */
 function sec(key: PortalSectionKey): boolean {
@@ -166,8 +176,10 @@ const ResolutionLine = defineComponent({
         h('div', { class: 'dim' }, `${r.content} · ${r.owner} · ${r.due}`),
         h('div', { class: 'res-acts' }, [
           r.status !== '已闭环' && !r.taskId
-            ? h('button', { class: 'mini-btn', onClick: () => store.resolutionToTask(r.id) }, '转任务')
-            : null,
+            ? h('button', { class: 'mini-btn', onClick: () => { if (store.resolutionToTask(r.id)) { window.location.hash = '#/workbench/tasks' } } }, '转任务')
+            : r.taskId
+              ? h('button', { class: 'mini-btn', onClick: () => { window.location.hash = '#/workbench/tasks' } }, '查看任务')
+              : null,
           r.status === '执行中' || r.status === '待执行'
             ? h('button', { class: 'mini-btn', onClick: () => { const ev = window.prompt('填写关闭证据（无证据关闭被拒 COM-008）'); if (ev) emit('close', ev) } }, '关闭')
             : null

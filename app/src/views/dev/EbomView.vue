@@ -48,6 +48,7 @@
           </div>
           <div class="row" style="margin-top: 10px">
             <el-button size="small" @click="$router.push('/dev/ecr')">发起 ECR 变更</el-button>
+            <el-button size="small" @click="$router.push('/trial/kitting')">查看齐套校验</el-button>
           </div>
         </div>
       </div>

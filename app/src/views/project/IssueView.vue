@@ -18,6 +18,7 @@
       <div class="crow" style="border-bottom: none; padding-top: 2px">
         <el-button size="small" type="primary" @click="scanLedger()">系统扫描自动录入</el-button>
         <el-button size="small" @click="openManualForm()">+ 人工手动录入</el-button>
+        <el-button size="small" @click="$router.push('/quality/pdca')">转 PDCA 闭环</el-button>
         <span class="dim">问题录入后，自动向责任人及其上级邮件报警；高严重度（P1/P2）追加报警部门总监</span>
       </div>
 

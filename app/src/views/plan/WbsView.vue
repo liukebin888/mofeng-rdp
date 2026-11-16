@@ -7,6 +7,8 @@
       </template>
     </PageHeader>
 
+    <SemanticTabs :tabs="tabs" />
+
     <div class="grid grid-5" style="margin-bottom: 12px">
       <KpiCard label="WBS 节点" :value="store.cpm.nodes.length" unit="个" sub="支持 6 层，叶子挂工时" />
       <KpiCard label="项目工期" :value="store.cpm.duration" unit="工作日" sub="CPM 正逆推结果" />
@@ -126,12 +128,19 @@ import { computed } from 'vue'
 import PageHeader from '@/components/PageHeader.vue'
 import KpiCard from '@/components/KpiCard.vue'
 import SvgGantt from '@/components/SvgGantt.vue'
+import SemanticTabs from '@/components/SemanticTabs.vue'
 import { useAppStore } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
 import { computeCpm, CyclicDependencyError } from '@/domain/schedule'
 
 const store = useAppStore()
 const { te } = useI18n()
+
+/** 本组件被 2 个菜单复用：WBS 与任务 / 权重体系（同一「项目计划与进度」域） */
+const tabs = [
+  { path: '/plan/wbs', label: 'WBS 与任务' },
+  { path: '/plan/weight', label: '权重体系' }
+]
 
 const gantt = computed(() =>
   store.cpm.nodes.map((n) => ({ code: n.code, name: n.name, level: n.level, start: n.es, finish: n.ef, percent: n.percent, critical: n.critical, isMilestone: n.isMilestone }))

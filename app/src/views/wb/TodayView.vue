@@ -6,6 +6,8 @@
       </template>
     </PageHeader>
 
+    <SemanticTabs :tabs="tabs" />
+
     <div class="grid grid-4" style="margin-bottom: 12px">
       <KpiCard label="我的任务（四类聚合）" :value="store.myTasks.length" unit="项" hint="WBS+审批+决议+督办 全聚合无遗漏（POR-004）" zone="brand" />
       <KpiCard label="逾期待办" :value="overdueCount" unit="项" :zone="overdueCount ? 'danger' : 'ok'" hint="逾期置顶（POR-005）" />
@@ -63,11 +65,18 @@
 import { computed } from 'vue'
 import PageHeader from '@/components/PageHeader.vue'
 import KpiCard from '@/components/KpiCard.vue'
+import SemanticTabs from '@/components/SemanticTabs.vue'
 import { useAppStore } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
 
 const store = useAppStore()
 const { te } = useI18n()
+
+/** 本组件被 2 个菜单复用：今日必办 / 我的任务（同一「工作中心」域） */
+const tabs = [
+  { path: '/workbench/today', label: '今日必办' },
+  { path: '/workbench/tasks', label: '我的任务' }
+]
 const lateCritical = computed(() => store.cpm.nodes.filter((n) => n.critical && n.percent < 100))
 const overdueCount = computed(() => store.myTodos.find((b) => b.bucket === '逾期')?.items.length ?? 0)
 const todayCount = computed(() => store.myTodos.find((b) => b.bucket === '今日')?.items.length ?? 0)

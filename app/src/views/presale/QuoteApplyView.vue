@@ -1,6 +1,6 @@
 <template>
   <div>
-    <PageHeader title="项目/产品报价" desc="统一工作流单据（WF-001）：两段式报价模型（一次性投入 NRE + 单件成本），按参考报价单「分层明细表驱动汇总」，参数表与下拉字典为单一数据源。红色 * 为必填项，未填不允许提交进入下一步">
+    <PageHeader title="项目成本" desc="项目/产品报价与费用明细统一入口（WF-001）：两段式报价模型（一次性投入 NRE + 单件成本），八类费用明细单一数据源填报，自动汇总驱动报价测算。红色 * 为必填项，未填不允许提交进入下一步">
       <template #actions>
         <WorkflowFormShell
           :form="wfForm"
@@ -98,12 +98,71 @@
           </div>
         </el-tab-pane>
 
-        <el-tab-pane name="unit">
-          <template #label><span class="tab-label">③ 单件成本明细</span></template>
+        <el-tab-pane name="cost-entry">
+          <template #label><span class="tab-label">③ 费用明细填报</span></template>
           <div class="panel">
-            <div class="panel-title">三、单件成本明细（可变成本，元/件）</div>
+            <div class="panel-title">三、费用明细填报（八类明细，单一数据源）</div>
             <div class="muted" style="margin-bottom: 6px; font-size: 12px">
-              材料/制造/包装明细自动从「报价费用明细」表单汇总引入（<span class="tag ok">表单</span> 只读，不可在此修改）；如需补充可「+ 手工补行」。
+              在此填报材料 / 制造 / 包装（单件成本）与研发 / 工装 / 设备 / 试验 / 合规（一次性投入 NRE）八类明细，④⑤ 标签页自动汇总引入，不再重复填写。
+            </div>
+            <!-- 汇总 KPI -->
+            <div class="grid grid-4" style="margin-bottom: 12px">
+              <KpiCard label="单件成本（材料+制造+包装）" :value="costEntryUnitTotal" unit="元/件" />
+              <KpiCard label="NRE 一次性投入（五类）" :value="costEntryNreTotal" unit="元" />
+              <KpiCard label="明细行总数" :value="costEntryLineCount" unit="行" />
+              <KpiCard label="已填报类别" :value="costEntryFilledCount" unit="类/8" />
+            </div>
+            <div v-for="meta in costEntryMetas" :key="meta.key" class="detail-block">
+              <div class="detail-head">
+                <span class="detail-title">{{ meta.code }} · {{ meta.label }}</span>
+                <span class="muted" style="font-weight: 400; font-size: 12px">（{{ meta.section === 'unit' ? '单件成本' : '一次性投入 NRE' }}）</span>
+                <span class="detail-sub num">小计 {{ fmt(costEntrySum(meta.key)) }} {{ meta.section === 'unit' ? '元/件' : '元' }}</span>
+              </div>
+              <el-table :data="costEntryLinesOf(meta.key)" size="small" border>
+                <el-table-column label="序号" type="index" width="50" align="center" />
+                <el-table-column :label="meta.namePlaceholder" min-width="140">
+                  <template #default="{ row, $index }"><el-input :model-value="row.name" size="small" @update:model-value="(v: string) => costEntryUpdate(meta.key, $index, { name: v })" /></template>
+                </el-table-column>
+                <el-table-column label="规格 / 说明" min-width="170">
+                  <template #default="{ row, $index }"><el-input :model-value="row.spec" size="small" placeholder="规格 / 牌号 / 工序 / 标准号" @update:model-value="(v: string) => costEntryUpdate(meta.key, $index, { spec: v })" /></template>
+                </el-table-column>
+                <el-table-column label="数量" width="90">
+                  <template #default="{ row, $index }"><el-input-number :model-value="row.qty" :min="0" :precision="2" size="small" style="width: 100%" @update:model-value="(v: number | undefined) => costEntryUpdate(meta.key, $index, { qty: v ?? 0 })" /></template>
+                </el-table-column>
+                <el-table-column label="单位" width="80">
+                  <template #default="{ row, $index }"><el-input :model-value="row.unit" size="small" :placeholder="meta.unitPlaceholder" @update:model-value="(v: string) => costEntryUpdate(meta.key, $index, { unit: v })" /></template>
+                </el-table-column>
+                <el-table-column label="单价(元)" width="120">
+                  <template #default="{ row, $index }"><el-input-number :model-value="row.unitPrice" :min="0" :precision="2" size="small" style="width: 100%" @update:model-value="(v: number | undefined) => costEntryUpdate(meta.key, $index, { unitPrice: v ?? 0 })" /></template>
+                </el-table-column>
+                <el-table-column v-if="meta.hasLossRate" label="损耗率%" width="90">
+                  <template #default="{ row, $index }"><el-input-number :model-value="row.lossRate" :min="0" :max="100" :precision="1" size="small" style="width: 100%" @update:model-value="(v: number | undefined) => costEntryUpdate(meta.key, $index, { lossRate: v ?? 0 })" /></template>
+                </el-table-column>
+                <el-table-column label="金额(元)" width="120" align="right">
+                  <template #default="{ row }"><span class="num">{{ fmt(detailLineAmount(row)) }}</span></template>
+                </el-table-column>
+                <el-table-column label="操作" width="60" align="center">
+                  <template #default="{ $index }">
+                    <el-button size="small" text type="danger" @click="costEntryRemove(meta.key, $index)">删</el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+              <div style="margin-top: 6px">
+                <el-button size="small" type="primary" plain @click="costEntryAdd(meta.key)">+ 明细行</el-button>
+              </div>
+            </div>
+            <div class="muted" style="font-size: 12px; line-height: 1.7">
+              填报口径：材料按净用量×含税到厂单价；制造按标准工时×综合费率；研发覆盖设计/仿真/试制/DFMEA；工装注明寿命与产权；设备仅计项目专用增量；试验列明标准号与机构；合规含体系认证/PPAP/IMDS/ELV/法规准入。
+            </div>
+          </div>
+        </el-tab-pane>
+
+        <el-tab-pane name="unit">
+          <template #label><span class="tab-label">④ 单件成本明细</span></template>
+          <div class="panel">
+            <div class="panel-title">四、单件成本明细（可变成本，元/件）</div>
+            <div class="muted" style="margin-bottom: 6px; font-size: 12px">
+              材料/制造/包装明细自动从「③ 费用明细填报」汇总引入（<span class="tag ok">表单</span> 只读，不可在此修改）；如需补充可「+ 手工补行」。
             </div>
             <div v-for="meta in unitDetailMetas" :key="meta.key" class="detail-block">
               <div class="detail-head">
@@ -175,11 +234,11 @@
         </el-tab-pane>
 
         <el-tab-pane name="nre">
-          <template #label><span class="tab-label">④ 一次性投入(NRE)</span></template>
+          <template #label><span class="tab-label">⑤ 一次性投入(NRE)</span></template>
           <div class="panel">
-            <div class="panel-title">四、一次性投入明细（NRE，元）</div>
+            <div class="panel-title">五、一次性投入明细（NRE，元）</div>
             <div class="muted" style="margin-bottom: 6px; font-size: 12px">
-              研发/工装/设备/试验/合规明细自动从「报价费用明细」表单汇总引入（<span class="tag ok">表单</span> 只读）；如需补充可「+ 手工补行」。
+              研发/工装/设备/试验/合规明细自动从「③ 费用明细填报」汇总引入（<span class="tag ok">表单</span> 只读）；如需补充可「+ 手工补行」。
             </div>
             <div v-for="meta in nreDetailMetas" :key="meta.key" class="detail-block">
               <div class="detail-head">
@@ -241,9 +300,9 @@
         </el-tab-pane>
 
         <el-tab-pane name="calc">
-          <template #label><span class="tab-label">⑤ 报价测算</span></template>
+          <template #label><span class="tab-label">⑥ 报价测算</span></template>
           <div class="panel">
-            <div class="panel-title">五、报价测算与建议单价</div>
+            <div class="panel-title">六、报价测算与建议单价</div>
             <div v-if="!result.valid" class="warn-box" style="margin: 8px 0">
               测算未完成：{{ result.blockers.join('、') }}
             </div>
@@ -269,25 +328,18 @@
         </el-tab-pane>
 
         <el-tab-pane name="sign">
-          <template #label><span class="tab-label">⑥ 签署与清单</span></template>
+          <template #label><span class="tab-label">⑦ 签署与清单</span></template>
           <div class="grid" style="grid-template-columns: 1fr 1fr; align-items: start">
             <div class="panel">
-              <div class="panel-title">六、签署与确认</div>
-              <div class="sign-grid">
-                <div class="sign-col">
-                  <div class="sign-title">报价方（我方）</div>
-                  <div class="sign-line">编制：<span class="sign-blank">{{ currentUser.name }}</span></div>
-                  <div class="sign-line">审核：<span class="sign-blank">__________</span></div>
-                  <div class="sign-line">批准：<span class="sign-blank">__________</span></div>
-                </div>
-                <div class="sign-col">
-                  <div class="sign-title">客户方</div>
-                  <div class="sign-line">接收人：<span class="sign-blank">__________</span></div>
-                  <div class="sign-line">确认：<span class="sign-blank">__________</span></div>
-                </div>
+              <div class="panel-title">七、签署与确认</div>
+              <div class="sign-col">
+                <div class="sign-title">内部签署（报价为内部审批，不经客户确认）</div>
+                <div class="sign-line">编制：<span class="sign-blank">{{ currentUser.name }}</span></div>
+                <div class="sign-line">审核：<span class="sign-blank">__________</span></div>
+                <div class="sign-line">批准：<span class="sign-blank">__________</span></div>
               </div>
               <div class="muted" style="margin-top: 8px; font-size: 12px">
-                注：材料单价随主材市场价联动、季度复核；年需求量变动超 ±20%、设计变更或试验项目增加时，单价与摊销须重新核算；报价有效期内未定点自动失效。
+                注：报价为内部流程，走内部审批（四角色填报 → 财务汇总核对 → 总经理批准），不需客户确认。材料单价随主材市场价联动、季度复核；年需求量变动超 ±20%、设计变更或试验项目增加时，单价与摊销须重新核算；报价有效期内未定点自动失效。
               </div>
             </div>
 
@@ -304,7 +356,7 @@
                 </el-table-column>
               </el-table>
               <div class="muted" style="margin-top: 8px; font-size: 12px">
-                报价单数据来自「项目/产品报价」审批流实例（FLOW-PRE-2），是报价的唯一权威来源。四角色（电子/结构/工艺/采购）并行填报 → 财务汇总核对 → 总经理批准。
+                报价单数据来自「项目成本」审批流实例（FLOW-PRE-2），是报价的唯一权威来源。四角色（电子/结构/工艺/采购）并行填报 → 财务汇总核对 → 总经理批准。
               </div>
             </div>
           </div>
@@ -317,6 +369,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import PageHeader from '@/components/PageHeader.vue'
+import KpiCard from '@/components/KpiCard.vue'
 import WorkflowFormShell from '@/components/WorkflowFormShell.vue'
 import { useAppStore } from '@/store/app'
 import { newWorkflowForm, saveWorkflowForm } from '@/domain/workflowForm'
@@ -328,7 +381,7 @@ import {
   type QuoteDetailLine
 } from '@/domain/quoteCalc'
 import { QUOTE_PARAMS, QUOTE_DICTS } from '@/domain/quoteParams'
-import { mergeQuoteCostLines, newManualQuoteCostLine, type QuoteCostCategoryKey, type QuoteCostLine } from '@/domain/quoteCost'
+import { mergeQuoteCostLines, newManualQuoteCostLine, newFormQuoteCostLine, sumQuoteCostCategory, type QuoteCostCategoryKey, type QuoteCostLine } from '@/domain/quoteCost'
 
 const store = useAppStore()
 const currentUser = computed(() => store.currentUser)
@@ -363,6 +416,43 @@ const manualLines = reactive<Record<DetailKey, QuoteCostLine[]>>(emptyManualLine
 const unitDetailMetas = computed(() => QUOTE_DETAIL_METAS.filter((m) => m.section === 'unit'))
 /** NRE 明细表元数据（研发→工装→设备→试验→合规） */
 const nreDetailMetas = computed(() => QUOTE_DETAIL_METAS.filter((m) => m.section === 'nre'))
+
+// —— ③ 费用明细填报（八类，直接写回 store.quoteCosts，单一数据源）——
+const costEntryMetas = QUOTE_DETAIL_METAS
+
+function costEntryLinesOf(key: string): QuoteCostLine[] {
+  return store.quoteCosts[key as QuoteCostCategoryKey] ?? []
+}
+function costEntrySum(key: string): number {
+  return sumQuoteCostCategory(costEntryLinesOf(key))
+}
+function costEntryAdd(key: string) {
+  const k = key as QuoteCostCategoryKey
+  const next = { ...store.quoteCosts }
+  next[k] = [...(store.quoteCosts[k] ?? []), newFormQuoteCostLine(`QCF-${Date.now()}-${Math.floor(Math.random() * 1000)}`)]
+  store.setQuoteCosts(next)
+  markDirty()
+}
+function costEntryRemove(key: string, index: number) {
+  const k = key as QuoteCostCategoryKey
+  const next = { ...store.quoteCosts }
+  next[k] = (store.quoteCosts[k] ?? []).filter((_, i) => i !== index)
+  store.setQuoteCosts(next)
+  markDirty()
+}
+function costEntryUpdate(key: string, index: number, patch: Partial<QuoteCostLine>) {
+  const k = key as QuoteCostCategoryKey
+  const next = { ...store.quoteCosts }
+  const lines = (store.quoteCosts[k] ?? []).map((l) => ({ ...l }))
+  lines[index] = { ...lines[index], ...patch }
+  next[k] = lines
+  store.setQuoteCosts(next)
+  markDirty()
+}
+const costEntryUnitTotal = computed(() => costEntrySum('material') + costEntrySum('manufacturing') + costEntrySum('packaging'))
+const costEntryNreTotal = computed(() => costEntrySum('development') + costEntrySum('tooling') + costEntrySum('equipment') + costEntrySum('testing') + costEntrySum('compliance'))
+const costEntryLineCount = computed(() => costEntryMetas.reduce((acc, m) => acc + costEntryLinesOf(m.key).length, 0))
+const costEntryFilledCount = computed(() => costEntryMetas.filter((m) => costEntryLinesOf(m.key).length > 0).length)
 
 /** 表单明细（来自费用表单，source=form，权威，只读） */
 function formLinesOf(key: string): QuoteCostLine[] {
@@ -653,7 +743,6 @@ function wfSubmit(customApprovers: import('@/domain/flowEngine').CustomApproverA
 .detail-from { font-size: 11px; color: #4ade80; background: rgba(74, 222, 128, 0.1); border: 1px solid rgba(74, 222, 128, 0.3); border-radius: 4px; padding: 1px 6px; }
 .detail-sub { font-size: 12px; color: var(--text-3); margin-left: auto; }
 .detail-sub.num { color: #7dd3fc; }
-.sign-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .sign-col { border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; }
 .sign-title { font-weight: 600; font-size: 13px; margin-bottom: 8px; color: var(--text-1); }
 .sign-line { font-size: 12px; padding: 4px 0; color: var(--text-2); }

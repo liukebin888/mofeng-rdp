@@ -2,6 +2,7 @@
   <div>
     <PageHeader title="需求条目库" desc="六类多态（SG/FSR/TSR/HSR/SSSR/SEC）+ 测试用例 + 版本验证；条目化率 100%，版本化留痕（REQ-003/005/009）">
       <template #actions>
+        <el-button size="small" @click="$router.push('/dev/trace')">查看追溯与覆盖率</el-button>
         <el-button size="small" @click="store.notify('info', '导入模板已下载：Excel/ReqIF 双通道，错误按行号回执（REQ-013）')">导入需求</el-button>
       </template>
     </PageHeader>

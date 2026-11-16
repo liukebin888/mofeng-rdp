@@ -9,6 +9,8 @@
       </template>
     </PageHeader>
 
+    <SemanticTabs :tabs="tabs" />
+
     <div class="grid grid-4" style="margin-bottom: 12px">
       <KpiCard label="运行中流程" :value="running.length" unit="单" :zone="running.length ? 'brand' : 'ok'" />
       <KpiCard label="已超时" :value="overdue.length" unit="单" :zone="overdue.length ? 'danger' : 'ok'" sub="超时即升级至上级（GAT-008）" />
@@ -81,6 +83,7 @@ import { computed, ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import PageHeader from '@/components/PageHeader.vue'
 import KpiCard from '@/components/KpiCard.vue'
+import SemanticTabs from '@/components/SemanticTabs.vue'
 import { useAppStore } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
 import type { FlowInstance } from '@/domain/flowEngine'
@@ -88,6 +91,14 @@ import type { FlowInstance } from '@/domain/flowEngine'
 const store = useAppStore()
 const { te } = useI18n()
 const newDefId = ref<string>('')
+
+/** 本组件被 4 个菜单复用：发起流程 / 待我审批 / 流程监控 / 我的待办（同一「流程中心」域的不同操作视角） */
+const tabs = [
+  { path: '/flow/approvals', label: '待我审批' },
+  { path: '/flow/start', label: '发起流程' },
+  { path: '/flow/monitor', label: '流程监控与时限' },
+  { path: '/workbench/todos', label: '我的待办' }
+]
 
 const running = computed(() =>
   store.data.flowInstances

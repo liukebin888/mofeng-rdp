@@ -6,6 +6,8 @@
       </template>
     </PageHeader>
 
+    <SemanticTabs :tabs="tabs" />
+
     <div class="grid grid-4" style="margin-bottom: 12px">
       <KpiCard label="应有交付物" :value="required.length" unit="项" />
       <KpiCard label="已提供" :value="required.length - missing.length" unit="项" zone="ok" />
@@ -40,6 +42,11 @@
             <span class="tag fail">{{ d.gate }}</span>
           </div>
           <el-empty v-if="!missing.length" description="无缺件，可提交 Gate5" :image-size="54" />
+          <div v-if="missing.length" class="src-note" style="margin-top: 8px">
+            缺件 {{ missing.length }} 项将阻断对应 Gate 放行（C-19），前往
+            <el-button link type="primary" size="small" @click="$router.push('/dev/gate')">评审与门禁</el-button>
+            查看受影响闸门。
+          </div>
         </div>
 
         <div class="panel">
@@ -62,11 +69,18 @@
 import { computed } from 'vue'
 import PageHeader from '@/components/PageHeader.vue'
 import KpiCard from '@/components/KpiCard.vue'
+import SemanticTabs from '@/components/SemanticTabs.vue'
 import { useAppStore } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
 
 const store = useAppStore()
 const { te } = useI18n()
+
+/** 本组件被 2 个菜单复用：交付物清单 / 样件发运与签收（同一「交付管理」域） */
+const tabs = [
+  { path: '/delivery/deliverables', label: '交付物清单' },
+  { path: '/delivery/ship', label: '样件发运与签收' }
+]
 const list = computed(() => store.projectDeliverables)
 const required = computed(() => list.value.filter((d) => d.required))
 const missing = computed(() => required.value.filter((d) => !d.provided))

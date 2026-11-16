@@ -2,6 +2,8 @@
   <div>
     <PageHeader title="评分与排序" desc="三维加权 40/35/25，总分 = Σ(分×权重)×20，落在 20~100；同分先比战略再比财务（PFM-017/018）" />
 
+    <SemanticTabs :tabs="tabs" />
+
     <div class="grid grid-4" style="margin-bottom: 12px">
       <KpiCard label="在册项目" :value="store.data.projects.length" unit="个" />
       <KpiCard label="权重版本" :value="'PMO-W-2026Q4'" sub="PMO 统一维护，项目不得自评改写" />
@@ -72,12 +74,19 @@ import { computed } from 'vue'
 import PageHeader from '@/components/PageHeader.vue'
 import KpiCard from '@/components/KpiCard.vue'
 import SvgBubble from '@/components/SvgBubble.vue'
+import SemanticTabs from '@/components/SemanticTabs.vue'
 import { useAppStore } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
 import { capacityCheck } from '@/domain/portfolio'
 
 const store = useAppStore()
 const { te } = useI18n()
+
+/** 本组件被 2 个菜单复用：评分与排序 / 优选与容量（同一「组合与投资」域） */
+const tabs = [
+  { path: '/portfolio/score', label: '评分与排序' },
+  { path: '/portfolio/capacity', label: '优选与容量' }
+]
 
 const caps = computed(() =>
   capacityCheck(

@@ -6,6 +6,8 @@
       </template>
     </PageHeader>
 
+    <SemanticTabs :tabs="tabs" />
+
     <div class="grid grid-4" style="margin-bottom: 12px">
       <KpiCard label="计划健康度" :value="store.quality.health" unit="分" :target="100" :zone="store.quality.health >= 80 ? 'ok' : store.quality.health >= 60 ? 'warn' : 'danger'" sub="<80 不得发布 / <60 无效" />
       <KpiCard label="通过项" :value="store.quality.checks.filter((c) => c.ok).length + ' / 13'" :zone="store.quality.checks.every((c) => c.ok) ? 'ok' : 'warn'" />
@@ -80,11 +82,18 @@
 import { computed } from 'vue'
 import PageHeader from '@/components/PageHeader.vue'
 import KpiCard from '@/components/KpiCard.vue'
+import SemanticTabs from '@/components/SemanticTabs.vue'
 import { useAppStore } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
 
 const store = useAppStore()
 const { te } = useI18n()
+
+/** 本组件被 2 个菜单复用：13 项质量检查 / 里程碑与关键节点（同一「项目计划与进度」域） */
+const tabs = [
+  { path: '/plan/quality', label: '13 项质量检查' },
+  { path: '/plan/milestone', label: '里程碑与关键节点' }
+]
 const hardFails = computed(() => store.quality.checks.filter((c) => [1, 9, 11, 13].includes(c.no) && !c.ok))
 const keyChecks = computed(() => store.quality.checks.filter((c) => [1, 4, 9, 6].includes(c.no)))
 const milestones = computed(() => store.cpm.nodes.filter((n) => n.isMilestone || n.level === 1).map((n) => ({ ...n })))

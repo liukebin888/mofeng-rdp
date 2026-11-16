@@ -418,12 +418,19 @@ export interface HourRecord {
   status: '草稿' | '已提交' | '已审核'
 }
 
+/** SEC-002：数据作用域四级（本人 SELF / 本部门 DEPT / 本项目 PROJECT / 本租户 TENANT） */
+export type DataScope = 'SELF' | 'DEPT' | 'PROJECT' | 'TENANT'
+
 export interface RoleDef {
   code: string
   name: string
   scope: string
   actions: Record<'view' | 'create' | 'update' | 'delete' | 'approve' | 'export', '●' | '○' | '—'>
   limits: string
+  /** SEC-006：组织角色 / 项目角色分离标记 */
+  roleType: 'org' | 'project'
+  /** SEC-002：角色默认数据作用域（四级） */
+  dataScope: DataScope
 }
 
 /** C-34：阶段复盘记录（目标达成 / 偏差原因 / 改进项，三要素齐全才判完成） */
@@ -750,6 +757,7 @@ export type DraftObjectType =
   | '立项申请'
   | '前期交流申请'
   | '项目产品报价'
+  | '技术方案'
   | '豁免申请'
   | 'ECR申请'
   // —— 项目正式启动后工作流（项目任务书/主计划/OTS/PPAP/SOP）——

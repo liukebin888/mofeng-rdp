@@ -2,9 +2,12 @@
   <div>
     <PageHeader title="齐套校验" desc="按 EBOM × 到货核算齐套率，不齐套不开工（K9）；齐套率同时是 Gate4 的硬判据（GAT-006）">
       <template #actions>
+        <el-button size="small" @click="$router.push('/dev/gate')">查看门禁（Gate4）</el-button>
         <el-button size="small" :disabled="!canStart" type="primary" @click="start">下达试制工单</el-button>
       </template>
     </PageHeader>
+
+    <SemanticTabs :tabs="tabs" />
 
     <div class="grid grid-4" style="margin-bottom: 12px">
       <KpiCard label="试制需求" :value="store.data.samples.length" unit="单" />
@@ -37,6 +40,11 @@
 
       <div class="panel">
         <div class="panel-title">缺料明细与到货计划（供应商未准入的到货不计入可用量 C-25）</div>
+        <div v-if="kit.blocked" class="src-note" style="margin-bottom: 8px">
+          当前齐套率 {{ kit.rate }}% 未达 100%，将阻塞 Gate4 放行（GAT-006）。可前往
+          <el-button link type="primary" size="small" @click="$router.push('/dev/gate')">评审与门禁</el-button>
+          查看受影响闸门。
+        </div>
         <el-table :data="kit.lines" size="small" height="330">
           <el-table-column prop="materialCode" label="物料" width="96" />
           <el-table-column prop="name" label="名称" min-width="130" />
@@ -58,12 +66,19 @@
 import { computed } from 'vue'
 import PageHeader from '@/components/PageHeader.vue'
 import KpiCard from '@/components/KpiCard.vue'
+import SemanticTabs from '@/components/SemanticTabs.vue'
 import { useAppStore } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
 import { explodeBom, kitRate } from '@/domain/kitting'
 
 const store = useAppStore()
 const { te } = useI18n()
+
+/** 本组件被 2 个菜单复用：试制需求 / 齐套校验（同一「样件试制」域） */
+const tabs = [
+  { path: '/trial/samples', label: '试制需求' },
+  { path: '/trial/kitting', label: '齐套校验' }
+]
 const lines = computed(() => explodeBom(store.data.boms, 30))
 const kit = computed(() => ({ ...kitRate(lines.value), lines: lines.value }))
 const canStart = computed(() => !kit.value.blocked)

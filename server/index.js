@@ -19,6 +19,7 @@
  *   GET  /api/state/version     当前 schema 版本
  *   GET  /api/audit             查询全量审计链 + 服务端链校验结果
  *   POST /api/audit             追加一条审计（服务端重算哈希，append-only）
+ *   POST /api/ai/chat           WorkBuddy 研发助手对话网关（SSE 流式；越权前置过滤 + 水印 + 审计留痕）
  *
  * 运行：node server/index.js   （默认端口 8787，可用 PORT 覆盖）
  */
@@ -26,6 +27,7 @@ const http = require('node:http')
 const fs = require('node:fs')
 const path = require('node:path')
 const crypto = require('node:crypto')
+const { execFile } = require('node:child_process')
 
 const PORT = Number(process.env.PORT || 8787)
 const HOST = process.env.HOST || '127.0.0.1'
@@ -35,6 +37,49 @@ const AUDIT_FILE = path.join(DATA_DIR, 'audit.json')
 
 const GENESIS = '0'.repeat(64)
 const DEFAULT_TENANT = 'T-1001'
+
+// ---------------------------------------------------------------------------
+// AI 研发助手网关（阶段二）——与 agent/src/assistant.ts 同源复刻（零依赖 JS 版）
+//   越权前置过滤（AIA-001）+ 水印（AIA-004）+ 红线（SRS 24.6），保证前后端语义一致。
+// ---------------------------------------------------------------------------
+
+const AI_WATERMARK = '【AI 生成 · 待人工复核 · 不作为放行依据】'
+const AI_ENDPOINT = process.env.AI_ENDPOINT || 'https://api.codebuddy.tencent.com/v1'
+const CLASS_RANK = { L1: 1, L2: 2, L3: 3, L4: 4 }
+
+/** 越权前置过滤：租户/项目/密级任一不符即剔除（越权命中须为 0） */
+function filterAiContext(items, scope) {
+  const visible = []
+  const filtered = []
+  for (const c of items || []) {
+    const tenantOk = c.tenantId === scope.tenantId
+    const projectOk = scope.projectId ? c.projectId === scope.projectId : true
+    const classOk = (CLASS_RANK[c.class] ?? 4) <= (CLASS_RANK[scope.allowedClass] ?? 4)
+    if (tenantOk && projectOk && classOk) visible.push(c)
+    else filtered.push(c)
+  }
+  return { visible, filtered }
+}
+
+/** 组装提示词（与 assistant.ts buildPrompt 同源） */
+function buildAiPrompt(question, projectName, visible) {
+  const parts = []
+  if (projectName) parts.push(`【当前项目】${projectName}`)
+  parts.push(`【用户问题】${question}`)
+  if (visible.length) {
+    parts.push('【可引用上下文（已按权限过滤）】')
+    for (const c of visible) {
+      parts.push(`  - [${c.objType}] ${c.id} (v${c.version}, ${c.class}): ${c.text}`)
+    }
+  } else {
+    parts.push('【可引用上下文】无（或全部越权已剔除）')
+  }
+  return parts.join('\n')
+}
+
+function ensureWatermark(text) {
+  return text.includes(AI_WATERMARK) ? text : `${AI_WATERMARK}\n${text}`
+}
 
 // —— 存储：单文档 JSON 文件，原子写（临时文件 + rename）——
 function ensureDir() {
@@ -180,7 +225,121 @@ function readBody(req) {
   })
 }
 
-// —— 对象存储（TEN-005 对象存储面）：按租户前缀分目录 + 短时预签名 ——
+// —— AI 网关辅助：真实模型调用（WorkBuddy OpenAPI）与占位降级 ——
+
+/** 调用 WorkBuddy OpenAPI（Agent Key 鉴权，流式解析 SSE），返回完整文本 */
+async function callWorkbuddyOpenApi(apiKey, prompt, onDelta) {
+  // 端点与鉴权遵循 WMA OpenAPI：Authorization 携带 Agent Key，流式返回 SSE
+  const resp = await fetch(`${AI_ENDPOINT}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: 'mofeng-rdp-assistant',
+      messages: [{ role: 'user', content: prompt }],
+      stream: true
+    })
+  })
+  if (!resp.ok) {
+    throw new Error(`WorkBuddy OpenAPI 返回 ${resp.status}`)
+  }
+  if (!resp.body) {
+    // 非流式兜底：直接读 JSON
+    const j = await resp.json()
+    const text = j?.choices?.[0]?.message?.content || j?.text || ''
+    onDelta?.(text)
+    return ensureWatermark(text)
+  }
+  // 解析 SSE 流（data: {...}）
+  const reader = resp.body.getReader()
+  const decoder = new TextDecoder('utf8')
+  let buf = ''
+  let text = ''
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buf += decoder.decode(value, { stream: true })
+    const lines = buf.split('\n')
+    buf = lines.pop() || ''
+    for (const line of lines) {
+      const s = line.trim()
+      if (!s.startsWith('data:')) continue
+      const payload = s.slice(5).trim()
+      if (payload === '[DONE]') continue
+      try {
+        const obj = JSON.parse(payload)
+        const delta = obj?.choices?.[0]?.delta?.content || obj?.choices?.[0]?.text || ''
+        if (delta) {
+          text += delta
+          onDelta?.(delta)
+        }
+      } catch {
+        /* 忽略无法解析的行 */
+      }
+    }
+  }
+  return ensureWatermark(text)
+}
+
+/** 占位降级：无 Agent Key 时的确定性响应（保证闭环可跑、便于前端联调） */
+async function fallbackAiAnswer(question, projectName, visible, filtered, onDelta) {
+  const projectNote = projectName ? `当前项目「${projectName}」` : '未指定项目'
+  const ctxNote = visible.length
+    ? `已携带 ${visible.length} 条可见上下文（越权剔除 ${filtered.length} 条）`
+    : '未携带可引用上下文'
+  const text = ensureWatermark(
+    [
+      '【占位响应 · 未配置 WorkBuddy Agent Key】',
+      `已收到问题：「${question}」`,
+      `${projectNote}；${ctxNote}。`,
+      '在 server 配置 CODEBUDDY_API_KEY 后将由 WorkBuddy 托管 Agent 真实回答。',
+      '（本响应用于联调闭环，非真实模型产出）'
+    ].join('\n')
+  )
+  // 模拟流式：按字符分批
+  const step = 8
+  for (let i = 0; i < text.length; i += step) {
+    onDelta?.(text.slice(i, i + step))
+    await new Promise((r) => setTimeout(r, 3))
+  }
+  return text
+}
+
+// —— WorkBuddy 桌面端安装探测（跨平台进程探测，零依赖）——
+// 用于「一键唤起」前置判断：只有检测到本机已运行 WorkBuddy 桌面端进程才走协议唤起，
+// 否则前端引导用户改用「账号绑定对话」。仅探测进程存在性，不读取任何文件/注册表/敏感信息。
+
+/** 探测本机是否运行 WorkBuddy 桌面端进程，返回 { installed, running, count, method } */
+function detectWorkbuddyDesktop() {
+  return new Promise((resolve) => {
+    let cmd = ''
+    let args = []
+    let filter = (out) => out
+    if (process.platform === 'win32') {
+      cmd = 'tasklist'
+      args = []
+      filter = (out) => /WorkBuddy\.exe/i.test(out)
+    } else {
+      cmd = 'ps'
+      args = ['-axo', 'comm=']
+      filter = (out) => /[Ww]ork[Bb]uddy/.test(out)
+    }
+    const child = execFile(cmd, args, { timeout: 3000, windowsHide: true }, (err, stdout, stderr) => {
+      if (err) {
+        // 探测命令不可用（非本机、命令缺失等）→ 视为「未检测到」，不抛错、不阻断
+        return resolve({ installed: false, running: false, count: 0, method: 'process', error: err.message })
+      }
+      const lines = String(stdout).split(/\r?\n/).filter((l) => l.trim())
+      const matches = lines.filter(filter)
+      const count = matches.length
+      return resolve({ installed: count > 0, running: count > 0, count, method: 'process' })
+    })
+    // execFile 带 timeout 已在上面兜底；此处再兜一层防挂起
+    child.on('error', (e) => resolve({ installed: false, running: false, count: 0, method: 'process', error: e.message }))
+  })
+}
 const STORAGE_DIR = path.join(DATA_DIR, 'storage')
 const PRESIGN_SECRET = process.env.PRESIGN_SECRET || 'mofeng-rdp-presign-secret'
 const PRESIGN_TTL_MS = Number(process.env.PRESIGN_TTL_MS || 15 * 60 * 1000) // 默认 15 分钟
@@ -303,6 +462,11 @@ const server = http.createServer(async (req, res) => {
         stateVersion: state ? state.version : null,
         now: new Date().toISOString()
       })
+    }
+
+    if (req.method === 'GET' && p === '/api/ai/workbuddy/status') {
+      const info = await detectWorkbuddyDesktop()
+      return send(res, 200, { ok: true, ...info })
     }
 
     if (req.method === 'GET' && p === '/api/state/version') {
@@ -462,6 +626,87 @@ const server = http.createServer(async (req, res) => {
       rows.push(base)
       writeAudit(rows, t.tenantId)
       return send(res, 201, { ok: true, tenantId: t.tenantId, saved: true, seq: base.seq, rowHash: base.rowHash, count: rows.length, at: base.occurredAt })
+    }
+
+    // —— AI 研发助手对话网关（阶段二）：越权前置过滤 + SSE 流式 + 审计留痕 ——
+    // POST /api/ai/chat  body: { question, projectId?, projectName?, context?: AiContextItem[], sessionId? }
+    //   ① 越权前置过滤（租户/项目/密级，命中 0）；② 组装提示词；③ 有 Agent Key 走真实模型，否则降级占位；
+    //   ④ SSE 流式返回；⑤ 写一条 AI_CALL 审计事件（chainOk 连续）。
+    if (req.method === 'POST' && p === '/api/ai/chat') {
+      const raw = await readBody(req)
+      let body
+      try {
+        body = JSON.parse(raw)
+      } catch {
+        return send(res, 400, { ok: false, code: 'BAD_JSON', message: '请求体非合法 JSON' })
+      }
+      if (!body || typeof body.question !== 'string' || !body.question.trim()) {
+        return send(res, 400, { ok: false, code: 'VALIDATION_FAILED', message: '缺少 question 字段' })
+      }
+      const t = extractTenant(req, body.tenantId)
+      if (t.error) return send(res, t.error.status, t.error.body)
+
+      // ① 越权前置过滤：请求方 scope（租户 + 项目 + 允许密级，allowedClass 默认 L4 取请求声明，缺省 L2 保守）
+      const scope = {
+        tenantId: t.tenantId,
+        projectId: body.projectId || '',
+        allowedClass: ['L1', 'L2', 'L3', 'L4'].includes(body.allowedClass) ? body.allowedClass : 'L2'
+      }
+      const { visible, filtered } = filterAiContext(body.context, scope)
+      const prompt = buildAiPrompt(body.question.trim(), body.projectName, visible)
+
+      // ② 组装 SSE 流式响应头
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type, x-tenant-id',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive'
+      })
+      const emit = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+
+      // ③ 是否配置了 Agent Key（有则真实调用，无则降级占位）
+      const apiKey = process.env.CODEBUDDY_API_KEY
+      let finalText
+      try {
+        if (apiKey) {
+          finalText = await callWorkbuddyOpenApi(apiKey, prompt, (chunk) => emit('delta', { text: chunk }))
+        } else {
+          finalText = await fallbackAiAnswer(body.question.trim(), body.projectName, visible, filtered, (chunk) => emit('delta', { text: chunk }))
+        }
+      } catch (err) {
+        finalText = ensureWatermark(`AI 调用失败：${err && err.message ? err.message : String(err)}`)
+        emit('delta', { text: finalText })
+      }
+
+      // ④ 写 AI_CALL 审计事件（append-only，服务端权威哈希，chainOk 连续）
+      try {
+        const auditRows = readAudit(t.tenantId)
+        const prev = auditRows.length ? auditRows[auditRows.length - 1].rowHash : GENESIS
+        const base = {
+          seq: auditRows.length + 1,
+          occurredAt: new Date().toISOString(),
+          actorId: body.actorId || 'unknown',
+          actorName: body.actorName || 'unknown',
+          actorRole: body.actorRole || 'user',
+          action: 'AI_CALL',
+          objType: 'ai_chat',
+          objId: body.sessionId || `AI-${Date.now()}`,
+          before: { question: body.question.trim(), visibleCount: visible.length },
+          after: { filteredCount: filtered.length, realModel: Boolean(apiKey) },
+          result: 'OK',
+          tenantId: t.tenantId,
+          prevHash: prev
+        }
+        base.rowHash = rowPayload(base)
+        auditRows.push(base)
+        writeAudit(auditRows, t.tenantId)
+      } catch (_auditErr) {
+        /* 审计失败不阻断响应，但记录（降级） */
+      }
+
+      emit('done', { ok: true, filteredCount: filtered.length, realModel: Boolean(apiKey), text: finalText })
+      return res.end()
     }
 
     // —— 对象存储（TEN-005 对象存储面）：按租户前缀分目录 + 短时预签名 ——
