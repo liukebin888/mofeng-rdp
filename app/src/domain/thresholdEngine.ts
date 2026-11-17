@@ -31,12 +31,6 @@ export interface ThresholdMetrics {
   redRiskCount: number
   /** 红区缺应对策略数 */
   redRiskNoStrategy: number
-  /** 逾期送审件数 */
-  overdueSendAuditCount: number
-  /** 逾期督办数 */
-  overdueSuperviseCount: number
-  /** 未闭环决议数 */
-  openResolutionCount: number
   /** 待我审批流程数 */
   pendingApprovalCount: number
 }
@@ -58,9 +52,6 @@ export const THRESHOLD_METRIC_DEFS: ThresholdMetricDef[] = [
   { key: 'planHealth', label: '计划质量健康度', unit: '分', higherIsWorse: false, desc: '13 项检查折算，<60 视为无效' },
   { key: 'redRiskCount', label: '红区风险数', unit: '条', higherIsWorse: true, desc: 'RPN≥200 的风险' },
   { key: 'redRiskNoStrategy', label: '红区缺策略数', unit: '条', higherIsWorse: true, desc: '红区且无应对策略' },
-  { key: 'overdueSendAuditCount', label: '逾期送审件数', unit: '件', higherIsWorse: true, desc: '已超期未答复送审件' },
-  { key: 'overdueSuperviseCount', label: '逾期督办数', unit: '项', higherIsWorse: true, desc: '超期未销项督办' },
-  { key: 'openResolutionCount', label: '未闭环决议数', unit: '条', higherIsWorse: true, desc: '待执行/执行中决议' },
   { key: 'pendingApprovalCount', label: '待我审批数', unit: '条', higherIsWorse: true, desc: '待审批流程' }
 ]
 
@@ -93,9 +84,7 @@ export const DEFAULT_THRESHOLD_RULES: ThresholdRule[] = [
   { id: 'TH-CVR-10', metric: 'cvRate', operator: '>', threshold: 10, severity: 'P2', assignTo: '项目经理', title: '成本偏差率 {value}% 超过阈值 {threshold}%，需专项说明', enabled: true },
   { id: 'TH-HEALTH-60', metric: 'planHealth', operator: '<', threshold: 60, severity: 'P2', assignTo: '项目经理', title: '计划质量健康度 {value} 分低于阈值 {threshold}，计划视为无效需重排', enabled: true },
   { id: 'TH-REDRISK-1', metric: 'redRiskCount', operator: '>=', threshold: 1, severity: 'P2', assignTo: '项目经理', title: '红区风险 {value} 条（≥{threshold}），须强制量化与策略', enabled: true },
-  { id: 'TH-NOSTRAT-1', metric: 'redRiskNoStrategy', operator: '>=', threshold: 1, severity: 'P1', assignTo: '功能安全经理', title: '红区风险缺策略 {value} 条，将阻断 Gate（C-44），需立即补策略', enabled: true },
-  { id: 'TH-OVERSEND-1', metric: 'overdueSendAuditCount', operator: '>=', threshold: 1, severity: 'P3', assignTo: '项目秘书', title: '逾期送审件 {value} 件，需跟进催办（COM-002）', enabled: true },
-  { id: 'TH-OVERSUP-1', metric: 'overdueSuperviseCount', operator: '>=', threshold: 1, severity: 'P3', assignTo: '项目秘书', title: '逾期督办 {value} 项，需升级督办（COM-009）', enabled: true }
+  { id: 'TH-NOSTRAT-1', metric: 'redRiskNoStrategy', operator: '>=', threshold: 1, severity: 'P1', assignTo: '功能安全经理', title: '红区风险缺策略 {value} 条，将阻断 Gate（C-44），需立即补策略', enabled: true }
 ]
 
 // ───────────────────────── 命中判定 ─────────────────────────

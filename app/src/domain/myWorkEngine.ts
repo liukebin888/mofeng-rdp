@@ -1,9 +1,9 @@
 /**
  * 我的工作引擎（POR-004 我的任务聚合 + POR-005 我的待办四段分组）
- * 依据：SRS 12.6「门户与工作中心」—— 四类任务全部聚合无遗漏；四段分组正确、逾期置顶。
+ * 依据：SRS 12.6「门户与工作中心」—— WBS/审批两类任务全部聚合无遗漏；四段分组正确、逾期置顶。
  * 约束：纯函数零依赖（ARC-001）。
  */
-import type { ResolutionItem, SuperviseItem, WbsNode } from './types'
+import type { WbsNode } from './types'
 
 /** 当前用户视角（用于「我的」匹配） */
 export interface Me {
@@ -11,8 +11,8 @@ export interface Me {
   roleCode: string
 }
 
-/** 聚合后的任务条目（四类任务统一形态，POR-004） */
-export type TaskKind = 'WBS' | '审批' | '决议' | '督办'
+/** 聚合后的任务条目（两类任务统一形态，POR-004） */
+export type TaskKind = 'WBS' | '审批'
 
 export interface AggregatedTask {
   id: string
@@ -34,15 +34,13 @@ export interface Bucketed {
 }
 
 /**
- * 四类任务聚合（POR-004 验收：四类任务全部聚合无遗漏）。
- * 输入四类原始对象 + 当前用户，输出统一 AggregatedTask 列表。
+ * 两类任务聚合（POR-004 验收：WBS/审批两类任务全部聚合无遗漏）。
+ * 输入两类原始对象 + 当前用户，输出统一 AggregatedTask 列表。
  */
 export function aggregateMyTasks(
   me: Me,
   opts: {
     wbs: WbsNode[]
-    resolutions: ResolutionItem[]
-    supervises: SuperviseItem[]
     approvals: { id: string; title: string; code: string; submitter: string; approverRole: string; due: string; status: string; projectId: string }[]
   }
 ): AggregatedTask[] {
@@ -55,21 +53,7 @@ export function aggregateMyTasks(
     }
   }
 
-  // ② 决议转任务（owner 匹配当前用户名，未闭环）
-  for (const r of opts.resolutions) {
-    if (r.owner === me.name && r.status !== '已闭环') {
-      out.push({ id: r.id, kind: '决议', title: r.content, code: r.code, owner: r.owner, due: r.due, status: r.status, projectId: r.projectId })
-    }
-  }
-
-  // ③ 督办事项（owner 匹配当前用户名，未销项）
-  for (const s of opts.supervises) {
-    if (s.owner === me.name && s.status !== '已销项') {
-      out.push({ id: s.id, kind: '督办', title: s.title, code: s.code, owner: s.owner, due: s.due, status: s.status, projectId: s.projectId })
-    }
-  }
-
-  // ④ 待审批流程（approverRole 匹配当前角色，运行中）
+  // ② 待审批流程（approverRole 匹配当前角色，运行中）
   for (const a of opts.approvals) {
     if (a.approverRole === me.roleCode) {
       out.push({ id: a.id, kind: '审批', title: a.title, code: a.code, owner: a.submitter, due: a.due, status: a.status, projectId: a.projectId })

@@ -23,7 +23,7 @@ export interface MenuGroup {
 const viewModules = import.meta.glob('../views/**/*.vue')
 const v = (p: string) => viewModules[`../views/${p}.vue`] as () => Promise<unknown>
 
-/** 17 个一级菜单，与 SOLUTION 11.1 一一对应；二级页标注 P0/P1 批次 */
+/** 16 个一级菜单，与 SOLUTION 11.1 一一对应；二级页标注 P0/P1 批次 */
 export const MENUS: MenuGroup[] = [
   {
     key: 'workbench', title: '工作中心', icon: 'Grid', stage: 'P1–P7', role: '全员', cp: '—',
@@ -137,15 +137,6 @@ export const MENUS: MenuGroup[] = [
       { path: '/cost/analysis', title: '组合分析', desc: 'ROI/决策留痕/What-if', icon: 'TrendCharts', comp: v('portfolio/AnalysisView') },
       { path: '/cost/eps', title: 'EPS 节点树', desc: '四级树逐层汇总', icon: 'Share', comp: v('portfolio/EpsView') },
       { path: '/cost/gate-consistency', title: '闸门一致性', desc: '跨项目判据集统一（PFM-011）', icon: 'Switch', comp: v('portfolio/GateConsistencyView') }
-    ]
-  },
-  {
-    key: 'collab', title: '门户与协同', icon: 'ChatDotRound', stage: 'P2–P7', role: '全员 / 项目秘书', cp: 'C-19 C-21 C-29',
-    items: [
-      { path: '/collab/portal', title: '项目门户', desc: '五区数据来自业务对象', icon: 'HomeFilled', comp: v('collab/PortalView') },
-      { path: '/collab/review', title: '送审件', desc: '送审与答复留痕', icon: 'DocumentAdd', comp: v('collab/PortalView') },
-      { path: '/collab/meeting', title: '会议与决议', desc: '决议条目化转任务', icon: 'ChatDotRound', comp: v('collab/PortalView') },
-      { path: '/collab/supervise', title: '督办', desc: '超期升级', icon: 'BellFilled', comp: v('collab/SuperviseView') }
     ]
   },
   {

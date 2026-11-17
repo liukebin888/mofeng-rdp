@@ -25,23 +25,19 @@ import type {
   HourRecord,
   InboxItem,
   LessonItem,
-  MeetingItem,
   MessageItem,
   FormDraft,
   PortalSectionConfig,
   Project,
   ProjectInvestment,
   Requirement,
-  ResolutionItem,
   ResourcePoolMember,
   ResourceShareApply,
   RetroItem,
   RiskItem,
   SampleReq,
-  SendAuditItem,
   StepRun,
   StepTemplate,
-  SuperviseItem,
   Supplier,
   ThresholdIssue,
   TraceLink,
@@ -687,15 +683,6 @@ export function buildSeed() {
 
   const deviations: DeviationItem[] = []
 
-  // —— COM 协同沟通域（会议决议 / 送审件 / 督办，替换视图内硬编码假数据）——
-  const resolutions: ResolutionItem[] = []
-
-  const meetings: MeetingItem[] = []
-
-  const sendAudits: SendAuditItem[] = []
-
-  const supervises: SuperviseItem[] = []
-
   // —— PFM 组合与投资域（ROI 收益计划 / 决策留痕 / What-if 场景）——
   const investments: ProjectInvestment[] = []
 
@@ -765,8 +752,6 @@ export function buildSeed() {
     { key: 'progress', title: '进度与里程碑', visibleRoles: [], order: 2, enabled: true },
     { key: 'risk', title: '风险与问题', visibleRoles: [], order: 3, enabled: true },
     { key: 'delivery', title: '交付件与齐套', visibleRoles: ['PM', 'SE', 'QDIR', 'TRIAL'], order: 4, enabled: true },
-    { key: 'meeting', title: '会议与决议', visibleRoles: [], order: 5, enabled: true },
-    { key: 'sendAudit', title: '送审件', visibleRoles: ['PM', 'SE', 'QE', 'TRIAL'], order: 6, enabled: true },
     { key: 'announce', title: '公告', visibleRoles: [], order: 7, enabled: true }
   ]
 
@@ -966,10 +951,6 @@ export function buildSeed() {
     /** 自定义字段定义（GEN-002 通用 PM：Jira 式自定义字段，空白模板不预置演示数据） */
     customFieldDefs: [] as CustomFieldDef[],
     deviations,
-    meetings,
-    resolutions,
-    sendAudits,
-    supervises,
     investments,
     decisions,
     whatIfs,

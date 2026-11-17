@@ -12,10 +12,6 @@
     <div class="grid" style="grid-template-columns: 1fr 1fr; align-items: start">
       <div class="panel">
         <div class="panel-title">阶段复盘（C-34）</div>
-        <div class="src-note" style="margin-bottom: 8px">
-          复盘改进项可条目化转为会议决议与督办任务，前往
-          <el-button link type="primary" size="small" @click="$router.push('/collab/meeting')">会议与决议</el-button>
-        </div>
         <div v-for="r in store.projectRetros" :key="r.id" class="card">
           <div class="between">
             <b>{{ te(r.stage) }}</b>

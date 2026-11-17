@@ -478,69 +478,6 @@ export interface DeviationItem {
   status: '开放' | '已关闭'
 }
 
-// —— COM 协同沟通域（FUN-024 项目门户与协同沟通，COM-001~009）——
-
-/** 会议决议条目（COM-006：决议必为条目结构；COM-007：转任务；COM-008：逾期升级与关闭判定） */
-export interface ResolutionItem {
-  id: string
-  projectId: string
-  meetingId: string
-  code: string
-  content: string
-  owner: string // 责任人（COM-006：缺责任人不可保存）
-  due: string // 期限（COM-006：缺期限不可保存）
-  status: '待执行' | '执行中' | '已闭环'
-  taskId?: string // 转任务后的任务 id（COM-007：同一决议不重复建任务）
-  evidence?: string // 关闭证据（COM-008：无证据关闭被拒）
-  createdAt: string
-}
-
-/** 会议（COM-005 策划四要素 + COM-006 记录与决议条目化 + COM-012 与 Gate 关联） */
-export interface MeetingItem {
-  id: string
-  projectId: string
-  code: string
-  title: string
-  date: string
-  stage?: string // 关联阶段（COM-005）
-  gateId?: string // 关联 Gate（COM-012）
-  host: string // 主持人
-  attendees: string[] // 参会人
-  agenda: string // 议题
-  minutes: string // 纪要
-  resolutions: string[] // 决议条目 id（条目化，不裸存文本）
-  status: '策划中' | '已召开' | '已归档'
-}
-
-/** 送审件（COM-001 登记与流转 + COM-002 超时升级；送审与答复留痕） */
-export interface SendAuditItem {
-  id: string
-  projectId: string
-  code: string
-  title: string
-  version: string // COM-001：必带版本
-  reviewerType: '客户' | '内部' | '供应商'
-  reviewer: string // 送审对象
-  sentAt: string
-  dueAt: string // 答复期限
-  status: '待答复' | '已答复' | '已超期'
-  answers: { at: string; by: string; content: string }[] // 往返记录（COM-001：全程留痕）
-  escalated: boolean // COM-002：超时升级
-}
-
-/** 督办事项（COM-009：交办→反馈→复核→销项 四态闭环，超期自动升级） */
-export interface SuperviseItem {
-  id: string
-  projectId: string
-  code: string
-  title: string
-  owner: string
-  due: string
-  status: '交办' | '反馈' | '复核' | '已销项'
-  actions: { at: string; by: string; action: '交办' | '反馈' | '复核' | '销项'; note: string }[] // 四动作留痕
-  escalated: boolean
-}
-
 // —— PFM 组合与投资域（FUN-023，PFM-020/022/024/025/026）——
 
 /** 项目收益计划（PFM-022：缺收益计划不出结论只提示；现金流单位万元，含币种） */

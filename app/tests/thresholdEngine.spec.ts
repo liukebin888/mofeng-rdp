@@ -17,15 +17,12 @@ const base: ThresholdMetrics = {
   planHealth: 90,
   redRiskCount: 0,
   redRiskNoStrategy: 0,
-  overdueSendAuditCount: 0,
-  overdueSuperviseCount: 0,
-  openResolutionCount: 0,
   pendingApprovalCount: 0
 }
 
 describe('临界值自动触发引擎（Oracle Thresholds 对标）', () => {
-  it('THRESHOLD_METRIC_DEFS 覆盖 10 类业务指标', () => {
-    expect(THRESHOLD_METRIC_DEFS).toHaveLength(10)
+  it('THRESHOLD_METRIC_DEFS 覆盖 7 类业务指标', () => {
+    expect(THRESHOLD_METRIC_DEFS).toHaveLength(7)
   })
 
   it('hitRule 按运算符判定（SPI < 0.9 命中）', () => {
@@ -78,7 +75,7 @@ describe('临界值自动触发引擎（Oracle Thresholds 对标）', () => {
 
   it('命中按严重级别 P1→P4 排序', () => {
     const { hits } = scanThresholds(
-      { ...base, spi: 0.7, cpi: 0.8, overdueSendAuditCount: 2 },
+      { ...base, spi: 0.7, cpi: 0.8 },
       DEFAULT_THRESHOLD_RULES,
       'P1'
     )

@@ -64,22 +64,6 @@ import { knowledgeStats, markReused, nextLessonCode, pushToLibrary, searchLesson
 import { validateLightTask, transitionTask, groupByStatus, completionRate as lightTaskCompletionRate, type LightTask, type LightTaskStatus } from '@/domain/lightTask'
 import { validateCustomFieldDef, validateCustomValue, type CustomFieldDef } from '@/domain/customField'
 import { buildKanban, type KanbanBoard } from '@/domain/kanban'
-import {
-  advanceSupervise as advanceSuperviseEngine,
-  answerSendAudit as answerSendAuditEngine,
-  closeResolution as closeResolutionEngine,
-  escalateSendAudit,
-  escalateSupervise,
-  nextResolutionCode,
-  overdueResolutions,
-  resolutionToTask as resolutionToTaskEngine,
-  validateMeeting,
-  validateResolution,
-  validateSendAudit,
-  type ResolutionInput,
-  type SendAuditInput,
-  type SuperviseActionType
-} from '@/domain/collabEngine'
 import { decisionComplete } from '@/domain/portfolio'
 import { roiOf, validateCurrency, type CurrencyAmount } from '@/domain/portfolioFinance'
 import { applyAdjustments, canMerge, diffScenarios, mergeScenario, removeScenario } from '@/domain/whatif'
@@ -107,7 +91,6 @@ import { aggregatePortfolio, interventionRows, type ProjectHealthSnapshot } from
 import { buildResourceProfile, type TaskResourceSpan } from '@/domain/resourceProfile'
 import { buildCostSheet } from '@/domain/costSheet'
 import { emptyQuoteCostSheet, type QuoteCostSheet } from '@/domain/quoteCost'
-import { isOverdue as isCollabOverdue } from '@/domain/collabEngine'
 import { rpn } from '@/domain/risk'
 import { riskRegistrationCheck, riskCanTransition, riskNextStatus, riskCloseCheck, riskToIssue, issueToRisk, riskEscalation, riskLedgerStats, RISK_STRATEGIES, type RiskLifecycleStatus, type RiskDecision } from '@/domain/riskLifecycle'
 import { reviewProject, humanReviewEvidence, type HumanReview } from '@/domain/projectReview'
@@ -1164,21 +1147,15 @@ export const useAppStore = defineStore('app', () => {
   const projectRetros = computed(() => data.value.retros.filter((r) => r.projectId === projectId.value))
   const projectLessons = computed(() => data.value.lessons.filter((l) => l.projectId === projectId.value))
   const projectDeviations = computed(() => data.value.deviations.filter((d) => d.projectId === projectId.value))
-  const projectMeetings = computed(() => data.value.meetings.filter((m) => m.projectId === projectId.value))
-  const projectResolutions = computed(() => data.value.resolutions.filter((r) => r.projectId === projectId.value))
-  const projectSendAudits = computed(() => data.value.sendAudits.filter((s) => s.projectId === projectId.value))
-  const projectSupervises = computed(() => data.value.supervises.filter((s) => s.projectId === projectId.value))
   const projectInvestments = computed(() => data.value.investments.filter((i) => i.projectId === projectId.value))
   const calendars = computed<CalendarDef[]>(() => (data.value.calendars ?? []) as CalendarDef[])
 
-  // —— 我的工作中心（POR-004 四类聚合 + POR-005 四段分组）——
+  // —— 我的工作中心（POR-004 两类聚合 + POR-005 四段分组）——
   const myTasks = computed(() =>
     aggregateMyTasks(
       { name: currentUser.value.name, roleCode: currentUser.value.roleCode },
       {
         wbs: data.value.wbs,
-        resolutions: data.value.resolutions,
-        supervises: data.value.supervises,
         approvals: data.value.flowInstances
           .filter((f) => f.status === '运行中')
           .map((f) => {
@@ -1388,9 +1365,6 @@ export const useAppStore = defineStore('app', () => {
       planHealth: quality.value.health,
       redRiskCount: redRisks.length,
       redRiskNoStrategy: redNoStrategy.length,
-      overdueSendAuditCount: projectSendAudits.value.filter((s) => s.status !== '已答复' && isCollabOverdue(s.dueAt, today)).length,
-      overdueSuperviseCount: projectSupervises.value.filter((s) => s.status !== '已销项' && isCollabOverdue(s.due, today)).length,
-      openResolutionCount: projectResolutions.value.filter((r) => r.status !== '已闭环').length,
       pendingApprovalCount: data.value.flowInstances.filter((f) => f.status === '运行中').length
     }
   })
@@ -2334,179 +2308,7 @@ export const useAppStore = defineStore('app', () => {
   /** GEN-001：轻量任务完成率（已完成数 / 未取消总数） */
   const lightTaskCompletion = computed(() => lightTaskCompletionRate(lightTasks.value))
 
-  // —— COM 协同沟通域（会议决议 / 送审件 / 督办，FUN-024）——
-
   const todayStr = () => new Date().toISOString().slice(0, 10)
-
-  /** COM-006：会议决议条目化登记（缺责任人/期限不可保存） */
-  function addResolution(meetingId: string, input: ResolutionInput): boolean {
-    const errors = validateResolution(input)
-    if (errors.length) {
-      notify('error', `决议登记被拒：${errors.join('；')}（COM-006）`)
-      return false
-    }
-    const m = data.value.meetings.find((x) => x.id === meetingId)
-    const id = 'RS' + (data.value.resolutions.length + 1)
-    const code = nextResolutionCode(data.value.resolutions, projectId.value)
-    data.value.resolutions.push({
-      id,
-      projectId: projectId.value,
-      meetingId,
-      code,
-      content: input.content.trim(),
-      owner: input.owner.trim(),
-      due: input.due,
-      status: '待执行',
-      createdAt: todayStr()
-    })
-    if (m) m.resolutions.push(id)
-    log('CREATE', '决议', id, { code, meetingId, owner: input.owner, due: input.due })
-    notify('success', `决议 ${code} 已条目化并挂责任人/期限（COM-006）`)
-    return true
-  }
-
-  /** COM-007：决议转任务（幂等，同一决议不重复建任务） */
-  function resolutionToTask(resolutionId: string): boolean {
-    const r = data.value.resolutions.find((x) => x.id === resolutionId)
-    if (!r) return false
-    if (r.taskId) {
-      notify('warning', `决议 ${r.code} 已转任务 ${r.taskId}，不重复建（COM-007）`)
-      return false
-    }
-    const taskId = 'TASK-' + (data.value.resolutions.length + 1).toString().padStart(3, '0')
-    const next = resolutionToTaskEngine(r, taskId)
-    Object.assign(r, next)
-    log('CREATE', '任务', taskId, { fromResolution: r.code })
-    notify('success', `决议 ${r.code} 已转任务 ${taskId}（COM-007）`)
-    return true
-  }
-
-  /** COM-008：决议关闭（无证据关闭被拒） */
-  function closeResolution(resolutionId: string, evidence: string): boolean {
-    const r = data.value.resolutions.find((x) => x.id === resolutionId)
-    if (!r) return false
-    const { resolution, closed, errors } = closeResolutionEngine(r, evidence, todayStr())
-    if (!closed) {
-      notify('error', errors.join('；'))
-      return false
-    }
-    Object.assign(r, resolution)
-    log('CLOSE', '决议', resolutionId, { evidence })
-    notify('success', `决议 ${r.code} 已闭环（证据已留痕，COM-008）`)
-    return true
-  }
-
-  /** COM-008：决议逾期列表（未闭环且逾期的决议，门户可见） */
-  const overdueResolutionsList = () => overdueResolutions(data.value.resolutions, todayStr())
-
-  /** COM-005：会议策划（四要素齐备方可发邀请） */
-  function addMeeting(input: { title: string; agenda: string; host: string; date: string; attendees: string[] }): boolean {
-    const errors = validateMeeting(input)
-    if (errors.length) {
-      notify('error', `会议策划被拒：${errors.join('；')}（COM-005）`)
-      return false
-    }
-    const id = 'M' + (data.value.meetings.length + 1)
-    const code = `MTG-${String(data.value.meetings.length + 1).padStart(3, '0')}`
-    data.value.meetings.push({
-      id,
-      projectId: projectId.value,
-      code,
-      title: input.title.trim(),
-      date: input.date,
-      host: input.host.trim(),
-      attendees: input.attendees,
-      agenda: input.agenda.trim(),
-      minutes: '',
-      resolutions: [],
-      status: '策划中'
-    })
-    log('CREATE', '会议', id, { code, title: input.title })
-    notify('success', `会议 ${code} 已策划（四要素齐备，COM-005）`)
-    return true
-  }
-
-  /** COM-001：送审件登记（必带版本与期限） */
-  function addSendAudit(input: SendAuditInput): boolean {
-    const errors = validateSendAudit(input)
-    if (errors.length) {
-      notify('error', `送审件登记被拒：${errors.join('；')}（COM-001）`)
-      return false
-    }
-    const id = 'SA' + (data.value.sendAudits.length + 1)
-    const code = `SA-${String(data.value.sendAudits.length + 1).padStart(3, '0')}`
-    data.value.sendAudits.push({
-      id,
-      projectId: projectId.value,
-      code,
-      title: input.title.trim(),
-      version: input.version.trim(),
-      reviewerType: input.reviewerType,
-      reviewer: input.reviewer.trim(),
-      sentAt: todayStr(),
-      dueAt: input.dueAt,
-      status: '待答复',
-      answers: [],
-      escalated: false
-    })
-    log('CREATE', '送审件', id, { code, title: input.title, version: input.version })
-    notify('success', `送审件 ${code} 已登记（版本+期限齐备，COM-001）`)
-    return true
-  }
-
-  /** COM-001/002：送审件答复（留痕 + 超期升级） */
-  function answerSendAudit(sendAuditId: string, content: string): boolean {
-    const s = data.value.sendAudits.find((x) => x.id === sendAuditId)
-    if (!s) return false
-    const { item, errors } = answerSendAuditEngine(s, currentUser.value.name, content, new Date().toISOString(), todayStr())
-    if (errors.length) {
-      notify('error', errors.join('；'))
-      return false
-    }
-    Object.assign(s, item)
-    log('ANSWER', '送审件', sendAuditId, { by: currentUser.value.name, escalated: item.escalated })
-    notify('success', `送审件 ${s.code} 已答复留痕${item.escalated ? '（超期已升级）' : ''}`)
-    return true
-  }
-
-  /** COM-009：新建督办（交办态） */
-  function dispatchSupervise(title: string, owner: string, due: string): boolean {
-    if (!title.trim() || !owner.trim() || !due.trim()) {
-      notify('error', '督办须明确事项、责任人与时限（COM-009）')
-      return false
-    }
-    const id = 'SV' + (data.value.supervises.length + 1)
-    const code = `SUP-${String(data.value.supervises.length + 1).padStart(4, '0')}`
-    data.value.supervises.push({
-      id,
-      projectId: projectId.value,
-      code,
-      title: title.trim(),
-      owner: owner.trim(),
-      due,
-      status: '交办',
-      actions: [{ at: new Date().toISOString(), by: currentUser.value.name, action: '交办', note: '' }],
-      escalated: false
-    })
-    log('CREATE', '督办', id, { code, owner, due })
-    notify('success', `督办 ${code} 已交办（COM-009）`)
-    return true
-  }
-
-  /** COM-009：督办推进（交办→反馈→复核→销项，四动作留痕） */
-  function advanceSupervise(superviseId: string, action: SuperviseActionType, note: string): boolean {
-    const s = data.value.supervises.find((x) => x.id === superviseId)
-    if (!s) return false
-    const { item, advanced, errors } = advanceSuperviseEngine(s, action, currentUser.value.name, note, new Date().toISOString(), todayStr())
-    if (!advanced) {
-      notify('error', errors.join('；'))
-      return false
-    }
-    Object.assign(s, item)
-    log('ADVANCE', '督办', superviseId, { action, status: item.status })
-    notify('success', `督办 ${s.code} 已推进至「${item.status}」${item.escalated ? '（超期已升级）' : ''}`)
-    return true
-  }
 
   // —— PFM 组合与投资域（决策留痕 / ROI / What-if，FUN-023）——
 
@@ -4448,10 +4250,6 @@ export const useAppStore = defineStore('app', () => {
     projectRetros,
     projectLessons,
     projectDeviations,
-    projectMeetings,
-    projectResolutions,
-    projectSendAudits,
-    projectSupervises,
     projectInvestments,
     calendars,
     myTasks,
@@ -4559,15 +4357,6 @@ export const useAppStore = defineStore('app', () => {
     pushLessonToLibrary,
     reuseLesson,
     knowledgeStats: () => knowledgeStats(data.value.lessons),
-    addResolution,
-    resolutionToTask,
-    closeResolution,
-    overdueResolutionsList,
-    addMeeting,
-    addSendAudit,
-    answerSendAudit,
-    dispatchSupervise,
-    advanceSupervise,
     addDecision,
     roiOfProject,
     validateCurrencyAmount,
