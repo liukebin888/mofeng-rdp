@@ -15,8 +15,9 @@
 - 部署：server/Dockerfile + deploy/Dockerfile.web + docker-compose.yml（前端 8080 + 后端内网 + 卷 mofeng-data）；后端构建 context=./server；手册 docs/DEPLOYMENT.md。
 
 ## Git push 踩坑（2026-11-16/17）
-- 注入代理 `http://127.0.0.1:13775`（旧 7814 已失效）。`git -c http.proxy=... push` 曾可用，现 GitHub git 通道不通：代理 502 `CONNECT tunnel failed`，unset 直连 `Connection reset`。`curl https://api.github.com` 走代理 200 可达；git 协议通道不可用。
-- 用户决策：等网络恢复再推，保持提交历史完整，不走 API 合并。恢复后 `git -c http.proxy=http://127.0.0.1:13775 push origin main`，核对 `git rev-list --left-right --count origin/main...main` = `0 0`。
+- 注入代理 `http://127.0.0.1:13775`（旧 7814 已失效）。曾出现代理 502 `CONNECT tunnel failed`、unset 直连 `Connection reset`，但 `curl https://api.github.com` 走代理一直 200 可达。
+- **2026-11-17 晚网络恢复**：`git ls-remote` 代理/直连均通，`git -c http.proxy=http://127.0.0.1:13775 push origin main` 成功，12 个待推提交一次性同步（36750fc..d244f5f），`git rev-list --left-right --count origin/main...main` = `0 0`。
+- 用户原则：保持提交历史完整，不走 API 合并；网络不通时先本地提交待推，恢复后补推。
 - 沙箱 `reg.exe` 被黑名单，探测注册表协议改走 `tasklist`。
 
 ## 六门禁（全过才闭环）
@@ -63,4 +64,4 @@
 ## 最新进度（R3 收官）
 - R3 全部方向完成（流程/租户/文档/经验/组合/日历/我的工作/治理/消息/共享/门户配置/草稿/多语言/移动门户/资源/风险/采购/报表/通用PM/接口计划/闸门一致性/OpenAPI/菜单导航）。门户与协同已彻底删除（非 R3 方向，用户主动精简）。
 - 六门禁基线：vue-tsc 0 / vitest 1585 / build 成功 / smoke exit 0 / e2e 33 / chainOk true。
-- 本地 main 领先 origin/main 10+ 提交待推；AI 真实模型 Key ⏸ 待用户提供。
+- 本地 main 与 origin/main 完全同步（`0 0`，远端 HEAD `d244f5f`）；AI 真实模型 Key ⏸ 待用户提供。
