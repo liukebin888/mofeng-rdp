@@ -55,7 +55,9 @@
 - 「组合与投资」并入「成本管理」：删 key:portfolio 组，5 子菜单 /portfolio/* → /cost/*（score/capacity/analysis/eps/gate-consistency），组件文件仍留 views/portfolio/；locale 中英文词条迁移，保留 /report/portfolio（组合级驾驶舱，属报表）。
 - 菜单重命名（仅显示文案，路径不变）：「项目执行」→「项目管理」（key:project）、「项目计划与进度」→「计划与进度」（key:plan）；locale 英文 Project Execution→Project Management。
 - 新建「行政管理」组（key:admin，图标 OfficeBuilding，置于 system 前）：系统管理下「组织与用户」「角色权限」迁入，路径 /system/org|roles → /admin/org|roles，组件文件仍留 views/system/。系统管理剩 7 项。
-- 拆分「资源与成本」组（key:resource 撤销）：成本项 `/resource/evm` 四值与挣值报表 → `/cost/evm`（成本管理，与成本偏差/工时归集同属挣值域）；资源项 `/resource/overload` → `/admin/overload`、`/resource/pool` → `/admin/pool`（行政管理）。组件物理文件仍留 views/resource/。一级菜单现 **18 个**，二级页仍 107。
+- 拆分「资源与成本」组（key:resource 撤销）：成本项 `/resource/evm` 四值与挣值报表 → `/cost/evm`（成本管理，与成本偏差/工时归集同属挣值域）；资源项 `/resource/overload` → `/admin/overload`、`/resource/pool` → `/admin/pool`（行政管理）。组件物理文件仍留 views/resource/。
+- 报表与看板并入顶部工作中心：`key:report` 撤销，4 项 `/report/*` → `/workbench/*`（dashboard/portfolio/audit/rules），组件物理文件仍留 views/report/；并入后 role 由「管理层」变「全员」，每个登录账号可在页面顶部访问。一级菜单现 **17 个**，二级页仍 107。
+- **顶部/侧栏渲染机制**：`AppLayout.vue` 中 `workbenchItems` 取 key='workbench' 的 items 渲染**页面顶部横向导航**，`sideMenus` 渲染其余分组到侧栏。要把某组移到「页面上端工作中心」= 把 items 并入 workbench 组（路径前缀改 `/workbench/*` 以保一致）。
 - **关键约束**：`AppLayout.isGroupActive` 用 `route.path.startsWith('/'+key)`，菜单路径前缀必须与 group key 一致，否则高亮失效。所有菜单迁移均「改路径、改 locale、探针/视图 tabs 同步、不挪物理组件文件」。
 
 ## 最新进度（R3 收官）
