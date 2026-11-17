@@ -23,7 +23,7 @@ export interface MenuGroup {
 const viewModules = import.meta.glob('../views/**/*.vue')
 const v = (p: string) => viewModules[`../views/${p}.vue`] as () => Promise<unknown>
 
-/** 18 个一级菜单，与 SOLUTION 11.1 一一对应；二级页标注 P0/P1 批次 */
+/** 17 个一级菜单，与 SOLUTION 11.1 一一对应；二级页标注 P0/P1 批次 */
 export const MENUS: MenuGroup[] = [
   {
     key: 'workbench', title: '工作中心', icon: 'Grid', stage: 'P1–P7', role: '全员', cp: '—',
@@ -33,7 +33,11 @@ export const MENUS: MenuGroup[] = [
       { path: '/workbench/todos', title: '我的待办', desc: '与流程中心同源（RPT-013）', icon: 'Tickets', comp: v('flow/ApprovalsView') },
       { path: '/workbench/messages', title: '消息与收件箱', desc: '已读回执 + 三类来件（POR-006/008）', icon: 'Message', comp: v('wb/InboxView') },
       { path: '/workbench/hours', title: '我的工时单', desc: '工时填报与审核（POR-009/010）', icon: 'Timer', comp: v('wb/HoursView') },
-      { path: '/workbench/light-task-board', title: '通用任务看板', desc: '轻量任务列表/看板/甘特三态 + 自定义字段（GEN-001/002/003 通用 PM）', icon: 'Grid', comp: v('wb/LightTaskBoardView') }
+      { path: '/workbench/light-task-board', title: '通用任务看板', desc: '轻量任务列表/看板/甘特三态 + 自定义字段（GEN-001/002/003 通用 PM）', icon: 'Grid', comp: v('wb/LightTaskBoardView') },
+      { path: '/workbench/dashboard', title: '项目级驾驶舱', desc: 'Gate/待办/逾期同源', icon: 'Odometer', comp: v('report/DashboardView') },
+      { path: '/workbench/portfolio', title: '组合级驾驶舱', desc: '企业级聚合视图（跨项目 SPI/CPI/风险/交接）', icon: 'PieChart', comp: v('report/PortfolioDashboardView') },
+      { path: '/workbench/audit', title: '审计与合规报表', desc: '哈希链校验报告', icon: 'DocumentChecked', comp: v('report/AuditReportView') },
+      { path: '/workbench/rules', title: '规则体检', desc: '48 控制点分布与口径核对', icon: 'List', comp: v('report/RulesView') }
     ]
   },
   {
@@ -174,15 +178,6 @@ export const MENUS: MenuGroup[] = [
       { path: '/supply/deliverables', title: '交付物清单', desc: '缺件率 0 方可提交（C-19）', icon: 'List', comp: v('delivery/DeliverableView') },
       { path: '/supply/ship', title: '样件发运与签收', desc: '签收后转已交付（HW-016）', icon: 'Van', comp: v('delivery/DeliverableView') },
       { path: '/supply/soft', title: '软件交付台账', desc: '版本与刷写记录', icon: 'Monitor', comp: v('delivery/SoftDeliverView') }
-    ]
-  },
-  {
-    key: 'report', title: '报表与看板', icon: 'DataAnalysis', stage: '全阶段', role: '管理层', cp: 'C-47',
-    items: [
-      { path: '/report/dashboard', title: '项目级驾驶舱', desc: 'Gate/待办/逾期同源', icon: 'Odometer', comp: v('report/DashboardView') },
-      { path: '/report/portfolio', title: '组合级驾驶舱', desc: '企业级聚合视图（跨项目 SPI/CPI/风险/交接）', icon: 'PieChart', comp: v('report/PortfolioDashboardView') },
-      { path: '/report/audit', title: '审计与合规报表', desc: '哈希链校验报告', icon: 'DocumentChecked', comp: v('report/AuditReportView') },
-      { path: '/report/rules', title: '规则体检', desc: '48 控制点分布与口径核对', icon: 'List', comp: v('report/RulesView') }
     ]
   },
   {

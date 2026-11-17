@@ -166,7 +166,7 @@ async function resetState(page) {
 
   // ============ 链路 6：审计链校验 + 导出 + 归档层结构（空态） ============
   console.log('\n[链路6] 审计链校验与导出')
-  await page.goto(BASE + '/#/report/audit', { waitUntil: 'domcontentloaded' })
+  await page.goto(BASE + '/#/workbench/audit', { waitUntil: 'domcontentloaded' })
   await page.waitForTimeout(400)
   const auditBody = await bodyText(page)
   ok('存在「校验哈希链」按钮', /校验哈希链/.test(auditBody))

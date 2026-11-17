@@ -143,7 +143,7 @@ async function goto(page, route) {
   cmp('trace', '影响闭包-冻结停止', mini['冻结停止'], exp.trace.impactR01.frozenStopped)
 
   // ---------- 6. 审计与合规报表 ----------
-  await goto(page, '/report/audit')
+  await goto(page, '/workbench/audit')
   k = await kpis(page)
   cmp('audit', '审计记录条数', pick(k, '审计记录').value, exp.audit.rows)
   cmp('audit', '链完整性', pick(k, '链完整性').value, exp.audit.chainOk ? '连续' : '断裂')

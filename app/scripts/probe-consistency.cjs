@@ -65,7 +65,7 @@ const VIEWS = [
     }
   },
   {
-    route: '/report/dashboard', page: '项目级驾驶舱',
+    route: '/workbench/dashboard', page: '项目级驾驶舱',
     kpis: {
       '加权完成率': 'shared.weightedPercent',
       'SPI': 'shared.spi',
@@ -87,7 +87,7 @@ const VIEWS = [
     }
   },
   {
-    route: '/report/audit', page: '审计与合规报表',
+    route: '/workbench/audit', page: '审计与合规报表',
     kpis: { '审计记录': 'counts.audit' }
   },
   {
