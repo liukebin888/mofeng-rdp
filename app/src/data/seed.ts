@@ -57,7 +57,10 @@ import type {
   NamingRuleHistory,
   CodeIssue,
   CodePattern,
-  NamingPattern
+  NamingPattern,
+  AiAccountBinding,
+  AiAccountState,
+  BindStatus
 } from '@/domain/types'
 import { ROLES } from '@/domain/rbac'
 import type { FlowDefinition, FlowInstance } from '@/domain/flowEngine'
@@ -876,6 +879,9 @@ export function buildSeed() {
   /** AI 调用日志（附录 B.3 ai_call_log）：平台不预置演示数据 */
   const aiCallLogs: AiCallLog[] = []
 
+  /** AI 账号绑定（手机号短信核验 + 用户自带 Key）：空态起步；API Key 绝不入库 */
+  const aiAccount: AiAccountState = { status: 'unbound' as BindStatus, bindings: [] as AiAccountBinding[] }
+
   const schemeLinked = true
   const quoteLinked = true
 
@@ -979,6 +985,7 @@ export function buildSeed() {
     aiCorpus,
     aiSwitch,
     aiCallLogs,
+    aiAccount,
     projectReviews: [] as HumanReview[],
     flowDefinitions: [
       // ① 含「条件分支 + 超时升级」的 ECR 审批流程（FUN-017 验收样例：不发版生效）

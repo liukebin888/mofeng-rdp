@@ -1378,4 +1378,26 @@ export interface RejectionPolicyItem {
   locked?: boolean
 }
 
+// —— AI 账号绑定（手机号短信核验 + 用户自带 Key）——
+// 安全红线：API Key 只走浏览器会话内存 / 请求体，绝不进入本层任何持久化结构。
+
+/** 绑定状态机：未绑定 → 已发送验证码 → 已绑定 */
+export type BindStatus = 'unbound' | 'code_sent' | 'bound'
+
+/** AI 账号绑定记录：手机号仅存密文 + 脱敏展示值，keyId 为加密密钥引用（密钥不与数据同库） */
+export interface AiAccountBinding {
+  userId: string
+  phoneEncrypted: string
+  phoneMasked: string
+  keyId: string
+  boundAt: string
+  status: BindStatus
+}
+
+/** AI 账号绑定状态（种子空态起步） */
+export interface AiAccountState {
+  status: BindStatus
+  bindings: AiAccountBinding[]
+}
+
 

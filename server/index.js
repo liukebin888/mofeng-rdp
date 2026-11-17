@@ -20,6 +20,8 @@
  *   GET  /api/audit             查询全量审计链 + 服务端链校验结果
  *   POST /api/audit             追加一条审计（服务端重算哈希，append-only）
  *   POST /api/ai/chat           WorkBuddy 研发助手对话网关（SSE 流式；越权前置过滤 + 水印 + 审计留痕）
+ *   POST /api/ai/sms/send       手机号短信验证码下发（可配置网关；未配置走开发演示模式，不写审计）
+ *   POST /api/ai/sms/verify     手机号短信验证码核验（5 分钟时效 + 单号 5 次上限，不写审计）
  *
  * 运行：node server/index.js   （默认端口 8787，可用 PORT 覆盖）
  */
@@ -73,6 +75,82 @@ const AI_ENDPOINT = process.env.AI_ENDPOINT || 'https://api.workbuddy.dev/v1'
 const AI_AGENT_ID = process.env.AI_AGENT_ID || ''
 const AI_MODEL = process.env.AI_MODEL || 'mofeng-rdp-assistant'
 const CLASS_RANK = { L1: 1, L2: 2, L3: 3, L4: 4 }
+
+// —— 手机号短信核验（可配置短信网关 + 诚实降级）——
+// 未配置 SMS_ENDPOINT / SMS_ACCESS_KEY / SMS_TEMPLATE_ID 时走开发演示模式：
+// 验证码仅在响应 devCode 中回显，且 devMode:true + 明确提示「开发演示模式，未发送真实短信」，
+// 绝不伪装成已下发真实短信。验证码只存进程内存 Map，不落盘、不进审计。
+const SMS_ENDPOINT = process.env.SMS_ENDPOINT || ''
+const SMS_ACCESS_KEY = process.env.SMS_ACCESS_KEY || ''
+const SMS_TEMPLATE_ID = process.env.SMS_TEMPLATE_ID || ''
+const SMS_SIGN_NAME = process.env.SMS_SIGN_NAME || ''
+const SMS_TIMEOUT_MS = Number(process.env.SMS_TIMEOUT_MS || 5000)
+const smsConfigured = Boolean(SMS_ENDPOINT && SMS_ACCESS_KEY && SMS_TEMPLATE_ID)
+const PHONE_RE = /^1[3-9]\d{9}$/
+const SMS_CODE_TTL_MS = 5 * 60 * 1000
+const SMS_MAX_ATTEMPTS = 5
+/** key = 手机号，value = { code, createdAt, attempts } */
+const smsCodes = new Map()
+
+/** 生成 6 位数字验证码（Node 内置 crypto，零依赖） */
+function createSmsCode() {
+  return String(crypto.randomInt(0, 1000000)).padStart(6, '0')
+}
+
+/** 清理过期 + 超限验证码，避免内存无限增长 */
+function sweepSmsCodes(now = Date.now()) {
+  for (const [phone, rec] of smsCodes) {
+    if (now - rec.createdAt > SMS_CODE_TTL_MS + 10 * 60 * 1000 || rec.attempts >= SMS_MAX_ATTEMPTS) {
+      smsCodes.delete(phone)
+    }
+  }
+}
+const smsSweeper = setInterval(sweepSmsCodes, 60 * 1000)
+if (typeof smsSweeper.unref === 'function') smsSweeper.unref()
+
+/**
+ * 通用短信网关下发：POST JSON 到 SMS_ENDPOINT，Authorization: Bearer <SMS_ACCESS_KEY>。
+ * 具体参数从 env 取：templateId / signName / ttlSeconds；SMS_EXTRA_JSON 可追加网关专属字段。
+ * 网关非 2xx / 超时一律抛错，由端点如实返回错误，不伪造成功。
+ */
+async function deliverSmsCode(phone, code) {
+  const extra = {}
+  if (process.env.SMS_EXTRA_JSON) {
+    try {
+      const parsed = JSON.parse(process.env.SMS_EXTRA_JSON)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) Object.assign(extra, parsed)
+    } catch {
+      throw new Error('SMS_EXTRA_JSON 不是合法 JSON 对象')
+    }
+  }
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), SMS_TIMEOUT_MS)
+  try {
+    const resp = await fetch(SMS_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SMS_ACCESS_KEY}` },
+      body: JSON.stringify({
+        phone,
+        code,
+        templateId: SMS_TEMPLATE_ID,
+        signName: SMS_SIGN_NAME,
+        ttlSeconds: Math.floor(SMS_CODE_TTL_MS / 1000),
+        ...extra
+      }),
+      signal: controller.signal
+    })
+    if (!resp.ok) {
+      let detail = ''
+      try { detail = await resp.text() } catch { /* 忽略响应体读取失败 */ }
+      throw new Error(`短信网关返回 ${resp.status}${detail ? '：' + detail.slice(0, 200) : ''}`)
+    }
+  } catch (err) {
+    if (err && err.name === 'AbortError') throw new Error(`短信网关超时（${SMS_TIMEOUT_MS}ms）`)
+    throw err
+  } finally {
+    clearTimeout(timer)
+  }
+}
 
 /** 越权前置过滤：租户/项目/密级任一不符即剔除（越权命中须为 0） */
 function filterAiContext(items, scope) {
@@ -661,10 +739,97 @@ const server = http.createServer(async (req, res) => {
       return send(res, 201, { ok: true, tenantId: t.tenantId, saved: true, seq: base.seq, rowHash: base.rowHash, count: rows.length, at: base.occurredAt })
     }
 
+    // —— AI 账号绑定：手机号短信验证码（不写审计，避免手机号/验证码入审计链）——
+    // POST /api/ai/sms/send  body { phone } → 下发验证码；未配置短信凭证时 devMode:true + devCode 回显
+    if (req.method === 'POST' && p === '/api/ai/sms/send') {
+      const raw = await readBody(req)
+      let body
+      try {
+        body = JSON.parse(raw)
+      } catch {
+        return send(res, 400, { ok: false, code: 'BAD_JSON', message: '请求体非合法 JSON' })
+      }
+      const phone = typeof body?.phone === 'string' ? body.phone.trim() : ''
+      if (!PHONE_RE.test(phone)) {
+        return send(res, 400, { ok: false, code: 'INVALID_PHONE', message: '手机号格式不正确（中国大陆 11 位）' })
+      }
+      const now = Date.now()
+      sweepSmsCodes(now)
+      const prev = smsCodes.get(phone)
+      // 重发不重置尝试次数，避免反复请求绕过上限
+      const attempts = prev && now - prev.createdAt < SMS_CODE_TTL_MS ? prev.attempts : 0
+      if (attempts >= SMS_MAX_ATTEMPTS) {
+        smsCodes.delete(phone)
+        return send(res, 429, { ok: false, code: 'SMS_TOO_MANY_ATTEMPTS', message: '该手机号尝试次数过多，请稍后再试' })
+      }
+      const code = createSmsCode()
+      if (smsConfigured) {
+        try {
+          await deliverSmsCode(phone, code)
+        } catch (err) {
+          // 网关失败如实返回，不落验证码、不伪装成功
+          return send(res, 502, { ok: false, code: 'SMS_GATEWAY_FAILED', message: `短信下发失败：${err && err.message ? err.message : String(err)}` })
+        }
+        smsCodes.set(phone, { code, createdAt: now, attempts })
+        return send(res, 200, { ok: true, devMode: false, message: '验证码已发送', expiresIn: Math.floor(SMS_CODE_TTL_MS / 1000) })
+      }
+      smsCodes.set(phone, { code, createdAt: now, attempts })
+      return send(res, 200, {
+        ok: true,
+        devMode: true,
+        devCode: code,
+        message: '开发演示模式，未发送真实短信',
+        expiresIn: Math.floor(SMS_CODE_TTL_MS / 1000)
+      })
+    }
+
+    // POST /api/ai/sms/verify  body { phone, code } → 5 分钟时效 + 5 次上限；成功即失效
+    if (req.method === 'POST' && p === '/api/ai/sms/verify') {
+      const raw = await readBody(req)
+      let body
+      try {
+        body = JSON.parse(raw)
+      } catch {
+        return send(res, 400, { ok: false, code: 'BAD_JSON', message: '请求体非合法 JSON' })
+      }
+      const phone = typeof body?.phone === 'string' ? body.phone.trim() : ''
+      const code = typeof body?.code === 'string' ? body.code.trim() : ''
+      if (!PHONE_RE.test(phone)) {
+        return send(res, 400, { ok: false, code: 'INVALID_PHONE', message: '手机号格式不正确（中国大陆 11 位）' })
+      }
+      if (!/^\d{4,8}$/.test(code)) {
+        return send(res, 400, { ok: false, code: 'INVALID_CODE', message: '验证码须为 4~8 位数字' })
+      }
+      const now = Date.now()
+      sweepSmsCodes(now)
+      const rec = smsCodes.get(phone)
+      if (!rec) {
+        return send(res, 400, { ok: false, code: 'SMS_CODE_NOT_FOUND', message: '请先发送验证码' })
+      }
+      if (rec.attempts >= SMS_MAX_ATTEMPTS) {
+        smsCodes.delete(phone)
+        return send(res, 429, { ok: false, code: 'SMS_TOO_MANY_ATTEMPTS', message: '尝试次数已用完，请重新发送验证码' })
+      }
+      if (now - rec.createdAt >= SMS_CODE_TTL_MS) {
+        smsCodes.delete(phone)
+        return send(res, 400, { ok: false, code: 'SMS_CODE_EXPIRED', message: '验证码已过期，请重新发送' })
+      }
+      if (rec.code !== code) {
+        rec.attempts += 1
+        const left = Math.max(0, SMS_MAX_ATTEMPTS - rec.attempts)
+        if (left === 0) smsCodes.delete(phone)
+        return send(res, 400, { ok: false, code: 'SMS_CODE_MISMATCH', message: `验证码错误，剩余 ${left} 次`, attemptsLeft: left })
+      }
+      // 一次性验证码：校验通过立即失效
+      smsCodes.delete(phone)
+      return send(res, 200, { ok: true, message: '验证码校验通过' })
+    }
+
     // —— AI 研发助手对话网关（阶段二）：越权前置过滤 + SSE 流式 + 审计留痕 ——
-    // POST /api/ai/chat  body: { question, projectId?, projectName?, context?: AiContextItem[], sessionId? }
-    //   ① 越权前置过滤（租户/项目/密级，命中 0）；② 组装提示词；③ 有 Agent Key 走真实模型，否则降级占位；
-    //   ④ SSE 流式返回；⑤ 写一条 AI_CALL 审计事件（chainOk 连续）。
+    // POST /api/ai/chat  body: { question, projectId?, projectName?, context?: AiContextItem[], sessionId?, apiKey? }
+    //   ① 越权前置过滤（租户/项目/密级，命中 0）；② 组装提示词；
+    //   ③ 鉴权优先级：请求体用户自带 apiKey → 服务端 CODEBUDDY_API_KEY → 占位降级；
+    //   ④ SSE 流式返回；⑤ 写一条 AI_CALL 审计事件（chainOk 连续，绝不写入 Key 明文）。
     if (req.method === 'POST' && p === '/api/ai/chat') {
       const raw = await readBody(req)
       let body
@@ -698,12 +863,17 @@ const server = http.createServer(async (req, res) => {
       })
       const emit = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
 
-      // ③ 是否配置了 Agent Key（有则真实调用，无则降级占位）
-      const apiKey = process.env.CODEBUDDY_API_KEY
+      // ③ 鉴权优先级：用户自带 Key（body.apiKey）→ 服务端 Key（env）→ 占位降级。
+      //    Key 仅在本请求内使用，绝不进入审计字段；realModel 只有真实调用成功才置 true。
+      const userApiKey = typeof body.apiKey === 'string' ? body.apiKey.trim() : ''
+      const apiKey = userApiKey || process.env.CODEBUDDY_API_KEY || ''
+      const keySource = userApiKey ? 'user' : apiKey ? 'server' : 'none'
+      let usedRealModel = false
       let finalText
       try {
         if (apiKey) {
           finalText = await callWorkbuddyOpenApi(apiKey, prompt, (chunk) => emit('delta', { text: chunk }))
+          usedRealModel = true
         } else {
           finalText = await fallbackAiAnswer(body.question.trim(), body.projectName, visible, filtered, (chunk) => emit('delta', { text: chunk }))
         }
@@ -726,7 +896,7 @@ const server = http.createServer(async (req, res) => {
           objType: 'ai_chat',
           objId: body.sessionId || `AI-${Date.now()}`,
           before: { question: body.question.trim(), visibleCount: visible.length },
-          after: { filteredCount: filtered.length, realModel: Boolean(apiKey) },
+          after: { filteredCount: filtered.length, realModel: usedRealModel },
           result: 'OK',
           tenantId: t.tenantId,
           prevHash: prev
@@ -738,7 +908,7 @@ const server = http.createServer(async (req, res) => {
         /* 审计失败不阻断响应，但记录（降级） */
       }
 
-      emit('done', { ok: true, filteredCount: filtered.length, realModel: Boolean(apiKey), text: finalText })
+      emit('done', { ok: true, filteredCount: filtered.length, realModel: usedRealModel, keySource, text: finalText })
       return res.end()
     }
 

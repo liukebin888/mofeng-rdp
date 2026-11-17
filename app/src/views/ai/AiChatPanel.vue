@@ -7,6 +7,29 @@
       <el-button size="small" type="primary" @click="send">账号绑定对话</el-button>
     </div>
 
+    <!-- 账号绑定 + 用户自带 Key：绑定非强制，只用 Key 也能问答；Key 仅在会话内 -->
+    <div class="ai-account">
+      <div class="account-line">
+        <span class="account-title">{{ t('ai.bind.section') }}</span>
+        <span class="muted">{{ bound ? `${t('ai.bind.bound')} ${bound.phoneMasked}` : t('ai.bind.unbound') }}</span>
+        <span v-if="modelLabel" class="model-tag" :class="modelMode">{{ modelLabel }}</span>
+      </div>
+      <div class="account-row">
+        <el-input v-model="bindPhone" size="small" clearable class="phone-input" :placeholder="t('ai.bind.phonePh')" />
+        <el-button size="small" :loading="smsSending" :disabled="!validPhone || smsSending" @click="sendCode">{{ t('ai.bind.sendCode') }}</el-button>
+        <el-input v-model="bindCode" size="small" clearable class="code-input" :placeholder="t('ai.bind.codePh')" />
+        <el-button size="small" type="primary" :loading="binding" :disabled="!validPhone || !bindCode.trim() || binding" @click="confirmBind">{{ t('ai.bind.confirm') }}</el-button>
+      </div>
+      <div v-if="devTip" class="dev-tip">{{ devTip }}</div>
+      <div class="account-row key-row">
+        <span class="key-label">{{ t('ai.bind.keyLabel') }}</span>
+        <el-input v-model="sessionKey" :type="showKey ? 'text' : 'password'" size="small" clearable class="key-input" :placeholder="t('ai.bind.keyPh')" @keyup.enter="saveKey" />
+        <el-button size="small" @click="showKey = !showKey">{{ showKey ? t('ai.bind.hideKey') : t('ai.bind.showKey') }}</el-button>
+        <el-button size="small" type="primary" plain @click="saveKey">{{ t('ai.bind.keySave') }}</el-button>
+        <el-button size="small" text @click="clearKey">{{ t('ai.bind.keyClear') }}</el-button>
+      </div>
+    </div>
+
     <div ref="listRef" class="chat-list">
       <div v-if="!messages.length" class="chat-empty">
         <el-empty description="向「魔程化解研发助手」提问，AI 以当前项目上下文作答（越权内容不可见，输出带待复核水印）" :image-size="70" />
@@ -42,6 +65,7 @@
 import { computed, ref, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useAppStore } from '@/store/app'
+import { useI18n } from '@/infra/i18nPlugin'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -49,6 +73,7 @@ interface ChatMessage {
 }
 
 const store = useAppStore()
+const { t } = useI18n()
 const currentUser = computed(() => store.currentUser)
 const aiEnabled = computed(() => store.aiSwitchState.enabled)
 const watermark = '【AI 生成 · 待人工复核 · 不作为放行依据】'
@@ -59,6 +84,25 @@ const messages = ref<ChatMessage[]>([])
 const streaming = ref(false)
 const streamText = ref('')
 const listRef = ref<HTMLElement | null>(null)
+
+// —— 账号绑定 / 自带 Key（会话态）——
+const bound = computed(() => store.aiBinding)
+const bindPhone = ref('')
+const bindCode = ref('')
+const smsSending = ref(false)
+const binding = ref(false)
+const devTip = ref('')
+const sessionKey = ref(store.getSessionApiKey())
+const showKey = ref(false)
+/** 最近一次问答的模型来源：idle 未发起 / real 真实模型 / fallback 占位降级 / error 调用失败 */
+const modelMode = ref<'idle' | 'real' | 'fallback' | 'error'>('idle')
+const validPhone = computed(() => store.isValidAiPhone(bindPhone.value))
+const modelLabel = computed(() => {
+  if (modelMode.value === 'real') return t('ai.bind.modelReal')
+  if (modelMode.value === 'fallback') return t('ai.bind.modelFallback')
+  if (modelMode.value === 'error') return t('ai.bind.modelError')
+  return ''
+})
 
 const tenantId = computed(() => (store.data as any).tenantId || 'T-1001')
 const projectId = computed(() => store.projectId as string)
@@ -92,6 +136,48 @@ function buildContext(): Array<{ id: string; objType: string; tenantId: string; 
 /** 后端 base（与 infra/repo.ts 一致，可用 VITE_API_BASE 覆盖） */
 const REST_BASE = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_API_BASE ?? 'http://127.0.0.1:8787'
 
+/** 请求短信验证码：未配置短信网关时后端回显 devCode，此处明示「未发送真实短信」 */
+async function sendCode() {
+  if (!validPhone.value || smsSending.value) return
+  smsSending.value = true
+  devTip.value = ''
+  const r = await store.sendAiSmsCode(bindPhone.value)
+  if (r.ok && r.devMode) devTip.value = `${t('ai.bind.devCode')}${r.devCode || ''}`
+  smsSending.value = false
+}
+
+/** 校验验证码并完成绑定：明文手机号只用于核验，落库为密文 + 脱敏值 */
+async function confirmBind() {
+  if (!validPhone.value || !bindCode.value.trim() || binding.value) return
+  binding.value = true
+  const r = await store.bindAiAccount(bindPhone.value, bindCode.value)
+  if (r.ok) {
+    bindCode.value = ''
+    devTip.value = ''
+  }
+  binding.value = false
+}
+
+/** 保存 Key 到浏览器会话：仅内存/sessionStorage，不进 store 业务数据 */
+function saveKey() {
+  const ok = store.setSessionApiKey(sessionKey.value)
+  if (!ok) {
+    ElMessage.warning(t('ai.bind.keyInvalid'))
+    return
+  }
+  if (sessionKey.value.trim()) {
+    sessionKey.value = sessionKey.value.trim()
+    ElMessage.success(t('ai.bind.keySaved'))
+  }
+}
+
+/** 清除本会话 Key（关闭标签页也会自动失效） */
+function clearKey() {
+  sessionKey.value = ''
+  store.setSessionApiKey('')
+  ElMessage.info(t('ai.bind.keyCleared'))
+}
+
 async function send() {
   const q = draft.value.trim()
   if (!q || streaming.value || !aiEnabled.value) return
@@ -99,8 +185,11 @@ async function send() {
   messages.value.push({ role: 'user', content: q })
   streaming.value = true
   streamText.value = ''
+  modelMode.value = 'idle'
   scrollToBottom()
 
+  // 用户自带 Key 只在本次请求体内携带；不写入业务状态、审计或日志
+  const sessionApiKey = store.getSessionApiKey()
   const body = {
     question: q,
     projectId: projectId.value || '',
@@ -111,7 +200,8 @@ async function send() {
     actorId: currentUser.value?.id || 'unknown',
     actorName: currentUser.value?.name || 'unknown',
     actorRole: currentUser.value?.roleName || 'user',
-    sessionId: `UI-${Date.now()}`
+    sessionId: `UI-${Date.now()}`,
+    ...(sessionApiKey ? { apiKey: sessionApiKey } : {})
   }
 
   let finalText = ''
@@ -150,6 +240,8 @@ async function send() {
             scrollToBottom()
           } else if (event === 'done') {
             finalText = obj.text || streamText.value
+            // done 事件 realModel 如实反映本次是否真的调用真实模型
+            modelMode.value = obj.realModel ? 'real' : 'fallback'
           }
         } catch {
           /* 忽略无法解析的块 */
@@ -158,7 +250,8 @@ async function send() {
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    finalText = `【AI 生成 · 待人工复核 · 不作为放行依据】\nAI 调用失败：${msg}（请确认后端已启动并配置 Agent Key）`
+    modelMode.value = 'error'
+    finalText = `【AI 生成 · 待人工复核 · 不作为放行依据】\nAI 调用失败：${msg}（请确认后端已启动并配置有效 API Key）`
     streamText.value = finalText
   }
 
@@ -225,6 +318,20 @@ async function openWorkbuddy() {
 .ai-chat { display: flex; flex-direction: column; gap: 8px; }
 .chat-toolbar { display: flex; align-items: center; gap: 12px; }
 .ctx-note { font-size: 12px; }
+.ai-account { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--bg-3, #2a3a52); border-radius: 8px; padding: 8px 10px; }
+.account-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.account-title { font-size: 12px; font-weight: 600; }
+.account-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.phone-input { width: 190px; }
+.code-input { width: 160px; }
+.key-row { margin-top: 2px; }
+.key-label { font-size: 12px; color: var(--text-3); }
+.key-input { width: 320px; max-width: 60vw; }
+.dev-tip { font-size: 12px; color: #e6a23c; word-break: break-all; }
+.model-tag { margin-left: auto; font-size: 11px; border-radius: 10px; padding: 2px 8px; border: 1px solid var(--bg-3, #2a3a52); }
+.model-tag.real { color: #67c23a; border-color: #67c23a; }
+.model-tag.fallback { color: #e6a23c; border-color: #e6a23c; }
+.model-tag.error { color: #f56c6c; border-color: #f56c6c; }
 .chat-list { height: 420px; overflow-y: auto; border: 1px solid var(--bg-3, #2a3a52); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .chat-empty { margin: auto; }
 .msg { display: flex; flex-direction: column; gap: 4px; }
@@ -239,5 +346,5 @@ async function openWorkbuddy() {
 @keyframes blink { 50% { opacity: 0; } }
 .chat-input { display: flex; flex-direction: column; gap: 6px; }
 .input-actions { display: flex; align-items: center; justify-content: space-between; }
-.muted { color: var(--text-3); }
+.muted { color: var(--text-3); font-size: 12px; }
 </style>

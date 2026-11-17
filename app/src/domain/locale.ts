@@ -222,7 +222,30 @@ export const zhCN: Dict = {
   'wf.customApprovers.rolePh': '选择审核角色',
   'wf.customApprovers.signRolesPh': '选择会签角色（可多选）',
   'wf.customApprovers.addApprove': '增加审核',
-  'wf.customApprovers.addSign': '增加会签'
+  'wf.customApprovers.addSign': '增加会签',
+
+  // —— AI 账号绑定与自带 Key（本次增量；菜单/品牌/既有词条一律不动）——
+  'ai.bind.section': '账号绑定与凭证',
+  'ai.bind.phonePh': '输入中国大陆手机号（11 位）',
+  'ai.bind.sendCode': '发送验证码',
+  'ai.bind.codePh': '输入短信验证码',
+  'ai.bind.confirm': '完成绑定',
+  'ai.bind.bound': '已绑定手机号',
+  'ai.bind.unbound': '未绑定手机号（可仅使用自带 Key 问答，绑定非强制）',
+  'ai.bind.codeSent': '验证码已发送，5 分钟内有效',
+  'ai.bind.devCode': '开发演示模式，未发送真实短信；本次验证码：',
+  'ai.bind.keyLabel': 'WorkBuddy API Key（仅本标签页会话有效）',
+  'ai.bind.keyPh': '粘贴你的 WorkBuddy API Key（Bearer Token）',
+  'ai.bind.keySave': '保存到本会话',
+  'ai.bind.keyClear': '清除本会话 Key',
+  'ai.bind.keySaved': 'Key 已保存到本次浏览器会话（不写入后端状态与审计）',
+  'ai.bind.keyCleared': '本会话 Key 已清除',
+  'ai.bind.keyInvalid': 'Key 形态不合法：请粘贴完整 Token（去空白后长度需大于 20）',
+  'ai.bind.modelReal': '本次：真实模型',
+  'ai.bind.modelFallback': '本次：占位降级（未使用真实模型）',
+  'ai.bind.modelError': '本次：调用失败（未使用真实模型）',
+  'ai.bind.showKey': '显示',
+  'ai.bind.hideKey': '隐藏'
 }
 
 export const enUS: Dict = {
@@ -437,7 +460,30 @@ export const enUS: Dict = {
   'btn.transfer': 'Transfer',
   'btn.escalate': 'Escalate',
   'flow.addSignPrompt': 'Append review/sign roles (e.g. "Legal", "Finance", separated by 、)',
-  'flow.addSignTitle': 'Add signer: append approval roles'
+  'flow.addSignTitle': 'Add signer: append approval roles',
+
+  // —— AI account binding & personal Key (new; menus/brand/existing entries untouched) ——
+  'ai.bind.section': 'Account Binding & Credential',
+  'ai.bind.phonePh': 'Mainland China phone number (11 digits)',
+  'ai.bind.sendCode': 'Send code',
+  'ai.bind.codePh': 'Enter SMS verification code',
+  'ai.bind.confirm': 'Bind now',
+  'ai.bind.bound': 'Phone bound',
+  'ai.bind.unbound': 'No phone bound (you may chat with your own Key only; binding is optional)',
+  'ai.bind.codeSent': 'Code sent, valid for 5 minutes',
+  'ai.bind.devCode': 'Dev demo mode, no real SMS sent; code: ',
+  'ai.bind.keyLabel': 'WorkBuddy API Key (current browser tab session only)',
+  'ai.bind.keyPh': 'Paste your WorkBuddy API Key (Bearer Token)',
+  'ai.bind.keySave': 'Save to this session',
+  'ai.bind.keyClear': 'Clear session Key',
+  'ai.bind.keySaved': 'Key saved for this browser session only (never written to server state or audit)',
+  'ai.bind.keyCleared': 'Session Key cleared',
+  'ai.bind.keyInvalid': 'Invalid Key shape: paste the full token (trimmed length must exceed 20)',
+  'ai.bind.modelReal': 'This turn: real model',
+  'ai.bind.modelFallback': 'This turn: placeholder fallback (no real model used)',
+  'ai.bind.modelError': 'This turn: call failed (no real model used)',
+  'ai.bind.showKey': 'Show',
+  'ai.bind.hideKey': 'Hide'
 }
 
 export const DICTS: Record<Locale, Dict> = {

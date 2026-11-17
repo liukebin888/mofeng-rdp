@@ -37,6 +37,18 @@ import { computeEvm } from '@/domain/evm'
 import { rankProjects } from '@/domain/portfolio'
 import { coverage, detectBreaks } from '@/domain/trace'
 import type { ActorContext, Baseline, GateDef, GateRun, Level, WbsNode, ThresholdIssue, RiskItem } from '@/domain/types'
+import { encryptField } from '@/domain/cipher'
+import {
+  bindingOf,
+  upsertBinding,
+  isKeyShapeValid,
+  isValidPhone,
+  maskPhone,
+  normalizePhone,
+  type AiAccountBinding,
+  type AiAccountState,
+  type BindStatus
+} from '@/domain/aiAccountEngine'
 import { canAny, canOperateAny, dataScopeOfRoles, roleOf, applyFieldPolicy, type ActionKey, type FieldPolicySurface } from '@/domain/rbac'
 import { guardTenant, visibleInTenant, groupDrillDown, type TenantContext } from '@/domain/tenant'
 import { canAccessSpace, visibleInSpace, accessibleSpaces, describeSwitch, type Space, type SpaceContext } from '@/domain/spaceEngine'
@@ -125,6 +137,45 @@ const KEY = 'mofeng.rdp.state.v1'
 const LOCALE_KEY = 'mofeng.rdp.locale.v1'
 /** 主题外观偏好独立持久化（NFR-017 可访问性：浅色/深色 + 强调色，不影响业务数据） */
 const THEME_KEY = 'mofeng.rdp.theme.v1'
+/**
+ * 用户自带 WorkBuddy API Key 仅存浏览器会话（sessionStorage + 内存）：
+ * 关闭标签页即清除；绝不写入 data / 审计 / 后端 state，也不进 git。
+ */
+const AI_SESSION_KEY_STORAGE = 'mofeng_ai_session_key'
+/** 手机号加密主密钥的会话存储键（密钥不落业务数据行，数据中只留 keyId） */
+const AI_FIELD_MASTER_STORAGE = 'mofeng.ai.field.master.v1'
+/** 手机号字段密钥句柄：密文前缀只记录该引用，密钥本体由环境/会话注入 */
+const AI_PHONE_KEY_ID = 'ai-phone-v1'
+
+/** 读取会话 Key：隐私模式 / 非浏览器环境返回空串，不抛错 */
+function readSessionApiKey(): string {
+  if (typeof sessionStorage === 'undefined') return ''
+  try {
+    return sessionStorage.getItem(AI_SESSION_KEY_STORAGE) || ''
+  } catch {
+    return ''
+  }
+}
+
+/** 手机号字段主密钥：优先环境变量注入，否则生成本会话随机密钥（不同标签页不可互解） */
+function aiFieldMasterKey(): string {
+  const envKey = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_AI_FIELD_MASTER_KEY
+  if (envKey && envKey.length > 8) return envKey
+  if (typeof sessionStorage === 'undefined') return 'mofeng-ai-field-fallback'
+  try {
+    let key = sessionStorage.getItem(AI_FIELD_MASTER_STORAGE)
+    if (!key) {
+      const bytes = new Uint8Array(16)
+      if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') crypto.getRandomValues(bytes)
+      else for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256)
+      key = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+      sessionStorage.setItem(AI_FIELD_MASTER_STORAGE, key)
+    }
+    return key
+  } catch {
+    return 'mofeng-ai-field-fallback'
+  }
+}
 
 export type ThemeMode = 'dark' | 'light'
 export type AccentKey = 'blue' | 'cyan' | 'purple' | 'green' | 'orange' | 'rose'
@@ -1610,6 +1661,129 @@ export const useAppStore = defineStore('app', () => {
     data.value.aiSwitch.projectSwitches[projectId] = enabled
     log('UPDATE', 'ai_switch', projectId, { enabled })
     notify('success', `项目 ${projectId} AI 已${enabled ? '开启' : '关闭'}`)
+  }
+
+  // —— AI 账号绑定（手机号短信核验 + 用户自带 Key）——
+  /** 会话态 Key：内存为主，sessionStorage 仅为同一标签页刷新后续用；不进 data.value */
+  const aiSessionApiKey = ref<string>(readSessionApiKey())
+  const aiAccountState = computed<AiAccountState>(() => data.value.aiAccount ?? { status: 'unbound', bindings: [] })
+  /** 当前用户绑定记录（Pinia 自动解包，视图直接用 store.aiBinding） */
+  const aiBinding = computed<AiAccountBinding | null>(() => bindingOf(aiAccountState.value, userId.value))
+  const aiBindStatus = computed<BindStatus>(() => aiBinding.value?.status ?? 'unbound')
+
+  /** 手机号形态校验（复用 domain 引擎，供视图控制按钮可用性，避免两处正则漂移） */
+  function isValidAiPhone(phone: string): boolean {
+    return isValidPhone(phone)
+  }
+
+  /** 读取本次会话的用户自带 Key（供 AI 请求体使用；绝不写入状态/审计） */
+  function getSessionApiKey(): string {
+    if (!aiSessionApiKey.value) aiSessionApiKey.value = readSessionApiKey()
+    return aiSessionApiKey.value
+  }
+
+  /**
+   * 保存 / 清除会话 Key：形态不合法时拒绝且保留旧值；空串表示清除。
+   * 返回是否成功（视图据此给出明确提示）。
+   */
+  function setSessionApiKey(key: string): boolean {
+    const k = typeof key === 'string' ? key.trim() : ''
+    if (k && !isKeyShapeValid(k)) return false
+    aiSessionApiKey.value = k
+    if (typeof sessionStorage !== 'undefined') {
+      try {
+        if (k) sessionStorage.setItem(AI_SESSION_KEY_STORAGE, k)
+        else sessionStorage.removeItem(AI_SESSION_KEY_STORAGE)
+      } catch {
+        /* 隐私模式禁用 storage：仅保留内存会话，不影响本次问答 */
+      }
+    }
+    return true
+  }
+
+  interface AiSmsSendResult {
+    ok: boolean
+    devMode?: boolean
+    devCode?: string
+    message: string
+  }
+
+  /** 请求发送短信验证码：手机号仅作为网关参数，不落状态、不写审计 */
+  async function sendAiSmsCode(phone: string): Promise<AiSmsSendResult> {
+    const p = normalizePhone(phone)
+    if (!isValidPhone(p)) {
+      const message = '请输入正确的中国大陆 11 位手机号'
+      notify('warning', message)
+      return { ok: false, message }
+    }
+    try {
+      const resp = await fetch(`${repoBase}/api/ai/sms/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-tenant-id': data.value.tenantId },
+        body: JSON.stringify({ phone: p, tenantId: data.value.tenantId })
+      })
+      const json = (await resp.json()) as { ok?: boolean; devMode?: boolean; devCode?: string; message?: string }
+      if (!resp.ok || !json.ok) {
+        const message = json.message || `短信发送失败（${resp.status}）`
+        notify('error', message)
+        return { ok: false, message }
+      }
+      const devMode = Boolean(json.devMode)
+      const message = json.message || (devMode ? '开发演示模式，未发送真实短信' : '验证码已发送')
+      notify(devMode ? 'warning' : 'success', devMode && json.devCode ? `${message}：${json.devCode}` : message)
+      if (data.value.aiAccount) data.value.aiAccount.status = 'code_sent'
+      return { ok: true, devMode, devCode: json.devCode, message }
+    } catch (err) {
+      const message = `短信服务不可用：${err instanceof Error ? err.message : String(err)}`
+      notify('error', message)
+      return { ok: false, message }
+    }
+  }
+
+  /** 校验验证码并完成绑定：手机号加密后落库，审计只记脱敏值，Key 全程不参与 */
+  async function bindAiAccount(phone: string, code: string): Promise<{ ok: boolean; message: string }> {
+    const p = normalizePhone(phone)
+    const c = typeof code === 'string' ? code.trim() : ''
+    if (!isValidPhone(p)) {
+      const message = '请输入正确的中国大陆 11 位手机号'
+      notify('warning', message)
+      return { ok: false, message }
+    }
+    if (!/^\d{4,8}$/.test(c)) {
+      const message = '请输入 4~8 位数字验证码'
+      notify('warning', message)
+      return { ok: false, message }
+    }
+    try {
+      const resp = await fetch(`${repoBase}/api/ai/sms/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-tenant-id': data.value.tenantId },
+        body: JSON.stringify({ phone: p, code: c, tenantId: data.value.tenantId })
+      })
+      const json = (await resp.json()) as { ok?: boolean; message?: string }
+      if (!resp.ok || !json.ok) {
+        const message = json.message || `验证码校验失败（${resp.status}）`
+        notify('error', message)
+        return { ok: false, message }
+      }
+      const binding: AiAccountBinding = {
+        userId: userId.value,
+        phoneEncrypted: encryptField(p, aiFieldMasterKey(), AI_PHONE_KEY_ID, 1),
+        phoneMasked: maskPhone(p),
+        keyId: AI_PHONE_KEY_ID,
+        boundAt: new Date().toISOString(),
+        status: 'bound'
+      }
+      data.value.aiAccount = upsertBinding(aiAccountState.value, binding)
+      // 审计仅含脱敏手机号与状态：禁止写入明文手机号、验证码或 API Key
+      log('AI_BIND', 'ai_account', userId.value, { phoneMasked: binding.phoneMasked, status: binding.status })
+      notify('success', `手机号 ${binding.phoneMasked} 绑定成功`)
+      return { ok: true, message: '绑定成功' }
+    } catch (err) {
+      const message = `绑定失败：${err instanceof Error ? err.message : String(err)}`
+      notify('error', message)
+      return { ok: false, message }
+    }
   }
 
   const gateResults = computed<Record<string, GateRun>>(() => {
@@ -4298,6 +4472,13 @@ export const useAppStore = defineStore('app', () => {
     aiScope,
     aiVisibleCorpus,
     aiCallLogs: computed(() => data.value.aiCallLogs ?? []),
+    aiBinding,
+    aiBindStatus,
+    isValidAiPhone,
+    getSessionApiKey,
+    setSessionApiKey,
+    sendAiSmsCode,
+    bindAiAccount,
     runAiScene,
     reviewAi,
     toggleAiSwitch,
