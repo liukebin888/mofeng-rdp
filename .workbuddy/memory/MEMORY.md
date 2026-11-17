@@ -22,7 +22,7 @@
 
 ## 六门禁（全过才闭环）
 1. `npx vue-tsc --noEmit` 0 error
-2. `npx vitest run --no-file-parallelism` 全绿（当前 1585/1585，105 文件）
+2. `npx vitest run --no-file-parallelism` 全绿（当前 1600/1600，106 文件）
 3. `npx vite build` 成功
 4. `npm run smoke` exit 0（脚本 `bad.length||errors.length?1:0`）
 5. `npm run e2e` 33 PASS / 0 FAIL
@@ -41,11 +41,13 @@
 - 引擎：flowEngine / tenant / docEngine / lessonEngine / portfolioFinance / whatif / calendarEngine / myWorkEngine / governanceConfig / messageCenter / resourceShare / portalConfig / draftEngine / i18n+locale+enumDict / mobilePortal / lightTask / customField / kanban。
 - 资源：resourceConflict / projectClone / shareLink / quota / resourceCapacity / supplyDemand / overallocation / leveling / bottleneck / resourcePool / resourcePlan。
 - 风险：riskQuant+simulation+contingency / riskLifecycle；采购：supplierPerformance / otsClosure；报表：reportLibrary+interop+dataQuality / extensionPoint+accessibility。
-- 通用：stateMachine / grading(APX-C-2026.11) / controlPoints(48，分布 29/10/7/2)。
+- 通用：stateMachine / grading(APX-C-2026.11) / controlPoints(48，分布 29/10/7/2) / aiAccountEngine。
 - 权限四维：`domain/rbac.ts`（canOperate / canAny / dataScopeOfRole(s) / applyFieldPolicy），前后端 TS + Java RbacEngine 一致。
-- server/index.js（/api/state 乐观锁 + /api/audit append-only + /api/ai/chat SSE + /api/ai/workbuddy/status 安装检测）/ infra/repo.ts（RestRepo↔LocalRepo 双通道，2~4s 静默降级）。
+- server/index.js（/api/state 乐观锁 + /api/audit append-only + /api/ai/chat SSE + /api/ai/workbuddy/status 安装检测 + /api/ai/sms/send|verify 短信验证码）/ infra/repo.ts（RestRepo↔LocalRepo 双通道，2~4s 静默降级）。
 - seed.ts：CENTER_SPECS 14 中心 + makeNameGenerator 预占 BASE_USER_NAMES，约 486 用户/219 节点。
-- WorkBuddy AI：`agent/`（ADK）+ `POST /api/ai/chat`（越权前置过滤 + SSE + AI_CALL 审计）+ `views/ai/AiChatPanel.vue`（嵌 AiAssistView）。WMA 契约 `https://api.workbuddy.dev/v1/agent/chat/completions` + Bearer Key + agent_id；server 零依赖读 `.env`（CODEBUDDY_API_KEY/AI_ENDPOINT/AI_AGENT_ID/AI_MODEL）；验证脚本 `server/scripts/verify-wma.js`，文档 docs/AI-INTEGRATION.md。Key 未就绪降级占位。一键唤起 `workbuddy://ch@t/?prompt=` + 安装检测（另有账号绑定对话）。语义双端复刻 agent/src/assistant.ts 与 server/index.js。
+- WorkBuddy AI：`agent/`（ADK）+ `POST /api/ai/chat`（越权前置过滤 + SSE + AI_CALL 审计）+ `views/ai/AiChatPanel.vue`（嵌 AiAssistView）。WMA 契约 `https://api.workbuddy.dev/v1/agent/chat/completions` + Bearer Key + agent_id；server 零依赖读 `.env`（CODEBUDDY_API_KEY/AI_ENDPOINT/AI_AGENT_ID/AI_MODEL）；验证脚本 `server/scripts/verify-wma.js`，文档 docs/AI-INTEGRATION.md。一键唤起 `workbuddy://ch@t/?prompt=` + 安装检测。语义双端复刻 agent/src/assistant.ts 与 server/index.js。
+- **AI 接入三决策（2026-11-18 用户拍板）**：①每人自带 Key（Key 仅存 sessionStorage + 内存，随请求体携带，不落库/不入审计/不入 git）；②手机号短信验证码核验；③Key 稍后提供，到位前占位降级不虚假接通。凭证优先级 `body.apiKey → 服务端 CODEBUDDY_API_KEY → 占位降级`，`realModel` 仅真实调用成功后 true。
+- **AI 账号绑定实现**：`domain/aiAccountEngine.ts`（isValidPhone/maskPhone/createVerificationCode(可注入rand)/isCodeExpired/canAttempt/verifyCode/isKeyShapeValid/绑定状态机）；后端 `/api/ai/sms/send|verify`（内存 Map + TTL 5min + 5 次上限 + 一次性失效；可配 SMS_ENDPOINT/SMS_ACCESS_KEY 走真实网关，未配则 devMode:true 回显 devCode 并明示"开发演示模式"）；手机号落库 `encryptField(keyId='ai-phone-v1')` + phoneMasked，审计只含脱敏值；**审计零 Key 泄露**（安全红线，QA 实测 grep 无命中）。types 新增 BindStatus/AiAccountBinding/AiAccountState；seed 空态 aiAccount；文档第七节。测试 15 条（aiAccount.spec.ts）。运行态 `state-T-1001.json` 测试绑定已清回空态。
 
 ## 需求方裁决
 - REQ-CONF-2026-1101-01：48 点分布 29/10/7/2；QM+CAL3~4+无自研软件判 L2 增行；冻结基线全量传播+打标。
