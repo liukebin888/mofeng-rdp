@@ -7,27 +7,62 @@
       <el-button size="small" type="primary" @click="send">账号绑定对话</el-button>
     </div>
 
-    <!-- 账号绑定 + 用户自带 Key：绑定非强制，只用 Key 也能问答；Key 仅在会话内 -->
+    <!-- 分步引导：Step1 手机号绑定 →（下一步按钮）→ Step2 绑定 WorkBuddy（唤起桌面端 / 自带 Key） -->
     <div class="ai-account">
       <div class="account-line">
         <span class="account-title">{{ t('ai.bind.section') }}</span>
         <span class="muted">{{ bound ? `${t('ai.bind.bound')} ${bound.phoneMasked}` : t('ai.bind.unbound') }}</span>
         <span v-if="modelLabel" class="model-tag" :class="modelMode">{{ modelLabel }}</span>
       </div>
-      <div class="account-row">
-        <el-input v-model="bindPhone" size="small" clearable class="phone-input" :placeholder="t('ai.bind.phonePh')" />
-        <el-button size="small" :loading="smsSending" :disabled="!validPhone || smsSending" @click="sendCode">{{ t('ai.bind.sendCode') }}</el-button>
-        <el-input v-model="bindCode" size="small" clearable class="code-input" :placeholder="t('ai.bind.codePh')" />
-        <el-button size="small" type="primary" :loading="binding" :disabled="!validPhone || !bindCode.trim() || binding" @click="confirmBind">{{ t('ai.bind.confirm') }}</el-button>
+
+      <!-- 步骤指示条 -->
+      <div class="bind-steps">
+        <span class="bind-step" :class="{ active: bindStep === 1, done: bindStep === 2 }" @click="bindStep = 1">
+          <i>1</i> {{ t('ai.bind.step1') }}
+        </span>
+        <span class="step-line"></span>
+        <span class="bind-step" :class="{ active: bindStep === 2 }" :style="{ cursor: bound ? 'pointer' : 'default' }" @click="bound && (bindStep = 2)">
+          <i>2</i> {{ t('ai.bind.step2') }}
+        </span>
       </div>
-      <div v-if="devTip" class="dev-tip">{{ devTip }}</div>
-      <div class="account-row key-row">
-        <span class="key-label">{{ t('ai.bind.keyLabel') }}</span>
-        <el-input v-model="sessionKey" :type="showKey ? 'text' : 'password'" size="small" clearable class="key-input" :placeholder="t('ai.bind.keyPh')" @keyup.enter="saveKey" />
-        <el-button size="small" @click="showKey = !showKey">{{ showKey ? t('ai.bind.hideKey') : t('ai.bind.showKey') }}</el-button>
-        <el-button size="small" type="primary" plain @click="saveKey">{{ t('ai.bind.keySave') }}</el-button>
-        <el-button size="small" text @click="clearKey">{{ t('ai.bind.keyClear') }}</el-button>
-      </div>
+
+      <!-- Step 1：手机号短信绑定 -->
+      <template v-if="bindStep === 1">
+        <div class="account-row">
+          <el-input v-model="bindPhone" size="small" clearable class="phone-input" :placeholder="t('ai.bind.phonePh')" />
+          <el-button size="small" :loading="smsSending" :disabled="!validPhone || smsSending" @click="sendCode">{{ t('ai.bind.sendCode') }}</el-button>
+          <el-input v-model="bindCode" size="small" clearable class="code-input" :placeholder="t('ai.bind.codePh')" @keyup.enter="confirmBind" />
+          <el-button size="small" type="primary" :loading="binding" :disabled="!validPhone || !bindCode.trim() || binding" @click="confirmBind">{{ t('ai.bind.confirm') }}</el-button>
+        </div>
+        <div v-if="devTip" class="dev-tip">{{ devTip }}</div>
+        <div class="step-actions">
+          <el-button v-if="bound" size="small" type="primary" @click="goStep2">{{ t('ai.bind.next') }} →</el-button>
+          <el-button size="small" text type="primary" @click="goStep2Skip">{{ t('ai.bind.skip') }}</el-button>
+        </div>
+      </template>
+
+      <!-- Step 2：绑定 WorkBuddy（唤起桌面端 / 自带 Key） -->
+      <template v-else>
+        <div class="step2-intro">{{ t('ai.bind.step2Intro') }}</div>
+        <div class="guide-block">
+          <div class="guide-head">{{ t('ai.bind.desktopTip') }}</div>
+          <el-button size="small" type="primary" plain :loading="detecting" @click="openWorkbuddy">{{ t('ai.bind.launchDesktop') }}</el-button>
+        </div>
+        <div class="guide-block">
+          <div class="guide-head">{{ t('ai.bind.keyTip') }}</div>
+          <div class="account-row key-row">
+            <span class="key-label">{{ t('ai.bind.keyLabel') }}</span>
+            <el-input v-model="sessionKey" :type="showKey ? 'text' : 'password'" size="small" clearable class="key-input" :placeholder="t('ai.bind.keyPh')" @keyup.enter="saveKey" />
+            <el-button size="small" @click="showKey = !showKey">{{ showKey ? t('ai.bind.hideKey') : t('ai.bind.showKey') }}</el-button>
+            <el-button size="small" type="primary" plain @click="saveKey">{{ t('ai.bind.keySave') }}</el-button>
+            <el-button size="small" text @click="clearKey">{{ t('ai.bind.keyClear') }}</el-button>
+          </div>
+        </div>
+        <div v-if="sessionKey.trim()" class="step2-ready">✓ {{ t('ai.bind.step2Ready') }}</div>
+        <div class="step-actions">
+          <el-button size="small" text @click="bindStep = 1">← {{ t('ai.bind.prev') }}</el-button>
+        </div>
+      </template>
     </div>
 
     <div ref="listRef" class="chat-list">
@@ -84,6 +119,18 @@ const messages = ref<ChatMessage[]>([])
 const streaming = ref(false)
 const streamText = ref('')
 const listRef = ref<HTMLElement | null>(null)
+
+// —— 分步绑定向导：1 手机号 → 2 绑定 WorkBuddy ——
+const bindStep = ref<1 | 2>(1)
+const detecting = ref(false)
+/** 手机号绑定成功后进入 Step2（保留手动推进按钮，此函数供「下一步」按钮调用） */
+function goStep2() {
+  bindStep.value = 2
+}
+/** 跳过手机号绑定直接进入 Step2（绑定非强制，只用 Key 也能问答） */
+function goStep2Skip() {
+  bindStep.value = 2
+}
 
 // —— 账号绑定 / 自带 Key（会话态）——
 const bound = computed(() => store.aiBinding)
@@ -154,6 +201,7 @@ async function confirmBind() {
   if (r.ok) {
     bindCode.value = ''
     devTip.value = ''
+    ElMessage.success(t('ai.bind.bindOk'))
   }
   binding.value = false
 }
@@ -276,6 +324,7 @@ function scrollToBottom() {
 async function openWorkbuddy() {
   const q = draft.value.trim() || ''
   let installed = false
+  detecting.value = true
   // 前置探测：请求后端 /api/ai/workbuddy/status（进程探测，零依赖）
   try {
     const ctrl = new AbortController()
@@ -288,11 +337,13 @@ async function openWorkbuddy() {
     }
   } catch {
     installed = false
+  } finally {
+    detecting.value = false
   }
 
   if (!installed) {
     ElMessage.warning({
-      message: '未检测到本机已安装/运行 WorkBuddy 桌面端，无法协议唤起。请改用「账号绑定对话」直接以当前账号提问，或先启动并登录 WorkBuddy 桌面客户端。',
+      message: '未检测到本机已安装/运行 WorkBuddy 桌面端，无法协议唤起。请改用下方「方式二」填入你的 WorkBuddy API Key 直接以当前账号提问，或先启动并登录 WorkBuddy 桌面客户端。',
       duration: 6000
     })
     return
@@ -328,6 +379,20 @@ async function openWorkbuddy() {
 .key-label { font-size: 12px; color: var(--text-3); }
 .key-input { width: 320px; max-width: 60vw; }
 .dev-tip { font-size: 12px; color: #e6a23c; word-break: break-all; }
+/* —— 分步绑定向导 —— */
+.bind-steps { display: flex; align-items: center; gap: 8px; padding: 2px 0; }
+.bind-step { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-3); cursor: pointer; user-select: none; }
+.bind-step i { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; font-style: normal; font-size: 11px; border: 1px solid var(--bg-3, #2a3a52); }
+.bind-step.active { color: #3b82f6; font-weight: 600; }
+.bind-step.active i { background: #3b82f6; border-color: #3b82f6; color: #fff; }
+.bind-step.done { color: #67c23a; }
+.bind-step.done i { background: #67c23a; border-color: #67c23a; color: #fff; }
+.step-line { flex: 0 0 24px; height: 1px; background: var(--bg-3, #2a3a52); }
+.step-actions { display: flex; align-items: center; gap: 6px; }
+.step2-intro { font-size: 12px; color: var(--text-2); line-height: 1.6; }
+.guide-block { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border: 1px dashed var(--bg-3, #2a3a52); border-radius: 6px; }
+.guide-head { font-size: 12px; color: var(--text-3); line-height: 1.5; }
+.step2-ready { font-size: 12px; color: #67c23a; }
 .model-tag { margin-left: auto; font-size: 11px; border-radius: 10px; padding: 2px 8px; border: 1px solid var(--bg-3, #2a3a52); }
 .model-tag.real { color: #67c23a; border-color: #67c23a; }
 .model-tag.fallback { color: #e6a23c; border-color: #e6a23c; }

@@ -245,7 +245,19 @@ export const zhCN: Dict = {
   'ai.bind.modelFallback': '本次：占位降级（未使用真实模型）',
   'ai.bind.modelError': '本次：调用失败（未使用真实模型）',
   'ai.bind.showKey': '显示',
-  'ai.bind.hideKey': '隐藏'
+  'ai.bind.hideKey': '隐藏',
+  // —— 分步引导：手机号 → WorkBuddy（手动推进）——
+  'ai.bind.step1': '第 1 步 · 手机号绑定',
+  'ai.bind.step2': '第 2 步 · 绑定 WorkBuddy',
+  'ai.bind.next': '下一步：绑定 WorkBuddy',
+  'ai.bind.skip': '跳过手机号，直接绑定 WorkBuddy',
+  'ai.bind.prev': '上一步：手机号',
+  'ai.bind.step2Intro': '手机号已就绪。接下来请唤起 WorkBuddy 桌面端，或填入你的 WorkBuddy API Key（仅本会话有效），即可开始真实问答。',
+  'ai.bind.launchDesktop': '唤起 WorkBuddy 桌面端',
+  'ai.bind.desktopTip': '方式一 · 本机已安装 WorkBuddy 时，可协议唤起桌面端并登录。',
+  'ai.bind.keyTip': '方式二 · 填入 WorkBuddy API Key，直接在本页发起真实问答（推荐）。',
+  'ai.bind.step2Ready': '配置完成：保存 Key 或唤起桌面端后，在下方输入框提问即可。',
+  'ai.bind.bindOk': '手机号绑定成功，可进入下一步绑定 WorkBuddy'
 }
 
 export const enUS: Dict = {
@@ -483,7 +495,19 @@ export const enUS: Dict = {
   'ai.bind.modelFallback': 'This turn: placeholder fallback (no real model used)',
   'ai.bind.modelError': 'This turn: call failed (no real model used)',
   'ai.bind.showKey': 'Show',
-  'ai.bind.hideKey': 'Hide'
+  'ai.bind.hideKey': 'Hide',
+  // —— Step-by-step guide: phone -> WorkBuddy (manual advance) ——
+  'ai.bind.step1': 'Step 1 · Bind phone',
+  'ai.bind.step2': 'Step 2 · Bind WorkBuddy',
+  'ai.bind.next': 'Next: Bind WorkBuddy',
+  'ai.bind.skip': 'Skip phone, bind WorkBuddy directly',
+  'ai.bind.prev': 'Previous: Phone',
+  'ai.bind.step2Intro': 'Phone is ready. Next, launch the WorkBuddy desktop app or enter your WorkBuddy API Key (session-only) to start real-model chat.',
+  'ai.bind.launchDesktop': 'Launch WorkBuddy desktop',
+  'ai.bind.desktopTip': 'Option 1 · If WorkBuddy is installed locally, launch and sign in to the desktop app via protocol.',
+  'ai.bind.keyTip': 'Option 2 · Enter your WorkBuddy API Key to chat here directly (recommended).',
+  'ai.bind.step2Ready': 'Setup complete: save a Key or launch the desktop app, then ask a question below.',
+  'ai.bind.bindOk': 'Phone bound. You may proceed to bind WorkBuddy.'
 }
 
 export const DICTS: Record<Locale, Dict> = {
