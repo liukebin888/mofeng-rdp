@@ -53,6 +53,14 @@ export const ENUM_DICT: Record<string, EnumMap> = {
   已释放: { zh: '已释放', en: 'Released' },
   待审批: { zh: '待审批', en: 'Pending Approval' },
 
+  // —— 样件需求用途（2026-11-19 提报必填）——
+  测试: { zh: '测试', en: 'Testing' },
+  试验: { zh: '试验', en: 'Experiment' },
+  验证: { zh: '验证', en: 'Verification' },
+  展示: { zh: '展示', en: 'Display' },
+  送样认可: { zh: '送样认可', en: 'Sample Approval' },
+  其他: { zh: '其他', en: 'Other' },
+
   // —— 项目状态 / 健康度 ——
   未定级: { zh: '未定级', en: 'Ungraded' },
   绿: { zh: '绿', en: 'Green' },

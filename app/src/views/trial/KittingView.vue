@@ -23,6 +23,8 @@
         <el-table :data="store.data.samples" size="small">
           <el-table-column prop="code" label="编号" width="104" />
           <el-table-column prop="type" label="类型" width="56"><template #default="{ row }"><span class="tag">{{ te(row.type) }}</span></template></el-table-column>
+          <el-table-column prop="purpose" label="需求用途" width="88"><template #default="{ row }"><span class="tag">{{ te(row.purpose) || '—' }}</span></template></el-table-column>
+          <el-table-column prop="requestDept" label="需求部门/单位" min-width="120"><template #default="{ row }"><span>{{ row.requestDept || '—' }}</span></template></el-table-column>
           <el-table-column prop="qty" label="数量" width="60"><template #default="{ row }"><span class="num">{{ row.qty }}</span></template></el-table-column>
           <el-table-column prop="needDate" label="需求日期" width="98" />
           <el-table-column prop="gate" label="绑定 Gate" width="82" />
@@ -72,6 +74,23 @@
             <el-option v-for="tp in sampleTypes" :key="tp" :label="te(tp)" :value="tp" />
           </el-select>
         </el-form-item>
+        <el-form-item label="需求用途" required>
+          <el-select v-model="form.purpose" placeholder="明确样件用途：测试/试验等" style="width: 100%">
+            <el-option v-for="p in samplePurposes" :key="p" :label="te(p)" :value="p" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="需求部门/单位" required>
+          <el-select
+            v-model="form.requestDept"
+            placeholder="选择部门或输入外部单位"
+            filterable
+            allow-create
+            default-first-option
+            style="width: 100%"
+          >
+            <el-option v-for="d in deptOptions" :key="d" :label="d" :value="d" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="需求数量" required>
           <el-input-number v-model="form.qty" :min="1" :max="100000" style="width: 100%" />
         </el-form-item>
@@ -106,7 +125,7 @@ import SemanticTabs from '@/components/SemanticTabs.vue'
 import { useAppStore } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
 import { explodeBom, kitRate } from '@/domain/kitting'
-import { SAMPLE_TYPES, nextSampleCode, type SampleType, type SampleSubmitInput } from '@/domain/sample'
+import { SAMPLE_TYPES, SAMPLE_PURPOSES, nextSampleCode, type SampleType, type SampleSubmitInput } from '@/domain/sample'
 
 const store = useAppStore()
 const { te } = useI18n()
@@ -132,10 +151,20 @@ function start() {
 
 // —— 样件需求提报单（HW-001）——
 const sampleTypes = SAMPLE_TYPES
+const samplePurposes = SAMPLE_PURPOSES
 const gateOptions = ['G1', 'G2', 'G3', 'G4', 'G5']
+/** 需求部门/单位候选：取自组织节点（公司/中心/部门/科室/班组），allow-create 支持外部单位手填 */
+const deptOptions = computed(() => {
+  const names = (store.orgNodes ?? [])
+    .filter((n) => n.level !== 'group')
+    .map((n) => n.name)
+  return Array.from(new Set(names))
+})
 const submitVisible = ref(false)
 const submitting = ref(false)
-const emptyForm = (): Required<SampleSubmitInput> => ({ type: 'A', qty: 1, needDate: '', gate: '', ebomVersion: '' })
+const emptyForm = (): Required<SampleSubmitInput> => ({
+  type: 'A', qty: 1, needDate: '', gate: '', ebomVersion: '', purpose: '测试', requestDept: ''
+})
 const form = ref<Required<SampleSubmitInput>>(emptyForm())
 /** 预览本次提报编号（与实际入列编号同源 nextSampleCode） */
 const previewCode = computed(() => nextSampleCode(store.data.samples.map((s) => s.code), form.value.type as SampleType))
@@ -153,7 +182,9 @@ function submitOrder() {
     qty: Number(form.value.qty),
     needDate: form.value.needDate,
     gate: form.value.gate,
-    ebomVersion: form.value.ebomVersion.trim()
+    ebomVersion: form.value.ebomVersion.trim(),
+    purpose: form.value.purpose,
+    requestDept: form.value.requestDept.trim()
   })
   submitting.value = false
   if (r.ok) submitVisible.value = false

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   SAMPLE_TYPES,
+  SAMPLE_PURPOSES,
   SAMPLE_STATUSES,
   validateSampleOrder,
   transitionSample,
@@ -30,6 +31,8 @@ const order = (over: Partial<SampleOrder> = {}): SampleOrder => ({
   gate: 'G4',
   status: '草稿',
   ebomVersion: 'EBOM-V1',
+  purpose: '测试',
+  requestDept: '硬件部',
   ...over
 })
 
@@ -50,6 +53,25 @@ describe('sample — HW-001 样件需求字段齐全率', () => {
     const r = validateSampleOrder({ code: 'SP-1', type: 'A', qty: 0, needDate: '', ebomVersion: '' })
     expect(r.ok).toBe(false)
     expect(r.missing).toEqual(expect.arrayContaining(['needDate', 'ebomVersion', 'qty']))
+  })
+})
+
+describe('sample — HW-001 样件用途 / 需求部门必填（2026-11-19 回退验证）', () => {
+  it('SAMPLE_PURPOSES 覆盖测试/试验等六类用途', () => {
+    expect(SAMPLE_PURPOSES).toEqual(['测试', '试验', '验证', '展示', '送样认可', '其他'])
+  })
+
+  it('缺 purpose / requestDept 时齐全率不足，命中缺失字段', () => {
+    const r = validateSampleOrder({ ...order(), purpose: '' as never, requestDept: '' })
+    expect(r.ok).toBe(false)
+    expect(r.missing).toEqual(expect.arrayContaining(['purpose', 'requestDept']))
+  })
+
+  it('purpose 合法但 requestDept 纯空格也算缺失（trim 后判空）', () => {
+    const r = validateSampleOrder({ ...order(), requestDept: '   ' })
+    expect(r.ok).toBe(false)
+    expect(r.missing).toContain('requestDept')
+    expect(r.missing).not.toContain('purpose')
   })
 })
 
@@ -221,7 +243,7 @@ describe('sample — 样件需求提报单（HW-001）', () => {
 
   it('buildSampleOrder 字段齐全时入列，状态为草稿、编号/项目由上下文注入', () => {
     const r = buildSampleOrder(
-      { type: 'OTS', qty: 30, needDate: '2026-12-01', gate: 'G4', ebomVersion: 'EBOM-V1' },
+      { type: 'OTS', qty: 30, needDate: '2026-12-01', gate: 'G4', ebomVersion: 'EBOM-V1', purpose: '验证', requestDept: '试验中心' },
       { id: 'SP-9', code: 'SMP-OTS-01', projectId: 'PRJ-1' }
     )
     expect(r.ok).toBe(true)
@@ -231,14 +253,27 @@ describe('sample — 样件需求提报单（HW-001）', () => {
       projectId: 'PRJ-1',
       type: 'OTS',
       qty: 30,
+      purpose: '验证',
+      requestDept: '试验中心',
       status: '草稿'
     })
+  })
+
+  it('buildSampleOrder 缺 purpose/requestDept 时拒绝入列（新必填回退验证）', () => {
+    const ctx = { id: 'SP-11', code: 'SMP-A-02', projectId: 'PRJ-1' }
+    const r = buildSampleOrder(
+      { type: 'A', qty: 5, needDate: '2026-12-01', gate: '', ebomVersion: 'EBOM-V1', purpose: '' as never, requestDept: '' },
+      ctx
+    )
+    expect(r.ok).toBe(false)
+    expect(r.missing).toEqual(expect.arrayContaining(['purpose', 'requestDept']))
+    expect(r.order).toBeUndefined()
   })
 
   it('buildSampleOrder 缺 needDate/qty/ebomVersion 时拒绝入列（回退验证）', () => {
     const ctx = { id: 'SP-9', code: 'SMP-A-01', projectId: 'PRJ-1' }
     const r = buildSampleOrder(
-      { type: 'A', qty: 0, needDate: '', gate: '', ebomVersion: '' },
+      { type: 'A', qty: 0, needDate: '', gate: '', ebomVersion: '', purpose: '测试', requestDept: '硬件部' },
       ctx
     )
     expect(r.ok).toBe(false)
@@ -248,7 +283,7 @@ describe('sample — 样件需求提报单（HW-001）', () => {
 
   it('提报仅要字段齐全；gate 可空但仍受下达阶段 canReleaseTrial 约束（分层不削弱 K9）', () => {
     const r = buildSampleOrder(
-      { type: 'B', qty: 5, needDate: '2026-12-01', gate: '', ebomVersion: 'EBOM-V1' },
+      { type: 'B', qty: 5, needDate: '2026-12-01', gate: '', ebomVersion: 'EBOM-V1', purpose: '测试', requestDept: '软件部' },
       { id: 'SP-10', code: 'SMP-B-01', projectId: 'PRJ-1' }
     )
     expect(r.ok).toBe(true) // gate 非 HW-001 必填，提报可暂不绑定

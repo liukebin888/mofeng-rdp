@@ -35,6 +35,14 @@ export const SAMPLE_TYPE_LABEL: Record<SampleType, string> = {
   OTS: 'OTS'
 }
 
+/**
+ * 样件需求用途（提报时须明确：测试 / 试验 等）。
+ * 用户裁决 2026-11-19：样件试制需求提报需明确样件需求，如测试、试验等。
+ */
+export type SamplePurpose = '测试' | '试验' | '验证' | '展示' | '送样认可' | '其他'
+
+export const SAMPLE_PURPOSES: SamplePurpose[] = ['测试', '试验', '验证', '展示', '送样认可', '其他']
+
 /** 样件状态机（HW-002）：草稿 → 试制中 → 检验中 → 已交付；返工可回试制中 */
 export type SampleStatus =
   | '草稿'
@@ -61,6 +69,10 @@ export interface SampleOrder extends SampleReq {
   status: SampleStatus
   /** 绑定 Gate（HW-001：可绑定 Gate） */
   gate: string
+  /** 样件需求用途（测试/试验/验证/展示/送样认可/其他，2026-11-19 必填） */
+  purpose: SamplePurpose
+  /** 需求部门或单位（2026-11-19 必填） */
+  requestDept: string
 }
 
 /** HW-001 必填字段（缺一不可，字段齐全率 100%） */
@@ -70,7 +82,9 @@ const SAMPLE_REQUIRED_FIELDS = [
   'type',
   'qty',
   'needDate',
-  'ebomVersion'
+  'ebomVersion',
+  'purpose',
+  'requestDept'
 ] as const
 
 /**
@@ -81,7 +95,8 @@ export function validateSampleOrder(order: Partial<SampleOrder>): { ok: boolean;
   const missing = SAMPLE_REQUIRED_FIELDS.filter((f) => {
     const v = order[f]
     if (f === 'qty') return typeof v !== 'number' || v <= 0
-    return v === undefined || v === null || v === ''
+    if (typeof v === 'string') return v.trim() === ''
+    return v === undefined || v === null
   })
   return { ok: missing.length === 0, missing: missing as unknown as string[] }
 }
@@ -372,6 +387,10 @@ export interface SampleSubmitInput {
   needDate: string
   gate: string
   ebomVersion: string
+  /** 样件需求用途（测试/试验/验证/展示/送样认可/其他，必填） */
+  purpose: SamplePurpose
+  /** 需求部门或单位（必填） */
+  requestDept: string
 }
 
 /**
@@ -393,6 +412,8 @@ export function buildSampleOrder(
     needDate: input.needDate,
     gate: input.gate,
     ebomVersion: input.ebomVersion,
+    purpose: input.purpose,
+    requestDept: input.requestDept,
     status: '草稿'
   }
   const check = validateSampleOrder(order)

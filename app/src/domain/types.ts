@@ -247,6 +247,10 @@ export interface SampleReq {
   gate: string
   status: string
   ebomVersion: string
+  /** 样件需求用途（测试/试验/验证/展示/送样认可/其他）；历史数据可缺，新提报必填 */
+  purpose?: '测试' | '试验' | '验证' | '展示' | '送样认可' | '其他'
+  /** 需求部门或单位；历史数据可缺，新提报必填 */
+  requestDept?: string
 }
 
 export interface BomNode {

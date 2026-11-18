@@ -3553,7 +3553,7 @@ export const useAppStore = defineStore('app', () => {
       projectId: projectId.value
     })
     if (!built.ok) {
-      log('CREATE', '样件需求提报', code, { type: input.type, missing: built.missing }, undefined, 'DENY')
+      log('CREATE', '样件需求提报', code, { type: input.type, purpose: input.purpose, requestDept: input.requestDept, missing: built.missing }, undefined, 'DENY')
       notify('error', `样件需求提报被拒：字段缺失 ${built.missing?.join('、')}（HW-001，字段齐全率须 100%）`)
       return { ok: false, missing: built.missing }
     }
@@ -3565,6 +3565,8 @@ export const useAppStore = defineStore('app', () => {
       needDate: input.needDate,
       gate: input.gate,
       ebomVersion: input.ebomVersion,
+      purpose: input.purpose,
+      requestDept: input.requestDept,
       status: '草稿'
     })
     persist()
