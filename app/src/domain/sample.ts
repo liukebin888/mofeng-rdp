@@ -341,3 +341,61 @@ export function summarizeBomUsage(bom: BomNode[], sampleQty: number) {
     ok: l.ok
   }))
 }
+
+// ————————————————————————————————————————————————————————————
+// 样件需求提报单（HW-001）：嵌入「试制需求」页，提报即入列（状态草稿）
+// 提报只需字段齐全率 100%；「先 BOM 后样件 / 齐套」由下达环节 canReleaseTrial 把关，
+// 两者分层，避免提报被空 BOM 卡死，同时不削弱 K9 硬门。
+// ————————————————————————————————————————————————————————————
+
+/**
+ * 生成下一个样件需求编号 SMP-<type>-NN（NN 两位，取同类型最大值 +1）。
+ * 纯函数，基于传入的现有编号集合计算，不依赖全局状态。
+ */
+export function nextSampleCode(existingCodes: string[], type: SampleType): string {
+  const prefix = `SMP-${type}-`
+  let max = 0
+  for (const code of existingCodes) {
+    if (!code.startsWith(prefix)) continue
+    const tail = code.slice(prefix.length)
+    if (!/^\d+$/.test(tail)) continue
+    const n = Number(tail)
+    if (n > max) max = n
+  }
+  return `${prefix}${String(max + 1).padStart(2, '0')}`
+}
+
+/** 提报单输入（除 projectId/id/code 由系统注入外，均为用户填写） */
+export interface SampleSubmitInput {
+  type: SampleType
+  qty: number
+  needDate: string
+  gate: string
+  ebomVersion: string
+}
+
+/**
+ * 组装并提交一份样件需求提报单（HW-001）。
+ * - 复用 validateSampleOrder 做字段齐全率 100% 校验，缺任一必填字段即拒绝入列；
+ * - status 置「草稿」：提报 ≠ 下达，仍受先 BOM 后样件 + 齐套门（canReleaseTrial）约束；
+ * - code 由调用方用 nextSampleCode 生成后传入，保证纯函数可确定性测试。
+ */
+export function buildSampleOrder(
+  input: SampleSubmitInput,
+  ctx: { id: string; code: string; projectId: string }
+): { ok: boolean; order?: SampleOrder; missing?: string[] } {
+  const order: SampleOrder = {
+    id: ctx.id,
+    projectId: ctx.projectId,
+    code: ctx.code,
+    type: input.type,
+    qty: input.qty,
+    needDate: input.needDate,
+    gate: input.gate,
+    ebomVersion: input.ebomVersion,
+    status: '草稿'
+  }
+  const check = validateSampleOrder(order)
+  if (!check.ok) return { ok: false, missing: check.missing }
+  return { ok: true, order }
+}

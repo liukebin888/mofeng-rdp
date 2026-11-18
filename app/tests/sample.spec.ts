@@ -14,7 +14,9 @@ import {
   submitSampleApproval,
   completeReceipt,
   checkKitting,
-  summarizeBomUsage
+  summarizeBomUsage,
+  nextSampleCode,
+  buildSampleOrder
 } from '@/domain/sample'
 import type { BomNode, SampleOrder } from '@/domain/sample'
 
@@ -202,6 +204,58 @@ describe('sample — HW-016 发运与签收', () => {
     const shipment = { id: 'SH-1', sampleOrderId: 'SP-1', waybillNo: 'SF123', carrier: '顺丰', qty: 10, shippedAt: '2026-12-01' }
     const receipt = { shipmentId: 'SH-OTHER', receiver: 'x', at: 'x', feedback: 'x' }
     expect(completeReceipt(order(), shipment, receipt).ok).toBe(false)
+  })
+})
+
+describe('sample — 样件需求提报单（HW-001）', () => {
+  it('nextSampleCode 按类型取最大值+1，且不串类型', () => {
+    expect(nextSampleCode([], 'A')).toBe('SMP-A-01')
+    expect(nextSampleCode(['SMP-A-01', 'SMP-A-07', 'SMP-B-03'], 'A')).toBe('SMP-A-08')
+    expect(nextSampleCode(['SMP-A-01'], 'OTS')).toBe('SMP-OTS-01')
+  })
+
+  it('nextSampleCode 忽略非法尾号与超过两位的历史编号影响', () => {
+    expect(nextSampleCode(['SMP-A-abc', 'SMP-A-'], 'A')).toBe('SMP-A-01')
+    expect(nextSampleCode(['SMP-A-099'], 'A')).toBe('SMP-A-100')
+  })
+
+  it('buildSampleOrder 字段齐全时入列，状态为草稿、编号/项目由上下文注入', () => {
+    const r = buildSampleOrder(
+      { type: 'OTS', qty: 30, needDate: '2026-12-01', gate: 'G4', ebomVersion: 'EBOM-V1' },
+      { id: 'SP-9', code: 'SMP-OTS-01', projectId: 'PRJ-1' }
+    )
+    expect(r.ok).toBe(true)
+    expect(r.order).toMatchObject({
+      id: 'SP-9',
+      code: 'SMP-OTS-01',
+      projectId: 'PRJ-1',
+      type: 'OTS',
+      qty: 30,
+      status: '草稿'
+    })
+  })
+
+  it('buildSampleOrder 缺 needDate/qty/ebomVersion 时拒绝入列（回退验证）', () => {
+    const ctx = { id: 'SP-9', code: 'SMP-A-01', projectId: 'PRJ-1' }
+    const r = buildSampleOrder(
+      { type: 'A', qty: 0, needDate: '', gate: '', ebomVersion: '' },
+      ctx
+    )
+    expect(r.ok).toBe(false)
+    expect(r.missing).toEqual(expect.arrayContaining(['needDate', 'qty', 'ebomVersion']))
+    expect(r.order).toBeUndefined()
+  })
+
+  it('提报仅要字段齐全；gate 可空但仍受下达阶段 canReleaseTrial 约束（分层不削弱 K9）', () => {
+    const r = buildSampleOrder(
+      { type: 'B', qty: 5, needDate: '2026-12-01', gate: '', ebomVersion: 'EBOM-V1' },
+      { id: 'SP-10', code: 'SMP-B-01', projectId: 'PRJ-1' }
+    )
+    expect(r.ok).toBe(true) // gate 非 HW-001 必填，提报可暂不绑定
+    // 下达仍被齐套门拦截：EBOM 未冻结时 canReleaseTrial 返回 blocker
+    const rel = canReleaseTrial({ ebomFrozen: false, kitBlocked: false, toolingReady: true })
+    expect(rel.ok).toBe(false)
+    expect(rel.blockers.some((b) => b.includes('EBOM'))).toBe(true)
   })
 })
 

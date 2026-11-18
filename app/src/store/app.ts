@@ -49,6 +49,7 @@ import {
   type AiAccountState,
   type BindStatus
 } from '@/domain/aiAccountEngine'
+import { nextSampleCode, buildSampleOrder, type SampleSubmitInput } from '@/domain/sample'
 import { canAny, canOperateAny, dataScopeOfRoles, roleOf, applyFieldPolicy, type ActionKey, type FieldPolicySurface } from '@/domain/rbac'
 import { guardTenant, visibleInTenant, groupDrillDown, type TenantContext } from '@/domain/tenant'
 import { canAccessSpace, visibleInSpace, accessibleSpaces, describeSwitch, type Space, type SpaceContext } from '@/domain/spaceEngine'
@@ -3543,6 +3544,34 @@ export const useAppStore = defineStore('app', () => {
   }
 
   // —— 通用写操作（P1 页使用）：所有变更走审计链 + 持久化 ——
+  /** 样件需求提报单（HW-001）：字段齐全率 100% 校验后入列，状态「草稿」；提报≠下达，仍受 K9 齐套门约束 */
+  function addSampleOrder(input: SampleSubmitInput): { ok: boolean; code?: string; missing?: string[] } {
+    const code = nextSampleCode(data.value.samples.map((s) => s.code), input.type)
+    const built = buildSampleOrder(input, {
+      id: `SMP-${Date.now()}`,
+      code,
+      projectId: projectId.value
+    })
+    if (!built.ok) {
+      log('CREATE', '样件需求提报', code, { type: input.type, missing: built.missing }, undefined, 'DENY')
+      notify('error', `样件需求提报被拒：字段缺失 ${built.missing?.join('、')}（HW-001，字段齐全率须 100%）`)
+      return { ok: false, missing: built.missing }
+    }
+    data.value.samples.push(built.order as import('@/domain/types').SampleReq)
+    log('CREATE', '样件需求提报', code, {
+      code,
+      type: input.type,
+      qty: input.qty,
+      needDate: input.needDate,
+      gate: input.gate,
+      ebomVersion: input.ebomVersion,
+      status: '草稿'
+    })
+    persist()
+    notify('success', `样件需求 ${code} 提报成功（状态：草稿；下达试制前须通过齐套校验 K9）`)
+    return { ok: true, code }
+  }
+
   /** 样件状态推进（A/B/C/OTS 状态机） */
   function advanceSample(id: string, to: string) {
     const s = data.value.samples.find((x) => x.id === id)
@@ -4576,6 +4605,7 @@ export const useAppStore = defineStore('app', () => {
     setQuoteCosts,
     submitGate,
     setLevel,
+    addSampleOrder,
     advanceSample,
     approveOts,
     submitHour,

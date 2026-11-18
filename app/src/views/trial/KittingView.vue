@@ -2,6 +2,7 @@
   <div>
     <PageHeader title="齐套校验" desc="按 EBOM × 到货核算齐套率，不齐套不开工（K9）；齐套率同时是 Gate4 的硬判据（GAT-006）">
       <template #actions>
+        <el-button size="small" type="primary" plain @click="openSubmit">提报样件需求</el-button>
         <el-button size="small" @click="$router.push('/dev/gate')">查看门禁（Gate4）</el-button>
         <el-button size="small" :disabled="!canStart" type="primary" @click="start">下达试制工单</el-button>
       </template>
@@ -59,17 +60,53 @@
         </el-table>
       </div>
     </div>
+
+    <!-- 样件需求提报单：嵌入试制需求页，字段齐全率 100% 校验后入列（状态草稿，提报≠下达） -->
+    <el-dialog v-model="submitVisible" title="样件需求提报单（HW-001）" width="560px" :close-on-click-modal="false">
+      <div class="src-note" style="margin-bottom: 12px">
+        提报即入列（状态「草稿」），字段齐全率须 100%。下达试制仍受「先 BOM 后样件 + 齐套校验（K9）」约束。
+      </div>
+      <el-form label-width="96px" size="small">
+        <el-form-item label="样件类型" required>
+          <el-select v-model="form.type" placeholder="选择 A/B/C/OTS 样" style="width: 100%">
+            <el-option v-for="tp in sampleTypes" :key="tp" :label="te(tp)" :value="tp" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="需求数量" required>
+          <el-input-number v-model="form.qty" :min="1" :max="100000" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="需求日期" required>
+          <el-date-picker v-model="form.needDate" type="date" value-format="YYYY-MM-DD" placeholder="选择需求日期" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="绑定 Gate">
+          <el-select v-model="form.gate" placeholder="可暂不绑定" clearable style="width: 100%">
+            <el-option v-for="g in gateOptions" :key="g" :label="g" :value="g" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="EBOM 版本" required>
+          <el-input v-model="form.ebomVersion" placeholder="如 EBOM-V1（须先在「图纸与 EBOM」建立）" />
+        </el-form-item>
+        <el-form-item label="提报编号">
+          <span class="muted">{{ previewCode }}</span>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button size="small" @click="submitVisible = false">取消</el-button>
+        <el-button size="small" type="primary" :loading="submitting" @click="submitOrder">提交提报</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import PageHeader from '@/components/PageHeader.vue'
 import KpiCard from '@/components/KpiCard.vue'
 import SemanticTabs from '@/components/SemanticTabs.vue'
 import { useAppStore } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
 import { explodeBom, kitRate } from '@/domain/kitting'
+import { SAMPLE_TYPES, nextSampleCode, type SampleType, type SampleSubmitInput } from '@/domain/sample'
 
 const store = useAppStore()
 const { te } = useI18n()
@@ -91,6 +128,35 @@ function start() {
   }
   store.log('SUBMIT', '试制工单', 'SMP-OTS-01', { kitRate: kit.value.rate })
   store.notify('success', `齐套率 ${kit.value.rate}%，试制工单已下达（挂接样件/EBOM/齐套三项）`)
+}
+
+// —— 样件需求提报单（HW-001）——
+const sampleTypes = SAMPLE_TYPES
+const gateOptions = ['G1', 'G2', 'G3', 'G4', 'G5']
+const submitVisible = ref(false)
+const submitting = ref(false)
+const emptyForm = (): Required<SampleSubmitInput> => ({ type: 'A', qty: 1, needDate: '', gate: '', ebomVersion: '' })
+const form = ref<Required<SampleSubmitInput>>(emptyForm())
+/** 预览本次提报编号（与实际入列编号同源 nextSampleCode） */
+const previewCode = computed(() => nextSampleCode(store.data.samples.map((s) => s.code), form.value.type as SampleType))
+
+function openSubmit() {
+  form.value = emptyForm()
+  submitVisible.value = true
+}
+
+function submitOrder() {
+  if (submitting.value) return
+  submitting.value = true
+  const r = store.addSampleOrder({
+    type: form.value.type,
+    qty: Number(form.value.qty),
+    needDate: form.value.needDate,
+    gate: form.value.gate,
+    ebomVersion: form.value.ebomVersion.trim()
+  })
+  submitting.value = false
+  if (r.ok) submitVisible.value = false
 }
 </script>
 
