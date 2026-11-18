@@ -22,7 +22,7 @@
 
 ## 六门禁（全过才闭环）
 1. `npx vue-tsc --noEmit` 0 error
-2. `npx vitest run --no-file-parallelism` 全绿（当前 1600/1600，106 文件）
+2. `npx vitest run --no-file-parallelism` 全绿（当前 1605/1605，106 文件）
 3. `npx vite build` 成功
 4. `npm run smoke` exit 0（脚本 `bad.length||errors.length?1:0`）
 5. `npm run e2e` 33 PASS / 0 FAIL
@@ -41,6 +41,7 @@
 - 引擎：flowEngine / tenant / docEngine / lessonEngine / portfolioFinance / whatif / calendarEngine / myWorkEngine / governanceConfig / messageCenter / resourceShare / portalConfig / draftEngine / i18n+locale+enumDict / mobilePortal / lightTask / customField / kanban。
 - 资源：resourceConflict / projectClone / shareLink / quota / resourceCapacity / supplyDemand / overallocation / leveling / bottleneck / resourcePool / resourcePlan。
 - 风险：riskQuant+simulation+contingency / riskLifecycle；采购：supplierPerformance / otsClosure；报表：reportLibrary+interop+dataQuality / extensionPoint+accessibility。
+- 样件试制：sample.ts（HW-001~016 全引擎）。2026-11-19 新增提报单：`nextSampleCode`/`buildSampleOrder`（HW-001 字段齐全率校验），嵌入 `/trial/samples` KittingView 弹窗；store `addSampleOrder`。分层：提报仅需字段齐全，先 BOM+齐套(K9) 由下达 `canReleaseTrial` 把关；未立项(projectId='')时提报被 HW-001 正确拒绝。
 - 通用：stateMachine / grading(APX-C-2026.11) / controlPoints(48，分布 29/10/7/2) / aiAccountEngine。
 - 权限四维：`domain/rbac.ts`（canOperate / canAny / dataScopeOfRole(s) / applyFieldPolicy），前后端 TS + Java RbacEngine 一致。
 - server/index.js（/api/state 乐观锁 + /api/audit append-only + /api/ai/chat SSE + /api/ai/workbuddy/status 安装检测 + /api/ai/sms/send|verify 短信验证码）/ infra/repo.ts（RestRepo↔LocalRepo 双通道，2~4s 静默降级）。
@@ -65,5 +66,5 @@
 
 ## 最新进度（R3 收官）
 - R3 全部方向完成（流程/租户/文档/经验/组合/日历/我的工作/治理/消息/共享/门户配置/草稿/多语言/移动门户/资源/风险/采购/报表/通用PM/接口计划/闸门一致性/OpenAPI/菜单导航）。门户与协同已彻底删除（非 R3 方向，用户主动精简）。
-- 六门禁基线：vue-tsc 0 / vitest 1585 / build 成功 / smoke exit 0 / e2e 33 / chainOk true。
+- 六门禁基线：vue-tsc 0 / vitest 1605 / build 成功 / smoke exit 0 / e2e 33 / chainOk true。
 - 本地 main 与 origin/main 完全同步（`0 0`，远端 HEAD `d244f5f`）；AI 真实模型 Key ⏸ 待用户提供。
