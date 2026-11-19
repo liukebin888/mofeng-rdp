@@ -1,6 +1,6 @@
 <template>
   <div>
-    <PageHeader title="检验与 8D" desc="不合格品处置（8D：D1~D8 全流程）；检验记录与缺陷闭环关联（C-08/C-09 同源）">
+    <PageHeader title="样件评审" desc="不合格品处置（8D：D1~D8 全流程）；检验记录与缺陷闭环关联（C-08/C-09 同源）">
       <template #actions>
         <el-button size="small" @click="resetDemo">重置演示数据</el-button>
       </template>
@@ -70,7 +70,7 @@ const ngCount = computed(() => inspections.value.filter((i) => i.result === '不
 const closed8d = computed(() => eightD.value.filter((e) => e.closed).length)
 
 function resetDemo() {
-  store.notify('info', '检验与 8D 为演示数据（与 C-08/C-09 控制点同源），无需重置')
+  store.notify('info', '样件评审为演示数据（与 C-08/C-09 控制点同源），无需重置')
 }
 </script>
 

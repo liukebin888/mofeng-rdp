@@ -109,7 +109,7 @@ export const MENUS: MenuGroup[] = [
       { path: '/trial/samples', title: '试制需求', desc: 'A/B/C/OTS 与 Gate 绑定', icon: 'Box', comp: v('trial/KittingView') },
       { path: '/trial/kitting', title: '齐套校验', desc: '不齐套不开工（K9）', icon: 'CircleCheck', comp: v('trial/KittingView') },
       { path: '/trial/workorder', title: '试制工单与工装', desc: '三处关联可跳转', icon: 'Tickets', comp: v('trial/WorkOrderView') },
-      { path: '/trial/inspect', title: '检验与 8D', desc: '不合格品处置', icon: 'Search', comp: v('trial/InspectView') }
+      { path: '/trial/inspect', title: '样件评审', desc: '不合格品处置', icon: 'Search', comp: v('trial/InspectView') }
     ]
   },
   {
