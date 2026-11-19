@@ -67,6 +67,17 @@ import {
   type SampleCollectPlan
 } from '@/domain/sampleCollectEngine'
 import { APQP_PHASES } from '@/domain/apqpFlow'
+import {
+  buildSampleReview,
+  reviewVerdictOf,
+  reviewDedupKey,
+  nextReviewCode,
+  signComplete,
+  reviewCanTransition,
+  REVIEW_SIGN_ROLES,
+  type SampleReview,
+  type ReviewVerdict
+} from '@/domain/sampleReviewEngine'
 import { canAny, canOperateAny, dataScopeOfRoles, roleOf, applyFieldPolicy, type ActionKey, type FieldPolicySurface } from '@/domain/rbac'
 import { guardTenant, visibleInTenant, groupDrillDown, type TenantContext } from '@/domain/tenant'
 import { canAccessSpace, visibleInSpace, accessibleSpaces, describeSwitch, type Space, type SpaceContext } from '@/domain/spaceEngine'
@@ -278,6 +289,8 @@ export const useAppStore = defineStore('app', () => {
   const sampleTrialOrders = computed(() => (data.value.sampleTrialOrders ?? []) as import('@/domain/sampleCollectEngine').TrialOrder[])
   /** 样件提报提醒记录（邮件 + 站内通知同批留痕） */
   const sampleReminders = computed(() => (data.value.sampleReminders ?? []) as import('@/domain/sampleCollectEngine').SampleReminder[])
+  /** 样件评审流程单（五态闭环单一数据源） */
+  const sampleReviews = computed<SampleReview[]>(() => (data.value.sampleReviews ?? []) as SampleReview[])
   /** 轻量任务（GEN-001 通用 PM：独立于 WBS/CPM/挣值的简化任务模型） */
   const lightTasks = computed<LightTask[]>(() => (data.value.lightTasks ?? []) as LightTask[])
   /** 自定义字段定义（GEN-002 通用 PM：Jira 式自定义字段，配置驱动） */
@@ -3933,6 +3946,230 @@ export const useAppStore = defineStore('app', () => {
     return { ok: true }
   }
 
+  // —— 样件评审流程五态闭环（检验确认 → 部门会签 → 总监批准 → 评审结论 → 关闭）——
+  // 单一权威在 sampleReviewEngine：每步推进经引擎求值，store 只做编排 / 审计 / 持久化。
+  /** 评审详情（同源判定：阶段 + 能否推进 + 关闭要素 + 会签进度一并给出） */
+  function sampleReviewView(id: string) {
+    const r = sampleReviews.value.find((x) => x.id === id)
+    return r ? reviewVerdictOf(r) : undefined
+  }
+
+  /**
+   * 新建评审单（幂等：同一样件仅允许一条未关闭评审）。
+   * 样件须存在；同项目同样件已有进行中评审（phase≠关闭）时拒绝。
+   */
+  function createSampleReview(sampleOrderId: string, title = ''): { ok: boolean; reason?: string; id?: string } {
+    const sample = (data.value.samples ?? []).find((s: { id: string }) => s.id === sampleOrderId)
+    if (!sample) {
+      notify('error', '样件不存在，无法发起评审')
+      return { ok: false, reason: '样件不存在' }
+    }
+    const sc = String((sample as { code?: string }).code || sampleOrderId)
+    const scId = String((sample as { projectId?: string }).projectId || projectId.value)
+    const dedup = reviewDedupKey(scId, sc)
+    const dup = sampleReviews.value.find((r) => reviewDedupKey(r.projectId, r.sampleCode) === dedup && r.phase !== '关闭')
+    if (dup) {
+      notify('warning', `样件 ${sc} 已有进行中的评审单 ${dup.code}（${dup.phase}），不可重复发起`)
+      return { ok: false, reason: `已存在进行中评审 ${dup.code}`, id: dup.id }
+    }
+    const code = nextReviewCode(sampleReviews.value.map((r) => r.code), sc)
+    const now = new Date().toISOString()
+    const review = buildSampleReview({
+      id: `SREV-${Date.now()}`,
+      code,
+      projectId: scId,
+      sampleOrderId,
+      sampleCode: sc,
+      title: title || `${sc} 样件评审`,
+      submitter: currentUser.value?.name || '',
+      createdAt: now
+    })
+    if (!data.value.sampleReviews) data.value.sampleReviews = []
+    data.value.sampleReviews.push(review)
+    log('CREATE', '样件评审单', code, { sampleCode: sc, phase: review.phase, submitter: review.submitter })
+    persist()
+    notify('success', `评审单 ${code} 已发起，进入「检验数据确认」`)
+    return { ok: true, id: review.id }
+  }
+
+  /** 通用阶段推进：经引擎校验合法流转后写入 phase（各业务动作复用，禁止视图直接改 phase） */
+  function moveReviewPhase(review: SampleReview, to: import('@/domain/sampleReviewEngine').ReviewPhase, patch: Partial<SampleReview> = {}, action = ''): boolean {
+    const check = reviewCanTransition(review.phase, to)
+    if (!check.ok) {
+      log('UPDATE', '样件评审单', review.code, { from: review.phase, to, reason: check.reason, action }, undefined, 'DENY')
+      notify('error', `评审单 ${review.code} 推进被拒：${check.reason}`)
+      return false
+    }
+    const before = { phase: review.phase }
+    Object.assign(review, patch, { phase: to })
+    log('UPDATE', '样件评审单', review.code, { from: before.phase, to, action })
+    persist()
+    return true
+  }
+
+  /** 检验数据确认：沉淀检验结论（合格/不合格）与检验人，进入部门会签 */
+  function confirmReviewInspection(id: string, conclusion: '合格' | '不合格', inspector: string): boolean {
+    const r = sampleReviews.value.find((x) => x.id === id)
+    if (!r) return false
+    if (!conclusion) {
+      notify('warning', '请先选择检验结论')
+      return false
+    }
+    if (r.phase !== '检验数据确认') {
+      notify('warning', `当前阶段为「${r.phase}」，非「检验数据确认」`)
+      return false
+    }
+    const ok = moveReviewPhase(r, '部门会签', {
+      inspectionConclusion: conclusion,
+      inspector: inspector || currentUser.value?.name || '',
+      inspectionConfirmedAt: new Date().toISOString()
+    }, '检验数据确认')
+    if (ok) notify('success', `评审单 ${r.code} 检验结论「${conclusion}」已确认，进入部门会签（${REVIEW_SIGN_ROLES.join('/')}）`)
+    return ok
+  }
+
+  /**
+   * 部门会签：按角色登记一名签署人（同一角色后签覆盖前签）；全员通过后自动进入总监批准。
+   * pass=false 视为驳回该会签角色，整节点不通过（fail-closed），记录在案。
+   */
+  function signReviewNode(id: string, role: string, pass: boolean, signerName = ''): boolean {
+    const r = sampleReviews.value.find((x) => x.id === id)
+    if (!r) return false
+    if (r.phase !== '部门会签') {
+      notify('warning', `当前阶段为「${r.phase}」，非「部门会签」`)
+      return false
+    }
+    if (!REVIEW_SIGN_ROLES.includes(role)) {
+      notify('warning', `「${role}」不是本流程会签角色（应为 ${REVIEW_SIGN_ROLES.join('/')}）`)
+      return false
+    }
+    const sig = { role, name: signerName || currentUser.value?.name || role, pass, at: new Date().toISOString() }
+    const signatures = [...r.signatures.filter((s) => s.role !== role), sig]
+    r.signatures = signatures
+    log('APPROVE', '样件评审会签', r.code, { role, pass, node: '部门会签' })
+    if (signComplete(signatures)) {
+      const ok = moveReviewPhase(r, '总监批准', {}, '会签全通过')
+      if (ok) notify('success', `评审单 ${r.code} 部门会签全员通过，进入总监批准`)
+      return ok
+    }
+    persist()
+    notify('info', `评审单 ${r.code} 会签已登记：${role}${pass ? '通过' : '驳回'}（${signatures.filter((s) => s.pass).length}/${REVIEW_SIGN_ROLES.length}）`)
+    return true
+  }
+
+  /** 总监批准（SOD-01：发起人≠批准人），进入评审结论 */
+  function approveReviewDirector(id: string): boolean {
+    const r = sampleReviews.value.find((x) => x.id === id)
+    if (!r) return false
+    if (r.phase !== '总监批准') {
+      notify('warning', `当前阶段为「${r.phase}」，非「总监批准」`)
+      return false
+    }
+    const approver = currentUser.value?.name || ''
+    if (r.submitter && r.submitter === approver) {
+      log('APPROVE', '样件评审总监批准', r.code, { reason: 'SOD-01' }, undefined, 'DENY')
+      notify('error', `SOD-01：${approver} 不得批准本人发起的评审单，放行被拒`)
+      return false
+    }
+    if (!signComplete(r.signatures)) {
+      notify('error', '部门会签未全员通过，不得总监批准')
+      return false
+    }
+    const ok = moveReviewPhase(r, '评审结论', {
+      directorApproved: true,
+      directorName: approver,
+      directorApprovedAt: new Date().toISOString()
+    }, '总监批准')
+    if (ok) notify('success', `评审单 ${r.code} 总监 ${approver} 已批准，进入评审结论`)
+    return ok
+  }
+
+  /** 关联 8D 报告（不合格 / 拒收 / 有条件认可时的 fail-closed 前置） */
+  function linkReview8D(id: string, eightDId: string): boolean {
+    const r = sampleReviews.value.find((x) => x.id === id)
+    if (!r) return false
+    if (!eightDId.trim()) {
+      notify('warning', '8D 报告编号不能为空')
+      return false
+    }
+    const before = { eightDId: r.eightDId || '' }
+    r.eightDId = eightDId.trim()
+    log('UPDATE', '样件评审单', r.code, { eightDId: r.eightDId }, before)
+    persist()
+    notify('success', `评审单 ${r.code} 已关联 8D 报告 ${r.eightDId}`)
+    return true
+  }
+
+  /**
+   * 下评审结论：认可 / 有条件认可 / 拒收。
+   * - 拒收 → 引擎判定 requiresRework，转 8D 复评回「检验数据确认」并 round+1（须先关联 8D）；
+   * - 认可 / 有条件认可 → 停留「评审结论」，待关闭动作经 fail-closed 校验后关闭。
+   */
+  function concludeReview(id: string, verdict: ReviewVerdict): boolean {
+    const r = sampleReviews.value.find((x) => x.id === id)
+    if (!r) return false
+    if (r.phase !== '评审结论') {
+      notify('warning', `当前阶段为「${r.phase}」，非「评审结论」`)
+      return false
+    }
+    if (!r.directorApproved) {
+      notify('error', '总监尚未批准，不得下评审结论')
+      return false
+    }
+    r.verdict = verdict
+    r.verdictBy = currentUser.value?.name || ''
+    r.verdictAt = new Date().toISOString()
+    const view = reviewVerdictOf(r)
+    if (view.requiresRework) {
+      if (!String(r.eightDId || '').trim()) {
+        r.verdict = '' // fail-closed 回滚：未关联 8D 不得转复评
+        notify('error', '评审结论为「拒收」，须先关联 8D 报告方可转整改复评')
+        return false
+      }
+      const before = { phase: r.phase, round: r.round }
+      // 复评：回到检验数据确认，清空上一轮签署/批准/结论留痕（保留 8D 关联）
+      r.phase = '检验数据确认'
+      r.round = r.round + 1
+      r.inspectionConclusion = ''
+      r.inspector = ''
+      r.inspectionConfirmedAt = undefined
+      r.signatures = []
+      r.directorApproved = false
+      r.directorName = undefined
+      r.directorApprovedAt = undefined
+      r.verdict = ''
+      r.verdictBy = undefined
+      r.verdictAt = undefined
+      log('UPDATE', '样件评审单', r.code, { from: before.phase, to: '检验数据确认', round: r.round, verdict: '拒收', eightDId: r.eightDId }, before)
+      persist()
+      notify('warning', `评审单 ${r.code} 结论「拒收」，已转 8D 复评（第 ${r.round} 轮），回到检验数据确认`)
+      return true
+    }
+    log('UPDATE', '样件评审单', r.code, { verdict, requiresClosure: view.requiresClosure })
+    persist()
+    notify('success', `评审单 ${r.code} 结论「${verdict}」已记录，可校验后关闭`)
+    return true
+  }
+
+  /** 关闭评审单（fail-closed：经引擎 canCloseReview 校验四要素 + 8D 前置） */
+  function closeSampleReview(id: string): boolean {
+    const r = sampleReviews.value.find((x) => x.id === id)
+    if (!r) return false
+    const view = reviewVerdictOf(r)
+    if (!view.canClose) {
+      log('UPDATE', '样件评审单', r.code, { reason: view.reason, missing: view.closureMissing }, undefined, 'DENY')
+      notify('error', `评审单 ${r.code} 关闭被拒：${view.reason}`)
+      return false
+    }
+    const before = { phase: r.phase }
+    r.phase = '关闭'
+    r.closedAt = new Date().toISOString()
+    log('UPDATE', '样件评审单', r.code, { from: before.phase, to: '关闭', verdict: r.verdict, eightDId: r.eightDId })
+    persist()
+    notify('success', `评审单 ${r.code} 已关闭（结论：${r.verdict}）`)
+    return true
+  }
+
   /** 样件状态推进（A/B/C/OTS 状态机） */
   function advanceSample(id: string, to: string) {
     const s = data.value.samples.find((x) => x.id === id)
@@ -4738,9 +4975,18 @@ export const useAppStore = defineStore('app', () => {
     sampleCollectPlans,
     sampleTrialOrders,
     sampleReminders,
+    sampleReviews,
     setSampleCollectDate,
     scanSampleCollect,
     advanceTrialOrder,
+    sampleReviewView,
+    createSampleReview,
+    confirmReviewInspection,
+    signReviewNode,
+    approveReviewDirector,
+    linkReview8D,
+    concludeReview,
+    closeSampleReview,
     pushMessageToUsers,
     addIssueManually,
     scanIssueLedger,

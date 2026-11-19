@@ -123,11 +123,25 @@ export async function appendRemoteAudit(entry: Record<string, unknown>): Promise
   }
 }
 
-/** 播种审计链（仅服务端空链时有效） */
+/**
+ * 播种审计链（仅服务端空链时有效）。
+ * 先 GET 后端审计计数：非空链则跳过（幂等，避免重复播种触发 409 噪音）；
+ * rows 为空亦跳过（后端要求非空数组，避免 400）。
+ */
 export async function seedRemoteAudit(rows: unknown[]): Promise<boolean> {
+  if (!Array.isArray(rows) || rows.length === 0) return false
   try {
     const ctrl = new AbortController()
     const t = setTimeout(() => ctrl.abort(), 4000)
+    // 前置检查：后端已有审计链则不重复播种（append-only 权威在服务端）
+    const probe = await fetch(`${REST_BASE}/api/audit`, { signal: ctrl.signal })
+    if (probe.ok) {
+      const j = (await probe.json()) as { count?: number }
+      if (typeof j?.count === 'number' && j.count > 0) {
+        clearTimeout(t)
+        return true
+      }
+    }
     const res = await fetch(`${REST_BASE}/api/audit/seed`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

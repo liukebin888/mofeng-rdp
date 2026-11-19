@@ -89,8 +89,9 @@ import type { IssueLedgerItem, IssueAlertMail } from '@/domain/issueAlert'
 import type { LightTask } from '@/domain/lightTask'
 import type { CustomFieldDef } from '@/domain/customField'
 import type { SampleCollectPlan, TrialOrder, SampleReminder } from '@/domain/sampleCollectEngine'
+import type { SampleReview } from '@/domain/sampleReviewEngine'
 
-export const SEED_VERSION = 'mofeng.rdp.v1.0.40'
+export const SEED_VERSION = 'mofeng.rdp.v1.0.41'
 const TENANT = 'T-1001'
 
 export interface SeedUser {
@@ -950,6 +951,8 @@ export function buildSeed() {
     sampleTrialOrders: [] as TrialOrder[],
     /** 提报提醒记录（邮件 + 站内通知，空白模板） */
     sampleReminders: [] as SampleReminder[],
+    /** 样件评审流程单（评审五态闭环单一数据源，空白模板：不预置演示数据） */
+    sampleReviews: [] as SampleReview[],
     otsAttachments,
     /** OTS 认可台账（OTS 认可闭环单一数据源，空白模板：不预置演示数据） */
     otsApprovals: [] as OtsApprovalRecord[],
@@ -1423,6 +1426,30 @@ export function buildSeed() {
           { id: 'td4', name: '财务审核', type: 'approve', approverRole: '财务', slaHours: 48, escalateToRole: '总经理' },
           { id: 'td5', name: '总经理批准', type: 'approve', approverRole: '总经理', slaHours: 24 },
           { id: 'td6', name: '结束', type: 'end' }
+        ],
+        enabled: true,
+        version: 1
+      },
+      // 样件试制 · 样件评审流程（检验数据确认 → 部门会签 → 总监批准 → 评审结论 → 结束）
+      // 会签角色与 sampleReviewEngine.REVIEW_SIGN_ROLES 同源；评审单五态闭环由引擎求值，流程实例供审批中心留痕。
+      {
+        id: 'DEF-TRIAL-REVIEW',
+        code: 'FLOW-TRIAL-REVIEW',
+        name: '样件评审流程',
+        formFields: [
+          { key: 'sampleCode', label: '样件编号' },
+          { key: 'projectName', label: '项目' },
+          { key: 'inspectionConclusion', label: '检验结论' },
+          { key: 'verdict', label: '评审结论' }
+        ],
+        startNodeId: 'rv1',
+        nodes: [
+          { id: 'rv1', name: '发起评审（质量工程师）', type: 'start' },
+          { id: 'rv2', name: '检验数据确认', type: 'approve', approverRole: '质量工程师', slaHours: 24, escalateToRole: '质量总监' },
+          { id: 'rv3', name: '部门会签（质量/研发/制造）', type: 'sign', signMode: 'all', signRoles: ['质量工程师', '研发工程师', '制造工程师'], slaHours: 48, escalateToRole: '研发副总' },
+          { id: 'rv4', name: '总监批准', type: 'approve', approverRole: '研发副总', slaHours: 24, escalateToRole: '总经理' },
+          { id: 'rv5', name: '评审结论', type: 'approve', approverRole: '质量总监', slaHours: 24, escalateToRole: '总经理' },
+          { id: 'rv6', name: '结束', type: 'end' }
         ],
         enabled: true,
         version: 1
