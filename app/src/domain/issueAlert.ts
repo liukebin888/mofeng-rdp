@@ -24,6 +24,7 @@
  *   - fail-closed：责任人不明或组织关系缺失时，不臆造收件人，仅报警责任人本人。
  */
 import type { OrgNode, OrgMembership } from './types'
+import type { IssuePhase, IssueAlertAckStatus } from './issueEngine'
 
 /** 问题严重度（复用 P1~P4） */
 export type IssueSeverity = 'P1' | 'P2' | 'P3' | 'P4'
@@ -60,8 +61,22 @@ export interface IssueLedgerItem {
   source: IssueSource
   /** 关联指标（自动录入时：阈值规则命中的指标；人工为空） */
   metric?: string
-  /** 处理状态 */
+  /** 处理状态（历史三态，保留供 OTS/偏差门禁消费；五态闭环见 phase） */
   status: '开放' | '处理中' | '已关闭'
+  /** 五态闭环相位（新增，可选兼容历史；缺省时按 status 镜像推导） */
+  phase?: IssuePhase
+  /** 根本原因（原因分析阶段沉淀；关闭三要素之一） */
+  rootCause?: string
+  /** 纠正措施（纠正措施执行阶段沉淀；关闭三要素之一） */
+  correctiveAction?: string
+  /** 验证人（验证阶段确认；关闭三要素之一） */
+  verifiedBy?: string
+  /** 验证时间（ISO） */
+  verifiedAt?: string
+  /** 关联键：问题清单 / 不符合项 / 8D（可选，串联 4 套结构） */
+  checklistId?: string
+  ncId?: string
+  eightDId?: string
   /** 录入时间（ISO） */
   createdAt: string
   /** 关闭留痕 */
@@ -88,8 +103,13 @@ export interface IssueAlertMail {
   level: '严重' | '一般'
   /** 发送时间（ISO） */
   sentAt: string
-  /** 邮件状态 */
-  status: '已发送'
+  /** 邮件回执状态（已发送 → 已响应 → 已确认） */
+  status: IssueAlertAckStatus
+  /** 回执留痕：首次响应人/时间、确认人/时间 */
+  acknowledgedBy?: string
+  acknowledgedAt?: string
+  confirmedBy?: string
+  confirmedAt?: string
 }
 
 /**

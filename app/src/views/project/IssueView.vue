@@ -52,7 +52,7 @@
 
       <el-table v-if="ledger.length" :data="ledger" size="small" style="margin-top: 6px" border>
         <el-table-column prop="code" label="编号" width="100" />
-        <el-table-column prop="title" label="问题描述" min-width="220" show-overflow-tooltip />
+        <el-table-column prop="title" label="问题描述" min-width="200" show-overflow-tooltip />
         <el-table-column label="严重度" width="90" align="center">
           <template #default="{ row }"><span class="tag" :class="isHigh(row.severity) ? 'fail' : 'ok'">{{ row.severity }}</span></template>
         </el-table-column>
@@ -60,16 +60,50 @@
         <el-table-column label="来源" width="70" align="center">
           <template #default="{ row }"><span class="tag" :class="row.source === '自动' ? 'cond' : 'ok'">{{ row.source }}</span></template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="80" align="center" />
-        <el-table-column label="操作" width="150">
+        <el-table-column label="闭环阶段" width="130" align="center">
+          <template #default="{ row }"><span class="tag" :class="phaseTag(row)">{{ phaseOf(row) }}</span></template>
+        </el-table-column>
+        <el-table-column label="根因 / 措施 / 验证" min-width="180" show-overflow-tooltip>
           <template #default="{ row }">
-            <el-button v-if="row.status !== '已关闭'" link size="small" @click="store.closeIssueLedgerItem(row.id)">关闭</el-button>
-            <el-button v-if="isHigh(row.severity)" link type="warning" size="small" @click="upgradeToRisk(row)">升级为风险</el-button>
-            <span v-else class="dim">已闭环</span>
+            <span v-if="row.rootCause || row.correctiveAction || row.verifiedBy" class="dim">
+              因：{{ row.rootCause || '—' }} ｜ 措：{{ row.correctiveAction || '—' }} ｜ 验：{{ row.verifiedBy || '—' }}
+            </span>
+            <span v-else class="dim">尚未填写</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="180">
+          <template #default="{ row }">
+            <el-button v-if="!isClosed(row)" link size="small" type="primary" @click="openPhaseDialog(row)">
+              推进：{{ nextPhaseLabel(row) }}
+            </el-button>
+            <el-button v-if="isHigh(row.severity) && !isClosed(row)" link type="warning" size="small" @click="upgradeToRisk(row)">升级为风险</el-button>
+            <span v-if="isClosed(row)" class="tag ok">已闭环</span>
           </template>
         </el-table-column>
       </el-table>
       <el-empty v-else description="暂无问题台账，点击「人工手动录入」或「系统扫描自动录入」生成" :image-size="48" />
+
+      <!-- 相位推进 / 关闭三要素弹窗 -->
+      <el-dialog v-model="phaseDialogOpen" :title="phaseDialogTitle" width="520px" destroy-on-close>
+        <div class="phase-hint">{{ phaseDialogHint }}</div>
+        <el-form label-width="100px" size="small">
+          <el-form-item label="根本原因" :required="closingPhase">
+            <el-input v-model="phaseForm.rootCause" type="textarea" :rows="2" placeholder="原因分析结论：问题的根本原因（关闭必填）" />
+          </el-form-item>
+          <el-form-item label="纠正措施" :required="closingPhase">
+            <el-input v-model="phaseForm.correctiveAction" type="textarea" :rows="2" placeholder="已采取的纠正措施（关闭必填）" />
+          </el-form-item>
+          <el-form-item label="验证人" :required="closingPhase">
+            <el-select v-model="phaseForm.verifiedBy" placeholder="选择验证人" filterable style="width: 220px">
+              <el-option v-for="u in userOptions" :key="u" :label="u" :value="u" />
+            </el-select>
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button size="small" @click="phaseDialogOpen = false">取消</el-button>
+          <el-button size="small" type="primary" @click="submitPhase()">{{ closingPhase ? '验证并关闭' : '确认推进' }}</el-button>
+        </template>
+      </el-dialog>
     </div>
 
     <div class="panel" style="margin-bottom: 12px">
@@ -86,10 +120,20 @@
           <template #default="{ row }"><span class="tag" :class="row.level === '严重' ? 'fail' : 'ok'">{{ row.level }}</span></template>
         </el-table-column>
         <el-table-column prop="issueCode" label="问题编号" width="100" />
-        <el-table-column label="收件人" min-width="200" show-overflow-tooltip>
+        <el-table-column label="收件人" min-width="180" show-overflow-tooltip>
           <template #default="{ row }">{{ recipientsText(row) }}</template>
         </el-table-column>
-        <el-table-column prop="subject" label="标题" min-width="240" show-overflow-tooltip />
+        <el-table-column prop="subject" label="标题" min-width="200" show-overflow-tooltip />
+        <el-table-column label="回执状态" width="100" align="center">
+          <template #default="{ row }"><span class="tag" :class="ackTag(row)">{{ row.status || '已发送' }}</span></template>
+        </el-table-column>
+        <el-table-column label="回执操作" width="130" align="center">
+          <template #default="{ row }">
+            <el-button v-if="(row.status || '已发送') === '已发送'" link size="small" @click="store.acknowledgeIssueAlert(row.id, '响应')">标记响应</el-button>
+            <el-button v-else-if="row.status === '已响应'" link size="small" type="success" @click="store.acknowledgeIssueAlert(row.id, '确认')">确认处理</el-button>
+            <span v-else class="tag ok">已确认</span>
+          </template>
+        </el-table-column>
       </el-table>
       <el-empty v-else description="暂无报警邮件记录" :image-size="48" />
     </div>
@@ -173,7 +217,10 @@ import { useAppStore } from '@/store/app'
 import { useI18n } from '@/infra/i18nPlugin'
 import { highUrgencyCount, openCount, overdueDaysOf, stayDaysOf, NONCONFORMITY_SEED, type Nonconformity } from '@/domain/nonconformity'
 import { ISSUE_CHECKLIST_TEMPLATE, ISSUE_CHECKLIST_STATUSES } from '@/domain/issueChecklist'
-import { ISSUE_SEVERITIES, ISSUE_SEVERITY_LABEL, isHighSeverity, type IssueSeverity, type IssueAlertMail } from '@/domain/issueAlert'
+import { ISSUE_SEVERITIES, ISSUE_SEVERITY_LABEL, isHighSeverity, type IssueSeverity, type IssueAlertMail, type IssueLedgerItem } from '@/domain/issueAlert'
+import {
+  phaseOf, issuePhaseNext, isIssueClosed, type IssuePhase
+} from '@/domain/issueEngine'
 
 const store = useAppStore()
 const { te } = useI18n()
@@ -261,6 +308,68 @@ function scan() {
 function upgradeToRisk(row: { id: string; severity: string }) {
   store.upgradeIssueToRisk(row.id, '缓解')
 }
+
+// —— 问题五态闭环推进（问题描述→原因分析→纠正措施执行→验证→关闭）——
+function isClosed(row: IssueLedgerItem): boolean {
+  return isIssueClosed(phaseOf(row))
+}
+function phaseTag(row: IssueLedgerItem): string {
+  const p = phaseOf(row)
+  if (p === '关闭') return 'ok'
+  if (p === '验证') return 'warn'
+  if (p === '纠正措施执行') return 'cond'
+  return 'fail'
+}
+function nextPhaseLabel(row: IssueLedgerItem): string {
+  const next = issuePhaseNext(phaseOf(row))
+  return next ?? '已完成'
+}
+
+const phaseDialogOpen = ref(false)
+const closingPhase = ref(false)
+const activeIssueId = ref('')
+const phaseForm = reactive({ rootCause: '', correctiveAction: '', verifiedBy: '' })
+
+function openPhaseDialog(row: IssueLedgerItem) {
+  const next = issuePhaseNext(phaseOf(row))
+  if (!next) return
+  activeIssueId.value = row.id
+  closingPhase.value = next === '关闭'
+  // 回填已沉淀要素，便于逐步完善
+  phaseForm.rootCause = row.rootCause ?? ''
+  phaseForm.correctiveAction = row.correctiveAction ?? ''
+  phaseForm.verifiedBy = row.verifiedBy ?? ''
+  phaseDialogOpen.value = true
+}
+
+const phaseDialogTitle = computed(() => closingPhase.value ? '验证并关闭问题（三要素必填）' : '推进问题相位')
+const phaseDialogHint = computed(() => closingPhase.value
+  ? '关闭为终态：根本原因、纠正措施、验证人三项齐全方可关闭（fail-closed）。'
+  : `将问题从「${activePhase.value}」推进到「${nextPhaseLabelForActive.value}」。可在此提前沉淀要素。`)
+const activePhase = computed<IssuePhase>(() => {
+  const row = ledger.value.find((x) => x.id === activeIssueId.value)
+  return row ? phaseOf(row) : '问题描述'
+})
+const nextPhaseLabelForActive = computed(() => issuePhaseNext(activePhase.value) ?? '已完成')
+
+function submitPhase() {
+  const r = store.advanceIssuePhase(activeIssueId.value, {
+    rootCause: phaseForm.rootCause,
+    correctiveAction: phaseForm.correctiveAction,
+    verifiedBy: phaseForm.verifiedBy
+  })
+  if (r.ok) phaseDialogOpen.value = false
+  else store.notify('error', r.reason ?? '推进被拒')
+}
+
+// —— 报警回执状态显示 ——
+function ackTag(row: IssueAlertMail): string {
+  const s = row.status || '已发送'
+  if (s === '已确认') return 'ok'
+  if (s === '已响应') return 'cond'
+  return 'warn'
+}
+
 function stayDays(row: Nonconformity): number {
   return stayDaysOf(row.raisedAt, row.status, row.actualDate, AS_OF)
 }
@@ -279,4 +388,5 @@ function overdueDays(row: Nonconformity): number {
 .tpl-statuses { color: var(--text-3); font-size: 10.5px; }
 .manual-form { margin-top: 10px; padding: 12px; border: 1px dashed var(--line); border-radius: 8px; background: var(--panel-bg, #0f1a2a); }
 .sub-title { font-size: 12px; font-weight: 600; color: var(--text-1); margin-bottom: 8px; }
+.phase-hint { font-size: 12px; color: var(--text-2); line-height: 1.6; margin-bottom: 12px; padding: 8px 10px; border-radius: 6px; background: var(--panel-bg, #0f1a2a); }
 </style>

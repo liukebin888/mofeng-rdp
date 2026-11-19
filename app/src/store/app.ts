@@ -113,6 +113,10 @@ import { detectOverallocations, gateBlocked } from '@/domain/overallocation'
 import { levelResources, smoothResources, revert, type LevelingResult } from '@/domain/leveling'
 import { scanThresholds, DEFAULT_THRESHOLD_RULES, type ThresholdMetrics } from '@/domain/thresholdEngine'
 import { resolveAlertRecipients, buildIssueAlertMail, isHighSeverity, exportAlertMails, type IssueLedgerItem, type IssueAlertMail, type IssueSeverity } from '@/domain/issueAlert'
+import {
+  phaseOf, phaseToStatus, evaluateAdvance, canCloseIssue, alertAckCanTransition,
+  type IssuePhase, type IssueClosure, type IssueAlertAckStatus
+} from '@/domain/issueEngine'
 import { fire, SOFTWARE_VERSION_TRANSITIONS } from '@/domain/stateMachine'
 import { evaluateHandoffs } from '@/domain/handoffEngine'
 import { evaluateInterfacePlan, exportInterfacePlan, interfacePlanHealth, type InterfaceEvaluation } from '@/domain/interfacePlan'
@@ -1520,6 +1524,7 @@ export const useAppStore = defineStore('app', () => {
       owner: input.owner.trim(),
       source: '人工',
       status: '开放',
+      phase: '问题描述',
       createdAt: new Date().toISOString()
     }
     if (!data.value.issueLedger) data.value.issueLedger = []
@@ -1554,6 +1559,7 @@ export const useAppStore = defineStore('app', () => {
         source: '自动',
         metric: key,
         status: '开放',
+        phase: '问题描述',
         createdAt: now
       }
       if (!data.value.issueLedger) data.value.issueLedger = []
@@ -1566,15 +1572,119 @@ export const useAppStore = defineStore('app', () => {
     return added
   }
 
-  /** 关闭问题台账条目（闭环留痕） */
-  function closeIssueLedgerItem(issueId: string) {
+  /**
+   * 内部：问题相位推进一步（纯状态机求值 + 写回 + 审计）。
+   * 下一态为「关闭」时须过 canCloseIssue 三要素校验（fail-closed）。
+   */
+  function doAdvanceIssuePhase(
+    i: IssueLedgerItem,
+    payload?: IssueClosure
+  ): { ok: boolean; next?: IssuePhase; missing?: string[]; reason?: string } {
+    const from = phaseOf(i)
+    const ev = evaluateAdvance(from)
+    if (!ev.ok) return { ok: false, reason: ev.reason }
+
+    // 沉淀各阶段要素（若提供）
+    if (payload?.rootCause !== undefined) i.rootCause = payload.rootCause.trim()
+    if (payload?.correctiveAction !== undefined) i.correctiveAction = payload.correctiveAction.trim()
+    if (payload?.verifiedBy !== undefined) i.verifiedBy = payload.verifiedBy.trim()
+
+    const next = ev.next as IssuePhase
+    // 关闭门禁：三要素齐全（fail-closed）
+    if (ev.requiresClosure) {
+      const chk = canCloseIssue(
+        { rootCause: i.rootCause, correctiveAction: i.correctiveAction, verifiedBy: i.verifiedBy },
+        from
+      )
+      if (!chk.ok) {
+        log('UPDATE', '问题清单', i.id, { phase: from, attempted: next, missing: chk.missing }, undefined, 'DENY')
+        return { ok: false, missing: [...chk.missing], reason: chk.reason }
+      }
+      i.verifiedAt = new Date().toISOString()
+    }
+
+    const before = { phase: from, status: i.status }
+    i.phase = next
+    i.status = phaseToStatus(next)
+    if (next === '关闭') {
+      i.closedBy = i.verifiedBy || currentUser.value.name
+      i.closedAt = new Date().toISOString()
+    }
+    persist()
+    log('UPDATE', '问题清单', i.id, { phase: next, status: i.status }, before)
+    return { ok: true, next }
+  }
+
+  /** 问题相位推进（五态闭环：问题描述→原因分析→纠正措施执行→验证→关闭） */
+  function advanceIssuePhase(
+    issueId: string,
+    payload?: IssueClosure
+  ): { ok: boolean; next?: IssuePhase; missing?: string[]; reason?: string } {
     const i = (data.value.issueLedger ?? []).find((x) => x.id === issueId)
-    if (!i) return
-    i.status = '已关闭'
-    i.closedBy = currentUser.value.name
-    i.closedAt = new Date().toISOString()
-    log('UPDATE', '问题清单', issueId, { status: '已关闭' })
-    notify('success', `${i.code} 已关闭`)
+    if (!i) return { ok: false, reason: '问题不存在' }
+    const r = doAdvanceIssuePhase(i, payload)
+    if (!r.ok) {
+      notify('error', r.reason ?? '推进被拒')
+    } else {
+      notify('success', `${i.code} 已推进到「${r.next}」${r.next === '关闭' ? '，闭环完成' : ''}`)
+    }
+    return r
+  }
+
+  /**
+   * 关闭问题台账条目（fail-closed：须处于「验证」阶段且三要素齐全）。
+   * 兼容旧签名：closure 省略时若条目已具备三要素亦可关闭；否则拒绝并提示。
+   */
+  function closeIssueLedgerItem(
+    issueId: string,
+    closure?: IssueClosure
+  ): { ok: boolean; missing?: string[]; reason?: string } {
+    const i = (data.value.issueLedger ?? []).find((x) => x.id === issueId)
+    if (!i) return { ok: false, reason: '问题不存在' }
+    const from = phaseOf(i)
+    if (from !== '验证') {
+      const reason = `当前处于「${from}」，须先推进到「验证」方可关闭（不可跳态）`
+      log('UPDATE', '问题清单', issueId, { attempted: '关闭', from }, undefined, 'DENY')
+      notify('error', reason)
+      return { ok: false, reason }
+    }
+    const r = doAdvanceIssuePhase(i, closure)
+    if (!r.ok) {
+      notify('error', r.reason ?? '关闭被拒：三要素不齐')
+    } else {
+      notify('success', `${i.code} 已完成验证并关闭（根因/措施/验证人齐全）`)
+    }
+    return { ok: r.ok, missing: r.missing, reason: r.reason }
+  }
+
+  /** 报警邮件回执（已发送→已响应→已确认），确认后回流问题台账留痕 */
+  function acknowledgeIssueAlert(
+    mailId: string,
+    kind: '响应' | '确认'
+  ): { ok: boolean; status?: IssueAlertAckStatus; reason?: string } {
+    const m = (data.value.issueAlertMails ?? []).find((x) => x.id === mailId)
+    if (!m) return { ok: false, reason: '报警邮件不存在' }
+    const from = (m.status ?? '已发送') as IssueAlertAckStatus
+    const to = kind === '响应' ? '已响应' : '已确认'
+    // 幂等：已是目标态或更后态则不重复
+    if (from === to || (kind === '响应' && from === '已确认')) {
+      return { ok: true, status: from }
+    }
+    const chk = alertAckCanTransition(from, to)
+    if (!chk.ok) {
+      log('UPDATE', '报警回执', mailId, { from, attempted: to }, undefined, 'DENY')
+      return { ok: false, reason: chk.reason }
+    }
+    const who = currentUser.value.name
+    const now = new Date().toISOString()
+    const before = { status: from }
+    m.status = to
+    if (to === '已响应') { m.acknowledgedBy = who; m.acknowledgedAt = now }
+    if (to === '已确认') { m.confirmedBy = who; m.confirmedAt = now }
+    persist()
+    log('UPDATE', '报警回执', mailId, { status: to, by: who, issueId: m.issueId }, before)
+    notify('success', `报警 ${m.issueCode} 已${to}`)
+    return { ok: true, status: to }
   }
 
   /** 导出报警邮件记录（CSV） */
@@ -4635,6 +4745,8 @@ export const useAppStore = defineStore('app', () => {
     addIssueManually,
     scanIssueLedger,
     closeIssueLedgerItem,
+    advanceIssuePhase,
+    acknowledgeIssueAlert,
     exportIssueAlertMails,
     isHighSeverity,
     riskLinks,
