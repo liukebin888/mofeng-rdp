@@ -50,6 +50,23 @@ import {
   type BindStatus
 } from '@/domain/aiAccountEngine'
 import { nextSampleCode, buildSampleOrder, type SampleSubmitInput } from '@/domain/sample'
+import {
+  DEFAULT_LEAD_DAYS,
+  sampleCollectNodesOf,
+  collectStateOf,
+  reminderEventKey,
+  orderDedupKey,
+  resolveCollectRecipients,
+  aggregateSampleNeeds,
+  nextTrialOrderCode,
+  buildTrialOrder,
+  transitionTrialOrder,
+  buildCollectReminder,
+  type TrialOrderStatus,
+  type TrialOrderEvent,
+  type SampleCollectPlan
+} from '@/domain/sampleCollectEngine'
+import { APQP_PHASES } from '@/domain/apqpFlow'
 import { canAny, canOperateAny, dataScopeOfRoles, roleOf, applyFieldPolicy, type ActionKey, type FieldPolicySurface } from '@/domain/rbac'
 import { guardTenant, visibleInTenant, groupDrillDown, type TenantContext } from '@/domain/tenant'
 import { canAccessSpace, visibleInSpace, accessibleSpaces, describeSwitch, type Space, type SpaceContext } from '@/domain/spaceEngine'
@@ -251,6 +268,12 @@ export const useAppStore = defineStore('app', () => {
   const issueLedger = computed<IssueLedgerItem[]>(() => (data.value.issueLedger ?? []) as IssueLedgerItem[])
   /** 报警邮件记录（站内邮件，责任人/上级/部门总监） */
   const issueAlertMails = computed<IssueAlertMail[]>(() => (data.value.issueAlertMails ?? []) as IssueAlertMail[])
+  /** 样件需求汇总节点配置（主计划每阶段一个，收集时间由用户设定） */
+  const sampleCollectPlans = computed<SampleCollectPlan[]>(() => (data.value.sampleCollectPlans ?? []) as SampleCollectPlan[])
+  /** 样件试制任务单（汇总后自动下达，跟进闭环） */
+  const sampleTrialOrders = computed(() => (data.value.sampleTrialOrders ?? []) as import('@/domain/sampleCollectEngine').TrialOrder[])
+  /** 样件提报提醒记录（邮件 + 站内通知同批留痕） */
+  const sampleReminders = computed(() => (data.value.sampleReminders ?? []) as import('@/domain/sampleCollectEngine').SampleReminder[])
   /** 轻量任务（GEN-001 通用 PM：独立于 WBS/CPM/挣值的简化任务模型） */
   const lightTasks = computed<LightTask[]>(() => (data.value.lightTasks ?? []) as LightTask[])
   /** 自定义字段定义（GEN-002 通用 PM：Jira 式自定义字段，配置驱动） */
@@ -3574,6 +3597,232 @@ export const useAppStore = defineStore('app', () => {
     return { ok: true, code }
   }
 
+  // —— 样件需求汇总驱动小闭环（主计划阶段节点）：提醒 → 汇总 → 下达试制任务单 → 跟进 ——
+  /** 设置某阶段汇总节点的收集时间（来自主计划节点完成时间） */
+  function setSampleCollectDate(phase: string, collectDate: string, phaseName = '') {
+    if (!phase) return
+    const list = (data.value.sampleCollectPlans ?? []) as SampleCollectPlan[]
+    let p = list.find((x) => x.phase === phase)
+    if (!p) {
+      p = { phase, phaseName, collectDate: '', leadDays: DEFAULT_LEAD_DAYS }
+      list.push(p)
+    }
+    const before = { collectDate: p.collectDate }
+    p.phaseName = phaseName || p.phaseName
+    p.collectDate = collectDate
+    data.value.sampleCollectPlans = list
+    log('UPDATE', '样件需求汇总节点', p.phase, { collectDate }, before)
+    persist()
+    notify('success', collectDate ? `${p.phaseName || phase} 样件需求收集时间已设为 ${collectDate}（提前 ${p.leadDays} 天提醒）` : `${p.phaseName || phase} 收集时间已清除`)
+  }
+
+  /** 给指定收件人推站内通知（按 userId 精准推送，逐人 24h 去重） */
+  function pushMessageToUsers(
+    recipients: Array<{ name: string; role: string }>,
+    input: { eventKey: string; title: string; content: string; category: import('@/domain/types').MessageItem['category']; refType?: string; refId?: string }
+  ): number {
+    const now = new Date().toISOString()
+    let sent = 0
+    for (const r of recipients) {
+      const u = users.value.find((x) => x.name === r.name)
+      if (!u) continue // fail-closed：找不到对应账号则不推送，不臆造
+      if (!shouldNotify(messages.value, u.id, `${input.eventKey}:${u.id}`, now)) continue
+      data.value.messages = [
+        ...(data.value.messages ?? []),
+        {
+          id: `MSG-${Date.now()}-${sent}`,
+          userId: u.id,
+          eventKey: `${input.eventKey}:${u.id}`,
+          title: input.title,
+          content: `${input.content}（角色：${r.role}）`,
+          category: input.category,
+          read: false,
+          createdAt: now,
+          refType: input.refType,
+          refId: input.refId
+        } as import('@/domain/types').MessageItem
+      ]
+      sent++
+    }
+    return sent
+  }
+
+  /**
+   * 扫描全部阶段汇总节点（页面进入时 / 手动触发）：
+   *   1) 提醒期且未提醒 → 发邮件（站内邮件记录）+ 站内通知，收件人=项目负责人+研发在职工；
+   *   2) 到收集时间且未下达 → 汇总当前项目草稿样件需求，自动下达试制任务单（幂等：dedupKey 唯一）；
+   * 全程审计留痕；fail-closed：无收件人/无需求不臆造并 DENY 留痕。
+   */
+  function scanSampleCollect(): {
+    reminded: number
+    issued: number
+    details: Array<{ phase: string; action: string; reason: string }>
+  } {
+    const now = new Date().toISOString()
+    const today = now.slice(0, 10)
+    const details: Array<{ phase: string; action: string; reason: string }> = []
+    let reminded = 0
+    let issued = 0
+    const plans = sampleCollectPlans.value
+    if (!plans.length) {
+      return { reminded, issued, details: [{ phase: '-', action: '跳过', reason: '尚未设定任何阶段汇总节点' }] }
+    }
+
+    // 由配置派生节点（配置驱动 + 引擎求值两段）
+    const planDates: Record<string, string> = {}
+    const leadByPhase: Record<string, number> = {}
+    for (const p of plans) {
+      planDates[p.phase] = p.collectDate
+      leadByPhase[p.phase] = p.leadDays ?? DEFAULT_LEAD_DAYS
+    }
+    const phaseDefs = plans.map((p) => ({ code: p.phase, name: p.phaseName || p.phase }))
+    const nodes = sampleCollectNodesOf(phaseDefs, planDates, DEFAULT_LEAD_DAYS)
+
+    for (const node of nodes) {
+      node.leadDays = leadByPhase[node.phase] ?? DEFAULT_LEAD_DAYS
+      const verdict = collectStateOf(node, now)
+
+      // —— 1) 提前提醒（邮件 + 通知）——
+      if (verdict.remindActive) {
+        const key = reminderEventKey(node.phase, node.collectDate)
+        const duplicated = (data.value.sampleReminders ?? []).some((r) => r.eventKey === key)
+        if (!duplicated) {
+          const owner = currentProject.value?.owner || ''
+          const { recipients, roles } = resolveCollectRecipients(owner, orgNodes.value, orgMemberships.value)
+          const pairList = recipients.map((name, i) => ({ name, role: roles[i] || '项目成员' }))
+          const mail = buildCollectReminder(node, recipients, now)
+          if (!recipients.length) {
+            log('CREATE', '样件需求提报提醒', node.id, { phase: node.phase, reason: '无项目组成员' }, undefined, 'DENY')
+            details.push({ phase: node.phase, action: '提醒DENY', reason: '无项目负责人且在职工，未臆造收件人' })
+          } else {
+            const reminder = {
+              id: `SREM-${Date.now()}-${node.phase}`,
+              phase: node.phase,
+              collectNodeId: node.id,
+              eventKey: key,
+              recipients,
+              roles,
+              subject: mail.subject,
+              body: mail.body,
+              notified: false,
+              sentAt: now
+            } as import('@/domain/sampleCollectEngine').SampleReminder
+            if (!data.value.sampleReminders) data.value.sampleReminders = []
+            data.value.sampleReminders.push(reminder)
+            // 站内通知（与邮件同批）；逐人按 eventKey 24h 去重
+            const n = pushMessageToUsers(pairList, {
+              eventKey: key,
+              title: mail.subject,
+              content: mail.body,
+              category: '系统',
+              refType: 'sampleCollect',
+              refId: node.id
+            })
+            reminder.notified = n > 0
+            log('CREATE', '样件需求提报提醒', node.id, { phase: node.phase, recipients, notified: n, due: node.collectDate })
+            details.push({ phase: node.phase, action: '提醒', reason: `邮件 1 封 + 通知 ${n} 人（收件 ${recipients.length} 人）` })
+            reminded++
+          }
+        } else {
+          details.push({ phase: node.phase, action: '提醒跳过', reason: '本阶段本收集日已提醒（幂等）' })
+        }
+      }
+
+      // —— 2) 到收集时间：汇总 + 下达试制任务单 ——
+      if (verdict.collectDue) {
+        const key = orderDedupKey(node.phase, node.collectDate)
+        const dup = (data.value.sampleTrialOrders ?? []).some((o) => o.dedupKey === key)
+        if (dup) {
+          details.push({ phase: node.phase, action: '下达跳过', reason: '该阶段本收集日已下达任务单（幂等）' })
+          continue
+        }
+        const agg = aggregateSampleNeeds(data.value.samples as Array<Partial<import('@/domain/sample').SampleOrder>>, projectId.value)
+        if (agg.count === 0) {
+          log('CREATE', '样件试制任务单', node.id, { phase: node.phase, reason: '无待汇总样件需求' }, undefined, 'DENY')
+          details.push({ phase: node.phase, action: '下达DENY', reason: '当前项目无草稿样件需求可汇总' })
+          continue
+        }
+        const code = nextTrialOrderCode((data.value.sampleTrialOrders ?? []).map((o) => o.code), node.phase)
+        const built = buildTrialOrder(agg, {
+          id: `SO-${Date.now()}-${node.phase}`,
+          code,
+          dedupKey: key,
+          phase: node.phase,
+          phaseName: node.phaseName,
+          projectId: projectId.value,
+          collectNodeId: node.id,
+          issuedAt: now
+        })
+        if (!built.ok) {
+          log('CREATE', '样件试制任务单', node.id, { phase: node.phase, reason: built.reason }, undefined, 'DENY')
+          details.push({ phase: node.phase, action: '下达DENY', reason: built.reason || '未知' })
+          continue
+        }
+        if (!data.value.sampleTrialOrders) data.value.sampleTrialOrders = []
+        data.value.sampleTrialOrders.push(built.order!)
+        // 需求转为"待下达"：从草稿池移除，避免后续重复汇总
+        for (const s of data.value.samples) {
+          if (agg.sourceCodes.includes(s.code) && s.status === '草稿') s.status = '待下达'
+        }
+        log('CREATE', '样件试制任务单', code, {
+          phase: node.phase,
+          sourceCodes: agg.sourceCodes,
+          totalQty: agg.totalQty,
+          byPurpose: agg.byPurpose,
+          byDept: agg.byDept
+        })
+        // 通知项目负责人任务单已下达
+        const owner = currentProject.value?.owner || ''
+        if (owner) {
+          const u = users.value.find((x) => x.name === owner)
+          if (u) {
+            const ukey = `sample-collect-issued:${node.phase}@${node.collectDate}:${u.id}`
+            if (shouldNotify(messages.value, u.id, ukey, now)) {
+              data.value.messages = [
+                ...(data.value.messages ?? []),
+                {
+                  id: `MSG-${Date.now()}-issue-${node.phase}`,
+                  userId: u.id,
+                  eventKey: ukey,
+                  title: `【样件试制任务单已下达】${code}`,
+                  content: `${node.phaseName} 阶段已汇总 ${agg.count} 条样件需求（共 ${agg.totalQty} 件），任务单 ${code} 已下达，请跟进试制。`,
+                  category: '系统',
+                  read: false,
+                  createdAt: now,
+                  refType: 'sampleTrialOrder',
+                  refId: code
+                } as import('@/domain/types').MessageItem
+              ]
+            }
+          }
+        }
+        details.push({ phase: node.phase, action: '下达', reason: `${code}：汇总 ${agg.count} 条 / ${agg.totalQty} 件` })
+        issued++
+      }
+    }
+
+    if (reminded || issued) persist()
+    return { reminded, issued, details }
+  }
+
+  /** 推进样件试制任务单状态（小闭环跟进） */
+  function advanceTrialOrder(id: string, event: TrialOrderEvent, note = '') {
+    const order = (data.value.sampleTrialOrders ?? []).find((o) => o.id === id)
+    if (!order) return { ok: false, reason: '任务单不存在' }
+    const r = transitionTrialOrder(order as import('@/domain/sampleCollectEngine').TrialOrder, event, currentUser.value?.name || '', new Date().toISOString())
+    if (!r.ok) {
+      log('UPDATE', '样件试制任务单', order.code, { event, reason: r.reason }, undefined, 'DENY')
+      notify('error', `任务单 ${order.code} 推进被拒：${r.reason}`)
+      return r
+    }
+    const beforeStatus = order.status
+    Object.assign(order, r.order)
+    log('UPDATE', '样件试制任务单', order.code, { status: r.order!.status, event, note }, { status: beforeStatus })
+    persist()
+    notify('success', `任务单 ${order.code} 已推进为「${r.order!.status}」`)
+    return { ok: true }
+  }
+
   /** 样件状态推进（A/B/C/OTS 状态机） */
   function advanceSample(id: string, to: string) {
     const s = data.value.samples.find((x) => x.id === id)
@@ -4376,6 +4625,13 @@ export const useAppStore = defineStore('app', () => {
     closeThresholdIssue,
     issueLedger,
     issueAlertMails,
+    sampleCollectPlans,
+    sampleTrialOrders,
+    sampleReminders,
+    setSampleCollectDate,
+    scanSampleCollect,
+    advanceTrialOrder,
+    pushMessageToUsers,
     addIssueManually,
     scanIssueLedger,
     closeIssueLedgerItem,

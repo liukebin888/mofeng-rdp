@@ -129,6 +129,75 @@
       </div>
     </div>
 
+    <!-- ============ 三、样件需求汇总驱动小闭环（每阶段一个汇总节点） ============ -->
+    <div class="panel" style="margin-top: 16px">
+      <div class="panel-title">
+        样件需求汇总与试制任务单（小闭环）
+        <el-button size="small" type="primary" plain @click="runCollectScan">运行检查</el-button>
+        <span class="flow-note">提前 {{ LEAD_DAYS }} 天提醒提报 → 到收集时间自动汇总 → 下达试制任务单 → 跟进闭环</span>
+      </div>
+
+      <div class="grid" style="grid-template-columns: 1fr 1.1fr; align-items: start; gap: 14px">
+        <!-- 阶段汇总节点：设定收集时间 + 状态 -->
+        <div>
+          <div class="sub-title">阶段汇总节点（收集时间 = 该阶段主计划完成时间）</div>
+          <el-table :data="collectNodes" size="small">
+            <el-table-column prop="phase" label="阶段" width="52" />
+            <el-table-column prop="phaseName" label="阶段名称" min-width="110" />
+            <el-table-column label="收集时间" width="138">
+              <template #default="{ row }">
+                <el-date-picker
+                  :model-value="collectDateOf(row.phase)"
+                  @update:model-value="(v: string) => onCollectDate(row, v)"
+                  type="date" value-format="YYYY-MM-DD" placeholder="设定收集日" size="small" style="width: 130px"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="状态" width="84">
+              <template #default="{ row }"><span class="tag" :class="collectBadge(row).cls">{{ collectBadge(row).text }}</span></template>
+            </el-table-column>
+          </el-table>
+          <div class="src-note" style="margin-top: 8px">
+            规则：进入本页自动检查一次；到收集日前 {{ LEAD_DAYS }} 天向项目负责人 + 研发在职成员发邮件与通知；到收集日汇总草稿样件需求并下达任务单（幂等，不重复下达）。
+          </div>
+          <div v-if="scanDetails.length" class="scan-log">
+            <div class="sub-title">最近一次检查</div>
+            <div v-for="(d, i) in scanDetails" :key="i" class="scan-line">
+              <span class="tag">{{ d.phase }}</span> {{ d.action }} — {{ d.reason }}
+            </div>
+          </div>
+        </div>
+
+        <!-- 试制任务单跟进 + 提醒记录 -->
+        <div>
+          <div class="sub-title">样件试制任务单（点击状态推进）</div>
+          <el-table :data="store.sampleTrialOrders" size="small">
+            <el-table-column prop="code" label="任务单号" width="96" />
+            <el-table-column prop="phase" label="阶段" width="52" />
+            <el-table-column prop="totalQty" label="汇总件数" width="76" />
+            <el-table-column label="用途汇总" min-width="120">
+              <template #default="{ row }"><span class="muted">{{ purposeSummary(row) }}</span></template>
+            </el-table-column>
+            <el-table-column label="状态 / 跟进" width="150">
+              <template #default="{ row }">
+                <el-button size="small" plain :disabled="!nextEvent(row.status)" @click="advanceOrder(row)">
+                  {{ row.status }}<span v-if="nextEvent(row.status)"> → {{ nextLabel(row.status) }}</span>
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <div v-if="!store.sampleTrialOrders.length" class="src-note" style="margin-top: 6px">尚无任务单：设定收集时间并到点后自动下达。</div>
+
+          <div v-if="store.sampleReminders.length" class="reminder-log">
+            <div class="sub-title">提报提醒记录（邮件 + 通知）</div>
+            <div v-for="r in store.sampleReminders.slice(-5).reverse()" :key="r.id" class="scan-line">
+              <span class="tag">{{ r.phase }}</span> {{ r.sentAt.slice(0, 10) }} · 收件 {{ r.recipients.length }} 人 · {{ r.notified ? '已通知' : '仅邮件' }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 节点编辑对话框（负责人 + 完成时间） -->
     <el-dialog v-model="editVisible" :title="`编辑节点：${editing?.name ?? ''}`" width="420px" append-to-body>
       <div class="edit-form">
@@ -150,12 +219,19 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import PersonSelect from '@/components/PersonSelect.vue'
 import { templateOf, type PlanTemplateKind } from '@/domain/planTemplate'
-import { cutNodes, APQP_FLOW, type ApqpNode } from '@/domain/apqpFlow'
+import { cutNodes, APQP_FLOW, APQP_PHASES, type ApqpNode } from '@/domain/apqpFlow'
+import {
+  DEFAULT_LEAD_DAYS,
+  sampleCollectNodesOf,
+  collectStateOf,
+  type TrialOrderStatus,
+  type TrialOrderEvent
+} from '@/domain/sampleCollectEngine'
 import { distributeToLanes, placeholderPos, sortByGlobalOrder, globalOrderOf, LANES } from '@/domain/masterPlanLanes'
 import { isConstraintAnchor, isPredecessor, validateTiming, dragBoundsOf, rescaleIntervals } from '@/domain/masterPlanConstraint'
 import { useAppStore } from '@/store/app'
@@ -492,6 +568,70 @@ function onSubmit() {
   store.notify('success', `项目主计划「${form.projectName}」已提交（待审批）`)
   router.push('/project/plan')
 }
+
+// —— 样件需求汇总驱动小闭环（每阶段一个汇总节点）——
+const LEAD_DAYS = DEFAULT_LEAD_DAYS
+/** 阶段汇总节点（配置由 APQP_PHASES 派生，收集时间来自用户设定） */
+const collectNodes = computed(() => {
+  const dates: Record<string, string> = {}
+  const leads: Record<string, number> = {}
+  for (const p of store.sampleCollectPlans) {
+    dates[p.phase] = p.collectDate
+    leads[p.phase] = p.leadDays
+  }
+  const nodes = sampleCollectNodesOf(APQP_PHASES, dates, LEAD_DAYS)
+  return nodes.map((n) => ({ ...n, leadDays: leads[n.phase] ?? LEAD_DAYS }))
+})
+function collectDateOf(phase: string): string {
+  return store.sampleCollectPlans.find((p) => p.phase === phase)?.collectDate || ''
+}
+function onCollectDate(row: { phase: string; phaseName: string }, v: string) {
+  store.setSampleCollectDate(row.phase, v || '', row.phaseName)
+}
+const scanDetails = ref<Array<{ phase: string; action: string; reason: string }>>([])
+function collectBadge(row: { phase: string; phaseName: string; collectDate: string; leadDays: number }): { text: string; cls: string } {
+  const node = sampleCollectNodesOf([{ code: row.phase, name: row.phaseName || row.phase }], { [row.phase]: row.collectDate }, row.leadDays)[0]
+  const v = collectStateOf(node, new Date().toISOString())
+  const map: Record<string, { text: string; cls: string }> = {
+    未设置: { text: '未设置', cls: '' },
+    待提报: { text: '待提报', cls: 'ok' },
+    提醒期: { text: '提醒中', cls: 'warn' },
+    待汇总: { text: '待汇总', cls: 'fail' }
+  }
+  return map[v.state] || map['未设置']
+}
+function runCollectScan() {
+  const r = store.scanSampleCollect()
+  scanDetails.value = r.details
+  if (r.reminded || r.issued) {
+    store.notify('success', `检查完成：提醒 ${r.reminded} 阶段，下达任务单 ${r.issued} 张`)
+  } else {
+    store.notify('info', '检查完成：当前无需提醒或下达的阶段')
+  }
+}
+// 进入本页自动检查一次（页面扫描，无后台定时器）
+onMounted(() => runCollectScan())
+
+// —— 试制任务单跟进 ——
+const NEXT_EVENT: Partial<Record<TrialOrderStatus, { event: TrialOrderEvent; label: string }>> = {
+  已下达: { event: 'start', label: '试制中' },
+  试制中: { event: 'finish', label: '检验中' },
+  检验中: { event: 'complete', label: '已完成' },
+  已完成: { event: 'close', label: '已关闭' }
+}
+function nextEvent(status: TrialOrderStatus): TrialOrderEvent | null {
+  return NEXT_EVENT[status]?.event ?? null
+}
+function nextLabel(status: TrialOrderStatus): string {
+  return NEXT_EVENT[status]?.label ?? ''
+}
+function advanceOrder(row: { id: string; status: TrialOrderStatus }) {
+  const e = nextEvent(row.status)
+  if (e) store.advanceTrialOrder(row.id, e)
+}
+function purposeSummary(row: { byPurpose: Record<string, number> }): string {
+  return Object.entries(row.byPurpose || {}).map(([k, v]) => `${k}×${v}`).join('、') || '—'
+}
 </script>
 
 <style scoped>
@@ -569,4 +709,16 @@ function onSubmit() {
 .edit-form { display: flex; flex-direction: column; gap: 14px; }
 .edit-item { display: flex; flex-direction: column; gap: 6px; }
 .edit-item label { font-size: 12px; color: var(--text-2); }
+
+/* 样件需求汇总小闭环 */
+.flow-note { font-size: 11px; color: var(--text-3); font-weight: 400; margin-left: auto; }
+.sub-title { font-size: 12px; font-weight: 700; color: var(--text-2); margin-bottom: 8px; }
+.tag.ok { color: #10b981; border-color: #10b981; }
+.tag.warn { color: #f59e0b; border-color: #f59e0b; }
+.tag.fail { color: #ef4444; border-color: #ef4444; }
+.src-note { font-size: 11px; color: var(--text-3); line-height: 1.5; }
+.muted { color: var(--text-2); font-size: 11px; }
+.scan-log, .reminder-log { margin-top: 10px; padding: 8px 10px; border: 1px solid var(--line-soft); border-radius: 6px; background: var(--bg-2); }
+.scan-line { font-size: 11px; color: var(--text-2); padding: 2px 0; }
+.scan-line .tag { font-size: 10px; padding: 0 6px; margin-right: 4px; }
 </style>

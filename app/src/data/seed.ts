@@ -88,6 +88,7 @@ import type { OtsApprovalRecord } from '@/domain/otsClosure'
 import type { IssueLedgerItem, IssueAlertMail } from '@/domain/issueAlert'
 import type { LightTask } from '@/domain/lightTask'
 import type { CustomFieldDef } from '@/domain/customField'
+import type { SampleCollectPlan, TrialOrder, SampleReminder } from '@/domain/sampleCollectEngine'
 
 export const SEED_VERSION = 'mofeng.rdp.v1.0.40'
 const TENANT = 'T-1001'
@@ -943,6 +944,12 @@ export function buildSeed() {
     docs,
     docAnnotations,
     samples,
+    /** 主计划阶段样件需求汇总节点配置（空白模板：收集时间待用户设定） */
+    sampleCollectPlans: [] as SampleCollectPlan[],
+    /** 样件试制任务单（汇总后自动下达，空白模板） */
+    sampleTrialOrders: [] as TrialOrder[],
+    /** 提报提醒记录（邮件 + 站内通知，空白模板） */
+    sampleReminders: [] as SampleReminder[],
     otsAttachments,
     /** OTS 认可台账（OTS 认可闭环单一数据源，空白模板：不预置演示数据） */
     otsApprovals: [] as OtsApprovalRecord[],
