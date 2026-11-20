@@ -10,7 +10,32 @@
       <KpiCard label="问题台账" :value="ledger.length" unit="条" />
       <KpiCard label="未关闭问题" :value="ledgerOpen" unit="条" :zone="ledgerOpen ? 'warn' : 'ok'" />
       <KpiCard label="高严重度(P1/P2)" :value="ledgerHigh" unit="条" :zone="ledgerHigh ? 'danger' : 'ok'" />
-      <KpiCard label="报警邮件" :value="alertMails.length" unit="封" />
+      <KpiCard label="AI 闭环率" :value="issueAiLoop.closeRate" unit="%" :zone="issueAiLoop.loopClosed ? 'ok' : 'warn'" />
+    </div>
+
+    <!-- AI 协助闭环看板 -->
+    <div class="panel" style="margin-bottom: 12px">
+      <div class="panel-title">AI 协助闭环（根因/措施候选 · 跟踪催办 · 人工确认关闭）</div>
+      <div class="crow" style="border-bottom: none; padding-top: 2px">
+        <el-button size="small" type="primary" @click="runAiTrack()">AI 跟踪巡检</el-button>
+        <el-tag size="small" :type="issueAiLoop.loopClosed ? 'success' : 'warning'">{{ issueAiLoop.nextAction }}</el-tag>
+        <span class="dim">{{ issueAiLoop.reason }}</span>
+      </div>
+      <div class="ai-phase-row">
+        <span v-for="p in ISSUE_PHASES" :key="p" class="ai-phase-chip">
+          {{ p }} <b>{{ issueAiLoop.byPhase[p] }}</b>
+        </span>
+        <span class="ai-phase-chip warn-chip">逾期 <b>{{ issueAiLoop.overdue }}</b></span>
+        <span class="ai-phase-chip">待关闭 <b>{{ issueAiLoop.readyToClose }}</b></span>
+      </div>
+      <div class="ai-watermark">{{ ISSUE_AI_WATERMARK }}</div>
+      <div v-if="issueAiCards.length" class="ai-track-list">
+        <div v-for="c in aiOverdueCards" :key="c.issueId" class="ai-track-alert">
+          <span class="tag fail">{{ c.code }}</span>
+          <span>{{ c.title }}</span>
+          <span class="dim">「{{ c.phase }}」停留 {{ c.stayDays }} 天 / SLA {{ c.sla }} 天</span>
+        </div>
+      </div>
     </div>
 
     <div class="panel" style="margin-bottom: 12px">
@@ -71,8 +96,9 @@
             <span v-else class="dim">尚未填写</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180">
+        <el-table-column label="操作" width="230">
           <template #default="{ row }">
+            <el-button link size="small" type="info" @click="openAiDialog(row)">AI 分析</el-button>
             <el-button v-if="!isClosed(row)" link size="small" type="primary" @click="openPhaseDialog(row)">
               推进：{{ nextPhaseLabel(row) }}
             </el-button>
@@ -102,6 +128,35 @@
         <template #footer>
           <el-button size="small" @click="phaseDialogOpen = false">取消</el-button>
           <el-button size="small" type="primary" @click="submitPhase()">{{ closingPhase ? '验证并关闭' : '确认推进' }}</el-button>
+        </template>
+      </el-dialog>
+
+      <!-- AI 分析建议弹窗（候选建议 + 水印 + 引用 + 采纳回填） -->
+      <el-dialog v-model="aiDialogOpen" :title="`AI 协助分析 · ${aiActiveCode}`" width="600px" destroy-on-close>
+        <div v-if="aiAdvice" class="ai-advice">
+          <div class="ai-watermark">{{ aiAdvice.watermark }}</div>
+          <div v-if="aiAdvice.reason" class="ai-block-note">{{ aiAdvice.reason }}</div>
+          <div class="ai-advice-block">
+            <div class="ai-advice-label">候选根因（模板驱动 · 供参考）</div>
+            <div class="ai-advice-text">{{ aiAdvice.rootCause }}</div>
+          </div>
+          <div class="ai-advice-block">
+            <div class="ai-advice-label">候选纠正措施（供参考）</div>
+            <div class="ai-advice-text">{{ aiAdvice.correctiveAction }}</div>
+          </div>
+          <div class="ai-advice-block">
+            <div class="ai-advice-label">验证要点（供参考）</div>
+            <div class="ai-advice-text">{{ aiAdvice.verificationFocus }}</div>
+          </div>
+          <div class="ai-citations">
+            <div class="ai-advice-label">引用依据（逐条可溯）</div>
+            <span v-for="(c, idx) in aiAdvice.citations" :key="idx" class="ai-cite">{{ c }}</span>
+          </div>
+        </div>
+        <template #footer>
+          <span class="dim" style="margin-right: auto">验证人须人工指定；关闭仍须根因/措施/验证人三要素齐全</span>
+          <el-button size="small" @click="aiDialogOpen = false">关闭</el-button>
+          <el-button size="small" type="primary" :disabled="!aiAdvice || !!aiAdvice.reason || aiActiveClosed" @click="adoptAi()">采纳为根因/措施</el-button>
         </template>
       </el-dialog>
     </div>
@@ -219,8 +274,9 @@ import { highUrgencyCount, openCount, overdueDaysOf, stayDaysOf, NONCONFORMITY_S
 import { ISSUE_CHECKLIST_TEMPLATE, ISSUE_CHECKLIST_STATUSES } from '@/domain/issueChecklist'
 import { ISSUE_SEVERITIES, ISSUE_SEVERITY_LABEL, isHighSeverity, type IssueSeverity, type IssueAlertMail, type IssueLedgerItem } from '@/domain/issueAlert'
 import {
-  phaseOf, issuePhaseNext, isIssueClosed, type IssuePhase
+  phaseOf, issuePhaseNext, isIssueClosed, ISSUE_PHASES, type IssuePhase
 } from '@/domain/issueEngine'
+import { ISSUE_AI_WATERMARK, type IssueAiAdvice } from '@/domain/issueAiEngine'
 
 const store = useAppStore()
 const { te } = useI18n()
@@ -362,6 +418,46 @@ function submitPhase() {
   else store.notify('error', r.reason ?? '推进被拒')
 }
 
+// —— AI 协助闭环 ——
+const issueAiLoop = computed(() => store.issueAiLoop)
+const issueAiCards = computed(() => store.issueAiCards)
+const aiOverdueCards = computed(() => issueAiCards.value.filter((c) => c.overdue))
+
+function runAiTrack() {
+  const r = store.aiTrackIssueAlerts()
+  if (r.overdue === 0) store.notify('success', 'AI 跟踪巡检完成：当前无逾期问题')
+  else store.notify('warning', `AI 跟踪巡检完成：${r.overdue} 条逾期，已向责任人催办${r.urged ? ` ${r.urged} 人` : ''}`)
+}
+
+const aiDialogOpen = ref(false)
+const aiActiveRow = ref<IssueLedgerItem | null>(null)
+const aiActiveCode = computed(() => aiActiveRow.value?.code || '')
+const aiActiveClosed = computed(() => aiActiveRow.value ? isClosed(aiActiveRow.value) : false)
+const aiAdvice = ref<IssueAiAdvice | null>(null)
+
+function openAiDialog(row: IssueLedgerItem) {
+  aiActiveRow.value = row
+  const advice = store.aiAssistIssue(row.id)
+  aiAdvice.value = advice
+  aiDialogOpen.value = true
+}
+
+function adoptAi() {
+  if (!aiActiveRow.value || !aiAdvice.value) return
+  const r = store.adoptIssueAiAdvice(aiActiveRow.value.id, {
+    rootCause: aiAdvice.value.rootCause,
+    correctiveAction: aiAdvice.value.correctiveAction,
+    watermark: aiAdvice.value.watermark,
+    reason: aiAdvice.value.reason
+  })
+  if (r.ok) {
+    // 回填后同步相位弹窗草稿，便于人工指定验证人并推进/关闭
+    phaseForm.rootCause = aiAdvice.value.rootCause
+    phaseForm.correctiveAction = aiAdvice.value.correctiveAction
+    aiDialogOpen.value = false
+  }
+}
+
 // —— 报警回执状态显示 ——
 function ackTag(row: IssueAlertMail): string {
   const s = row.status || '已发送'
@@ -389,4 +485,21 @@ function overdueDays(row: Nonconformity): number {
 .manual-form { margin-top: 10px; padding: 12px; border: 1px dashed var(--line); border-radius: 8px; background: var(--panel-bg, #0f1a2a); }
 .sub-title { font-size: 12px; font-weight: 600; color: var(--text-1); margin-bottom: 8px; }
 .phase-hint { font-size: 12px; color: var(--text-2); line-height: 1.6; margin-bottom: 12px; padding: 8px 10px; border-radius: 6px; background: var(--panel-bg, #0f1a2a); }
+.ai-phase-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.ai-phase-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-bg, #0f1a2a); font-size: 11.5px; color: var(--text-2); }
+.ai-phase-chip b { color: var(--text-1); font-size: 13px; }
+.ai-phase-chip.warn-chip { border-color: var(--c-red, #e5484d); }
+.ai-phase-chip.warn-chip b { color: var(--c-red, #e5484d); }
+.ai-watermark { font-size: 10px; color: var(--text-3); margin-top: 8px; line-height: 1.5; }
+.ai-track-list { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.ai-track-alert { display: flex; align-items: center; gap: 8px; font-size: 11.5px; padding: 6px 8px; border-radius: 6px; background: rgba(229,72,77,.08); }
+.ai-track-alert .dim { margin-left: auto; }
+.ai-advice { display: flex; flex-direction: column; gap: 10px; }
+.ai-block-note { font-size: 11.5px; color: var(--c-red, #e5484d); padding: 6px 8px; border-radius: 6px; background: rgba(229,72,77,.08); }
+.ai-advice-block { padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-bg, #0f1a2a); }
+.ai-advice-label { font-size: 11px; font-weight: 600; color: var(--text-3); margin-bottom: 5px; }
+.ai-advice-text { font-size: 12.5px; color: var(--text-1); line-height: 1.6; }
+.ai-citations { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ai-citations .ai-advice-label { width: 100%; }
+.ai-cite { font-size: 10.5px; color: var(--text-2); padding: 3px 8px; border: 1px dashed var(--line); border-radius: 5px; }
 </style>

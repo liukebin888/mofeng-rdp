@@ -18,21 +18,22 @@ import {
   transitionTrialOrder,
   type TrialOrder
 } from '@/domain/sampleCollectEngine'
+import type { SampleOrder, SampleStatus } from '@/domain/sample'
 
 const PROJECT = 'PRJ-T1'
 
-const draft = (code: string, extra: Record<string, unknown> = {}) => ({
+const draft = (code: string, extra: Partial<SampleOrder> = {}): Partial<SampleOrder> => ({
   id: `id-${code}`,
   projectId: PROJECT,
   code,
-  type: 'A' as const,
-  purpose: '测试' as const,
+  type: 'A',
+  purpose: '测试',
   requestDept: '智能控制部',
   qty: 8,
   needDate: '2026-12-25',
   ebomVersion: 'EBOM-V1',
   gate: '',
-  status: '草稿',
+  status: '草稿' as SampleStatus,
   ...extra
 })
 

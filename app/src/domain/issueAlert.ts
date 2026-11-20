@@ -73,6 +73,8 @@ export interface IssueLedgerItem {
   verifiedBy?: string
   /** 验证时间（ISO） */
   verifiedAt?: string
+  /** AI 协助：最近一次采纳 AI 根因/措施建议的时间（ISO；验证人仍由人工指定） */
+  aiAdoptedAt?: string
   /** 关联键：问题清单 / 不符合项 / 8D（可选，串联 4 套结构） */
   checklistId?: string
   ncId?: string

@@ -86,6 +86,13 @@ import {
   sampleRequestRows,
   SAMPLE_REQUEST_AI_WATERMARK
 } from '@/domain/sampleRequestEngine'
+import {
+  aiAdviseIssue,
+  aiAdoptVerdict,
+  aiTrackIssues,
+  aiIssueLoopView,
+  ISSUE_AI_WATERMARK
+} from '@/domain/issueAiEngine'
 import { canAny, canOperateAny, dataScopeOfRoles, roleOf, applyFieldPolicy, type ActionKey, type FieldPolicySurface } from '@/domain/rbac'
 import { guardTenant, visibleInTenant, groupDrillDown, type TenantContext } from '@/domain/tenant'
 import { canAccessSpace, visibleInSpace, accessibleSpaces, describeSwitch, type Space, type SpaceContext } from '@/domain/spaceEngine'
@@ -291,6 +298,16 @@ export const useAppStore = defineStore('app', () => {
   const issueLedger = computed<IssueLedgerItem[]>(() => (data.value.issueLedger ?? []) as IssueLedgerItem[])
   /** 报警邮件记录（站内邮件，责任人/上级/部门总监） */
   const issueAlertMails = computed<IssueAlertMail[]>(() => (data.value.issueAlertMails ?? []) as IssueAlertMail[])
+  /** 问题 AI 跟踪输入（相位由 issueEngine 单一权威求值，不自造口径） */
+  const issueAiTrackInputs = computed(() => issueLedger.value.map((i) => ({
+    id: i.id, code: i.code, title: i.title, severity: i.severity,
+    phase: phaseOf(i), createdAt: i.createdAt, closedAt: i.closedAt,
+    rootCause: i.rootCause, correctiveAction: i.correctiveAction, verifiedBy: i.verifiedBy
+  })))
+  /** 问题 AI 跟踪卡（进度/停留/SLA 逾期/下一步，同源 issueAiEngine） */
+  const issueAiCards = computed(() => aiTrackIssues(issueAiTrackInputs.value, new Date().toISOString()))
+  /** 问题 AI 闭环看板（阶段计数/闭环率/逾期/待关闭，同源 issueAiEngine） */
+  const issueAiLoop = computed(() => aiIssueLoopView(issueAiTrackInputs.value, new Date().toISOString()))
   /** 样件需求汇总节点配置（主计划每阶段一个，收集时间由用户设定） */
   const sampleCollectPlans = computed<SampleCollectPlan[]>(() => (data.value.sampleCollectPlans ?? []) as SampleCollectPlan[])
   /** 样件试制任务单（汇总后自动下达，跟进闭环） */
@@ -1719,6 +1736,90 @@ export const useAppStore = defineStore('app', () => {
     log('UPDATE', '报警回执', mailId, { status: to, by: who, issueId: m.issueId }, before)
     notify('success', `报警 ${m.issueCode} 已${to}`)
     return { ok: true, status: to }
+  }
+
+  // —— 问题管理 AI 协助闭环（AI 分析建议 → 人工采纳 → AI 跟踪催办 → 人工关闭）——
+  // 单一权威在 issueEngine（五态状态机 + 关闭三要素）+ issueAiEngine（建议/跟踪判定），
+  // store 只做编排 / 审计 / 持久化 / 通知，不自造业务口径。AI 不越权：验证人由人工指定，关闭仍走 fail-closed。
+
+  /** AI 分析单条问题：生成根因/措施/验证候选建议（只读求值 + 审计留痕，带水印与引用） */
+  function aiAssistIssue(issueId: string): ReturnType<typeof aiAdviseIssue> | null {
+    const i = (data.value.issueLedger ?? []).find((x) => x.id === issueId)
+    if (!i) { notify('error', '问题不存在'); return null }
+    const advice = aiAdviseIssue({
+      code: i.code, title: i.title, desc: i.desc, metric: i.metric,
+      severity: i.severity, source: i.source, phase: phaseOf(i)
+    })
+    log('QUERY', 'AI问题分析', i.code, {
+      matched: advice.matched, phase: advice.phase,
+      hasReason: !!advice.reason, watermark: advice.watermark,
+      citations: advice.citations.slice(0, 6)
+    }, undefined, advice.reason ? 'DENY' : 'OK')
+    persist()
+    return advice
+  }
+
+  /**
+   * 采纳 AI 建议：仅回填「根因/纠正措施」候选，验证人由人工另行指定（AIA-004 不越权）。
+   * fail-closed：终态 / 无水印 / 空建议均拒绝并留痕。
+   */
+  function adoptIssueAiAdvice(
+    issueId: string,
+    advice: { rootCause: string; correctiveAction: string; watermark: string; reason: string }
+  ): { ok: boolean; reason: string } {
+    const i = (data.value.issueLedger ?? []).find((x) => x.id === issueId)
+    if (!i) return { ok: false, reason: '问题不存在' }
+    const v = aiAdoptVerdict({ phase: phaseOf(i), status: i.status }, advice)
+    if (!v.ok) {
+      log('UPDATE', 'AI问题建议采纳', i.code, { reason: v.reason }, undefined, 'DENY')
+      persist()
+      notify('error', v.reason)
+      return { ok: false, reason: v.reason }
+    }
+    const before = { rootCause: i.rootCause || '', correctiveAction: i.correctiveAction || '' }
+    i.rootCause = v.rootCause
+    i.correctiveAction = v.correctiveAction
+    i.aiAdoptedAt = new Date().toISOString()
+    persist()
+    log('UPDATE', 'AI问题建议采纳', i.code, {
+      rootCause: v.rootCause, correctiveAction: v.correctiveAction,
+      watermark: ISSUE_AI_WATERMARK, by: currentUser.value.name
+    }, before)
+    notify('success', `已采纳 AI 候选根因/措施；验证人仍须人工指定，关闭须三要素齐全`)
+    return { ok: true, reason: v.reason }
+  }
+
+  /** AI 跟踪巡检：对逾期未闭环问题发催办通知（幂等按 问题+日期），闭环判定由 aiIssueLoopView 同源派生 */
+  function aiTrackIssueAlerts(): { overdue: number; urged: number } {
+    const now = new Date().toISOString()
+    const cards = aiTrackIssues(issueAiTrackInputs.value, now)
+    const overdueCards = cards.filter((c) => c.overdue)
+    let urged = 0
+    if (overdueCards.length) {
+      const recipients: Array<{ name: string; role: string }> = []
+      for (const c of overdueCards) {
+        const i = issueLedger.value.find((x) => x.id === c.issueId)
+        if (i?.owner && !recipients.some((r) => r.name === i.owner)) {
+          recipients.push({ name: i.owner, role: '责任人' })
+        }
+      }
+      const content = overdueCards.map((c) => `${c.code}「${c.phase}」已停留 ${c.stayDays} 天（SLA ${c.sla} 天）`).join('；')
+      if (recipients.length) {
+        urged = pushMessageToUsers(recipients, {
+          eventKey: `ai-issue-track-overdue:${now.slice(0, 10)}`,
+          title: `【AI 跟踪催办】${overdueCards.length} 条问题逾期未闭环`,
+          content: `${content}。${ISSUE_AI_WATERMARK}`,
+          category: '系统',
+          refType: 'issueLedger',
+          refId: overdueCards.map((c) => c.code).join(',')
+        })
+      }
+      log('QUERY', 'AI问题跟踪催办', overdueCards.map((c) => c.code).join('、'), {
+        overdue: overdueCards.length, urged, watermark: ISSUE_AI_WATERMARK
+      }, undefined, 'OK')
+      persist()
+    }
+    return { overdue: overdueCards.length, urged }
   }
 
   /** 导出报警邮件记录（CSV） */
@@ -5148,6 +5249,11 @@ export const useAppStore = defineStore('app', () => {
     closeThresholdIssue,
     issueLedger,
     issueAlertMails,
+    issueAiCards,
+    issueAiLoop,
+    aiAssistIssue,
+    adoptIssueAiAdvice,
+    aiTrackIssueAlerts,
     sampleCollectPlans,
     sampleTrialOrders,
     sampleReminders,
