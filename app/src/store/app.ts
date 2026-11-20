@@ -78,6 +78,14 @@ import {
   type SampleReview,
   type ReviewVerdict
 } from '@/domain/sampleReviewEngine'
+import {
+  aiAssessNeeds,
+  aiDispatchVerdict,
+  aiTrackOrders,
+  requestLoopVerdict,
+  sampleRequestRows,
+  SAMPLE_REQUEST_AI_WATERMARK
+} from '@/domain/sampleRequestEngine'
 import { canAny, canOperateAny, dataScopeOfRoles, roleOf, applyFieldPolicy, type ActionKey, type FieldPolicySurface } from '@/domain/rbac'
 import { guardTenant, visibleInTenant, groupDrillDown, type TenantContext } from '@/domain/tenant'
 import { canAccessSpace, visibleInSpace, accessibleSpaces, describeSwitch, type Space, type SpaceContext } from '@/domain/spaceEngine'
@@ -291,6 +299,19 @@ export const useAppStore = defineStore('app', () => {
   const sampleReminders = computed(() => (data.value.sampleReminders ?? []) as import('@/domain/sampleCollectEngine').SampleReminder[])
   /** 样件评审流程单（五态闭环单一数据源） */
   const sampleReviews = computed<SampleReview[]>(() => (data.value.sampleReviews ?? []) as SampleReview[])
+  /** 样件需求申请：本项目的申请单列表（草稿需求；AI 汇总→下达→跟踪闭环的承载数据） */
+  const sampleRequestRowsView = computed(() =>
+    sampleRequestRows((data.value.samples ?? []) as Array<Partial<import('@/domain/sample').SampleOrder>>, projectId.value)
+  )
+  /** 样件需求申请：批次级闭环状态（同源判定：阶段+计数+下一步动作单一求值） */
+  const sampleRequestLoop = computed(() =>
+    requestLoopVerdict(
+      (data.value.samples ?? []) as Array<Partial<import('@/domain/sample').SampleOrder>>,
+      sampleTrialOrders.value,
+      projectId.value,
+      new Date().toISOString()
+    )
+  )
   /** 轻量任务（GEN-001 通用 PM：独立于 WBS/CPM/挣值的简化任务模型） */
   const lightTasks = computed<LightTask[]>(() => (data.value.lightTasks ?? []) as LightTask[])
   /** 自定义字段定义（GEN-002 通用 PM：Jira 式自定义字段，配置驱动） */
@@ -3946,6 +3967,161 @@ export const useAppStore = defineStore('app', () => {
     return { ok: true }
   }
 
+  // —— 样件需求申请 AI 闭环（填报 → AI 汇总决策 → AI 自动下达 → AI 跟踪闭环）——
+  // 单一权威在 sampleRequestEngine（决策/跟踪判定）+ sampleCollectEngine（聚合/下达/状态机），
+  // store 只做编排 / 审计 / 持久化 / 通知，不自造业务口径。
+  /** 部门人员填报样件需求申请（复用 HW-001 提报，状态草稿；提报≠下达） */
+  function submitSampleRequest(input: import('@/domain/sample').SampleSubmitInput) {
+    return addSampleOrder(input)
+  }
+
+  /** AI 汇总决策：按用途/部门/类型聚合当前草稿需求，给出可下达判定 + 引用（只读，审计留痕） */
+  function aiAssessSampleRequests(): ReturnType<typeof aiAssessNeeds> {
+    const phase = 'REQ'
+    const agg = aggregateSampleNeeds((data.value.samples ?? []) as Array<Partial<import('@/domain/sample').SampleOrder>>, projectId.value)
+    const decision = aiAssessNeeds(agg, {
+      projectName: currentProject.value?.name || '',
+      phaseName: '样件需求申请',
+      collectDate: new Date().toISOString().slice(0, 10),
+      now: new Date().toISOString()
+    })
+    log('QUERY', 'AI样件需求汇总', agg.sourceCodes.join('、') || projectId.value, {
+      recommend: decision.recommend,
+      priority: decision.priority,
+      count: agg.count,
+      totalQty: agg.totalQty,
+      watermark: decision.watermark
+    }, undefined, decision.recommend ? 'OK' : 'DENY')
+    persist()
+    return decision
+  }
+
+  /**
+   * AI 自动下达试制任务单：
+   * 汇总草稿需求 → 幂等判定（同批次不重复下达）→ 组装任务单 → 通知需求部门。
+   * fail-closed：无需求 / 重复批次均不下达并 DENY 留痕。
+   */
+  function aiDispatchSampleRequests(): {
+    ok: boolean
+    reason: string
+    code?: string
+    assess?: ReturnType<typeof aiAssessNeeds>
+  } {
+    const phase = 'REQ'
+    const agg = aggregateSampleNeeds((data.value.samples ?? []) as Array<Partial<import('@/domain/sample').SampleOrder>>, projectId.value)
+    const assess = aiAssessNeeds(agg, {
+      projectName: currentProject.value?.name || '',
+      phaseName: '样件需求申请',
+      collectDate: new Date().toISOString().slice(0, 10),
+      now: new Date().toISOString()
+    })
+    const verdict = aiDispatchVerdict(agg, sampleTrialOrders.value as Array<{ dedupKey?: string; sourceCodes?: string[]; projectId?: string }>, projectId.value)
+    if (!verdict.ok || !assess.recommend) {
+      const reason = verdict.ok ? assess.reason : verdict.reason
+      log('CREATE', 'AI自动下达样件试制任务单', verdict.key, { reason, watermark: SAMPLE_REQUEST_AI_WATERMARK }, undefined, 'DENY')
+      persist()
+      notify('error', `AI 未下达：${reason}`)
+      return { ok: false, reason, assess }
+    }
+    const now = new Date().toISOString()
+    const code = nextTrialOrderCode((data.value.sampleTrialOrders ?? []).map((o) => o.code), phase)
+    const built = buildTrialOrder(agg, {
+      id: `SO-AI-${Date.now()}`,
+      code,
+      // 用 AI 批次幂等键替代时间键，确保同批次来源需求不重复下达
+      dedupKey: verdict.key,
+      phase,
+      phaseName: currentProject.value?.name || phase,
+      projectId: projectId.value,
+      collectNodeId: 'AI-SAMPLE-REQUEST',
+      issuedAt: now
+    })
+    if (!built.ok) {
+      log('CREATE', 'AI自动下达样件试制任务单', code, { reason: built.reason }, undefined, 'DENY')
+      persist()
+      notify('error', `AI 下达失败：${built.reason || '未知原因'}`)
+      return { ok: false, reason: built.reason || '未知原因', assess }
+    }
+    if (!data.value.sampleTrialOrders) data.value.sampleTrialOrders = []
+    data.value.sampleTrialOrders.push(built.order!)
+    // 来源需求从草稿池移出，避免再次被汇总下达
+    for (const s of data.value.samples) {
+      if (agg.sourceCodes.includes(s.code) && s.status === '草稿') s.status = '待下达'
+    }
+    log('CREATE', 'AI自动下达样件试制任务单', code, {
+      reason: verdict.reason,
+      sourceCodes: agg.sourceCodes,
+      totalQty: agg.totalQty,
+      byPurpose: agg.byPurpose,
+      byDept: agg.byDept,
+      priority: assess.priority,
+      watermark: SAMPLE_REQUEST_AI_WATERMARK,
+      citations: assess.citations.slice(0, 8)
+    })
+    // 通知项目负责人 + 需求部门联系人（按姓名匹配账号，逐人 24h 去重）
+    const recipients: Array<{ name: string; role: string }> = []
+    const owner = currentProject.value?.owner || ''
+    if (owner) recipients.push({ name: owner, role: '项目负责人' })
+    for (const dept of Object.keys(agg.byDept)) {
+      const matched = users.value.find((u) => u.dept === dept)
+      if (matched) recipients.push({ name: matched.name, role: `${dept} 需求联系人` })
+    }
+    const notice = `AI 已汇总 ${agg.count} 条样件需求（${agg.totalQty} 件），自动下达试制任务单 ${code}，请跟进试制闭环。`
+    if (recipients.length) {
+      pushMessageToUsers(recipients, {
+        eventKey: `ai-sample-dispatch:${verdict.key}`,
+        title: `【AI 自动下达试制任务单】${code}`,
+        content: notice,
+        category: '系统',
+        refType: 'sampleTrialOrder',
+        refId: code
+      })
+    }
+    persist()
+    notify('success', `AI 已下达试制任务单 ${code}（${agg.count} 条 / ${agg.totalQty} 件），开始跟踪闭环`)
+    return { ok: true, reason: verdict.reason, code, assess }
+  }
+
+  /** AI 跟踪巡检：生成跟踪卡 + 逾期催办（幂等通知），闭环判定由 requestLoopVerdict 同源派生 */
+  function aiTrackSampleRequests(): {
+    cards: ReturnType<typeof aiTrackOrders>
+    loop: ReturnType<typeof requestLoopVerdict>
+    urged: number
+  } {
+    const now = new Date().toISOString()
+    const cards = aiTrackOrders(sampleTrialOrders.value as import('@/domain/sampleCollectEngine').TrialOrder[], now)
+    const overdue = cards.filter((c) => c.overdue)
+    let urged = 0
+    if (overdue.length) {
+      const owner = currentProject.value?.owner || ''
+      const recipients: Array<{ name: string; role: string }> = owner ? [{ name: owner, role: '项目负责人' }] : []
+      const content = overdue.map((c) => `${c.code}「${c.status}」已停留 ${c.stayDays} 天（SLA ${c.sla} 天）`).join('；')
+      if (recipients.length) {
+        urged = pushMessageToUsers(recipients, {
+          eventKey: `ai-sample-track-overdue:${now.slice(0, 10)}`,
+          title: `【AI 跟踪催办】${overdue.length} 张试制任务单逾期`,
+          content: `${content}。${SAMPLE_REQUEST_AI_WATERMARK}`,
+          category: '系统',
+          refType: 'sampleTrialOrder',
+          refId: overdue.map((c) => c.code).join(',')
+        })
+      }
+      log('QUERY', 'AI样件需求跟踪催办', overdue.map((c) => c.code).join('、'), {
+        overdue: overdue.length,
+        urged,
+        watermark: SAMPLE_REQUEST_AI_WATERMARK
+      })
+    }
+    const loop = requestLoopVerdict(
+      (data.value.samples ?? []) as Array<Partial<import('@/domain/sample').SampleOrder>>,
+      sampleTrialOrders.value as import('@/domain/sampleCollectEngine').TrialOrder[],
+      projectId.value,
+      now
+    )
+    if (urged) persist()
+    return { cards, loop, urged }
+  }
+
   // —— 样件评审流程五态闭环（检验确认 → 部门会签 → 总监批准 → 评审结论 → 关闭）——
   // 单一权威在 sampleReviewEngine：每步推进经引擎求值，store 只做编排 / 审计 / 持久化。
   /** 评审详情（同源判定：阶段 + 能否推进 + 关闭要素 + 会签进度一并给出） */
@@ -4976,9 +5152,15 @@ export const useAppStore = defineStore('app', () => {
     sampleTrialOrders,
     sampleReminders,
     sampleReviews,
+    sampleRequestRowsView,
+    sampleRequestLoop,
     setSampleCollectDate,
     scanSampleCollect,
     advanceTrialOrder,
+    submitSampleRequest,
+    aiAssessSampleRequests,
+    aiDispatchSampleRequests,
+    aiTrackSampleRequests,
     sampleReviewView,
     createSampleReview,
     confirmReviewInspection,

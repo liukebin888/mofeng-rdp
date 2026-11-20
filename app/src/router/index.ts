@@ -57,6 +57,7 @@ export const MENUS: MenuGroup[] = [
     items: [
       { path: '/project/task', title: '项目任务书', desc: '任务目标/交付物/里程碑，项目经理发起→研发副总审核→总经理批准', icon: 'Notebook', comp: v('project/ProjectTaskView') },
       { path: '/project/plan', title: '项目主计划', desc: 'RMP 式主计划表达：项目上下文 + RAG + 5 KPI + 等级工时 + 集成整体视图（统一时间轴/里程碑矩阵/分计划投影），数据实时映射四级计划', icon: 'Histogram', comp: v('project/ProjectMasterPlanView') },
+      { path: '/project/sample-request', title: '样件需求申请', desc: '部门人员填报样件需求（用途/部门/数量/EBOM）→ AI 汇总决策 → AI 自动下达试制任务单（幂等）→ AI 跟踪闭环与逾期催办', icon: 'Box', comp: v('project/SampleRequestView') },
       { path: '/project/ots', title: 'OTS 认可', desc: '三大条件附件驱动 + L1-L4 等级自动判定，部门会签→客户认可→总经理批准', icon: 'Stamp', comp: v('project/OtsApprovalView') },
       { path: '/project/ots-attachment-a', title: '附件 A 设计文件归档', desc: '设计文件归档汇总表（A-1 电子 / A-2 结构 / A-3 工艺），只读', icon: 'Folder', comp: v('project/OtsAttachmentA') },
       { path: '/project/ots-attachment-b', title: '附件 B 样件评审报告', desc: 'OTS 样件评审报告，只读', icon: 'DocumentChecked', comp: v('project/OtsAttachmentB') },
