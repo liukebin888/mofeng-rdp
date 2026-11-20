@@ -22,7 +22,7 @@
 
 ## 六门禁（全过才闭环）
 1. `npx vue-tsc --noEmit` 0 error
-2. `npx vitest run --no-file-parallelism` 全绿（当前 1691/1691，109 文件）
+2. `npx vitest run --no-file-parallelism` 全绿（当前 1720/1720，110 文件）
 3. `npx vite build` 成功
 4. `npm run smoke` exit 0（脚本 `bad.length||errors.length?1:0`）
 5. `npm run e2e` 33 PASS / 0 FAIL
@@ -43,6 +43,7 @@
 - 风险：riskQuant+simulation+contingency / riskLifecycle；采购：supplierPerformance / otsClosure；报表：reportLibrary+interop+dataQuality / extensionPoint+accessibility。
 - 样件试制：sample.ts（HW-001~016 全引擎）。2026-11-19 新增提报单：`nextSampleCode`/`buildSampleOrder`（HW-001 字段齐全率校验），嵌入 `/trial/samples` KittingView 弹窗；store `addSampleOrder`。分层：提报仅需字段齐全，先 BOM+齐套(K9) 由下达 `canReleaseTrial` 把关；未立项(projectId='')时提报被 HW-001 正确拒绝。
 - **样件评审流程（2026-11-20）**：`domain/sampleReviewEngine.ts` 五态闭环（检验确认→会签→总监批准→结论→关闭），配置驱动流转表+会签角色集(质量/研发/制造,全通过)+关闭四要素 fail-closed，不合格/有条件认可须关联8D、拒收转8D复评round+1；`reviewVerdictOf` 同源判定（reason 须透传 close.reason）。seed 注册 `DEF-TRIAL-REVIEW` 可配置模板，`sampleReviews: []`，SEED_VERSION v1.0.41。store 动作 createReview/confirmInspection/signNode/approveDirector/link8D/conclude/close（SOD-01 提交人≠批准人）。视图 `/trial/inspect` InspectView 可运行流程。`infra/repo.ts seedRemoteAudit` 已加幂等前置（后端非空链跳过），根治 smoke 良性 409/400。注意 seed 的 audit 恒为空，版本迁移后需重播 audit=6 基线。
+- **样件需求申请 AI 闭环（2026-11-20）**：`domain/sampleRequestEngine.ts` 单一权威（纯函数）。复用 sampleCollectEngine 聚合/下达/状态机不自造口径；复用 samples/sampleTrialOrders 数据，不新增 state 字段、不 bump 版本。AI 汇总决策 `aiAssessNeeds`（按用途/部门/类型聚合+优先级+引用+水印）、幂等键 `requestDispatchKey(projectId, sourceCodes 排序)`、`aiDispatchVerdict`（无需求/同批次 DENY）、`aiTrackOrder`（进度按状态序位/SLA REQUEST_TRACK_SLA/逾期/下一步）、`requestLoopVerdict`（批次闭环同源）。**AI 不越权**：结论强制水印「供参考·不替代人工放行」，试制下达仍受 K9 约束（同源 AIA-004）。store 动作 submitSampleRequest（复用 addSampleOrder）/aiAssess/aiDispatch/aiTrack + computed sampleRequestRowsView/sampleRequestLoop。页面 `/project/sample-request`（项目管理分组）SampleRequestView：填报+列表+AI汇总卡+自动下达+跟踪看板。
 - 通用：stateMachine / grading(APX-C-2026.11) / controlPoints(48，分布 29/10/7/2) / aiAccountEngine。
 - 权限四维：`domain/rbac.ts`（canOperate / canAny / dataScopeOfRole(s) / applyFieldPolicy），前后端 TS + Java RbacEngine 一致。
 - server/index.js（/api/state 乐观锁 + /api/audit append-only + /api/ai/chat SSE + /api/ai/workbuddy/status 安装检测 + /api/ai/sms/send|verify 短信验证码）/ infra/repo.ts（RestRepo↔LocalRepo 双通道，2~4s 静默降级）。
@@ -67,5 +68,5 @@
 
 ## 最新进度（R3 收官）
 - R3 全部方向完成（流程/租户/文档/经验/组合/日历/我的工作/治理/消息/共享/门户配置/草稿/多语言/移动门户/资源/风险/采购/报表/通用PM/接口计划/闸门一致性/OpenAPI/菜单导航）。门户与协同已彻底删除（非 R3 方向，用户主动精简）。
-- 六门禁基线：vue-tsc 0 / vitest 1691 / build 成功 / smoke exit 0 / e2e 33 / chainOk true。
+- 六门禁基线：vue-tsc 0 / vitest 1720 / build 成功 / smoke exit 0（104/104 real）/ e2e 33 / chainOk true。
 - 本地 main 与 origin/main 完全同步（`0 0`，远端 HEAD `d244f5f`）；AI 真实模型 Key ⏸ 待用户提供。
