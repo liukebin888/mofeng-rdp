@@ -93,6 +93,14 @@ import {
   aiIssueLoopView,
   ISSUE_AI_WATERMARK
 } from '@/domain/issueAiEngine'
+import {
+  aiAssessPurchaseOrders,
+  aiTrackPurchaseOrders,
+  purchaseLoopVerdict,
+  purchaseUrgeKey,
+  PURCHASE_AI_WATERMARK,
+  type SupplierRiskInput
+} from '@/domain/purchaseAiEngine'
 import { canAny, canOperateAny, dataScopeOfRoles, roleOf, applyFieldPolicy, type ActionKey, type FieldPolicySurface } from '@/domain/rbac'
 import { guardTenant, visibleInTenant, groupDrillDown, type TenantContext } from '@/domain/tenant'
 import { canAccessSpace, visibleInSpace, accessibleSpaces, describeSwitch, type Space, type SpaceContext } from '@/domain/spaceEngine'
@@ -372,6 +380,31 @@ export const useAppStore = defineStore('app', () => {
   const supplierPerfs = computed(() => (data.value.supplierPerfs ?? []) as SupplierPerfScore[])
   const samplePurchases = computed(() => (data.value.samplePurchases ?? []) as import('@/domain/types').SamplePurchase[])
   const suppliers = computed(() => (data.value.suppliers ?? []) as import('@/domain/types').Supplier[])
+  /**
+   * 外购外协件采购 AI 跟进：供应商绩效风险输入（从 supplierPerfs 最新一期派生，单一权威）。
+   * 绩效「需改进」或建议暂停/淘汰 → 标记风险；用 supplierId→name 关联采购单的供应商名。
+   */
+  const purchaseSupplierRisks = computed<SupplierRiskInput[]>(() => {
+    const risks: SupplierRiskInput[] = []
+    for (const s of suppliers.value) {
+      const scores = supplierPerfs.value.filter((p) => p.supplierId === s.id).sort((a, b) => b.period.localeCompare(a.period))
+      const latest = scores[0]
+      if (!latest) continue
+      const ev = evaluatePerformance(latest, scores, { riskLevel: '低' })
+      if (ev.ok && ev.result && (ev.result.grade === '需改进' || ev.result.suggestSuspend || ev.result.suggestEliminate)) {
+        risks.push({
+          supplier: s.name,
+          risk: true,
+          reason: `${latest.period} 绩效「${ev.result.grade}」${ev.result.alerts.length ? '：' + ev.result.alerts.join('；') : ''}`
+        })
+      }
+    }
+    return risks
+  })
+  /** 外购外协件采购 AI 跟踪卡（实时派生，供视图展示） */
+  const purchaseAiCards = computed(() => aiTrackPurchaseOrders(samplePurchases.value, new Date().toISOString(), purchaseSupplierRisks.value))
+  /** 外购外协件采购 AI 闭环看板（阶段/计数/闭环率，同源判定） */
+  const purchaseAiLoop = computed(() => purchaseLoopVerdict(samplePurchases.value, new Date().toISOString(), purchaseSupplierRisks.value))
 
   // —— 多租户隔离（TEN-002/TEN-004）：当前租户上下文 + 可见项目 ——
   const tenants = computed(() => (data.value.tenants ?? []) as import('@/domain/tenant').Tenant[])
@@ -3084,6 +3117,56 @@ export const useAppStore = defineStore('app', () => {
     return true
   }
 
+  // —— 外购外协件采购 AI 跟进闭环（AI 预警 → 人工推进 → AI 跟踪催办 → 闭环）——
+  /** AI 风险预警汇总：逐单判定到货逾期/需求临近/供应商风险（只读，审计留痕，AI 不越权） */
+  function aiAssessPurchaseAlerts(): ReturnType<typeof aiAssessPurchaseOrders> {
+    const now = new Date().toISOString()
+    const risks = aiAssessPurchaseOrders(samplePurchases.value, now, purchaseSupplierRisks.value)
+    const high = risks.filter((r) => r.level === '高').length
+    const overdue = risks.filter((r) => r.flags.some((f) => f.kind === '到货逾期' || f.kind === '需求临近')).length
+    log('QUERY', 'AI外购外协件风险预警', `${risks.length} 单`, {
+      high, overdue, level: high ? '高风险需关注' : '正常', watermark: PURCHASE_AI_WATERMARK
+    }, undefined, 'OK')
+    persist()
+    return risks
+  }
+
+  /**
+   * AI 跟踪巡检：生成跟踪卡 + 对逾期采购单向负责人催办（幂等键=采购单+日期）。
+   * AI 只预警催办，不推进状态；状态推进仍由人工调用 advanceSamplePurchase。
+   */
+  function aiTrackPurchaseAlerts(): {
+    cards: ReturnType<typeof aiTrackPurchaseOrders>
+    loop: ReturnType<typeof purchaseLoopVerdict>
+    urged: number
+  } {
+    const now = new Date().toISOString()
+    const cards = aiTrackPurchaseOrders(samplePurchases.value, now, purchaseSupplierRisks.value)
+    const loop = purchaseLoopVerdict(samplePurchases.value, now, purchaseSupplierRisks.value)
+    const overdue = cards.filter((c) => c.overdue)
+    let urged = 0
+    if (overdue.length) {
+      const owner = currentProject.value?.owner || ''
+      const recipients: Array<{ name: string; role: string }> = owner ? [{ name: owner, role: '项目负责人' }] : []
+      const content = overdue.map((c) => `${c.code}「${c.status}」风险${c.level}${c.stayDays ? `，已停留 ${c.stayDays} 天` : ''}`).join('；')
+      const eventKey = overdue.map((c) => purchaseUrgeKey(c.orderId, now)).join('|')
+      if (recipients.length) {
+        urged = pushMessageToUsers(recipients, {
+          eventKey,
+          title: `【AI 跟踪催办】${overdue.length} 张外购外协件采购单需关注`,
+          content: `${content}。${PURCHASE_AI_WATERMARK}`,
+          category: '系统',
+          refType: 'samplePurchase',
+          refId: overdue.map((c) => c.code).join(',')
+        })
+      }
+      log('QUERY', 'AI外购外协件跟踪催办', overdue.map((c) => c.code).join('、'), {
+        overdue: overdue.length, urged, watermark: PURCHASE_AI_WATERMARK
+      })
+    }
+    return { cards, loop, urged }
+  }
+
   // —— 采购管理：招投标闭环（开标→评标→定标→流标）——
   /** 开标：录入投标人清单 */
   function recordBids(tenderId: string, bids: import('@/domain/types').TenderBid[]): boolean {
@@ -5163,6 +5246,11 @@ export const useAppStore = defineStore('app', () => {
     addSupplierPerfScore,
     createSamplePurchase,
     advanceSamplePurchase,
+    aiAssessPurchaseAlerts,
+    aiTrackPurchaseAlerts,
+    purchaseAiCards,
+    purchaseAiLoop,
+    purchaseSupplierRisks,
     recordBids,
     evaluateTender,
     awardTender,
