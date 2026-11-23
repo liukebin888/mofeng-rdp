@@ -1,4 +1,8 @@
-# 前后端 REST 契约与统一错误码表（OpenAPI 3.1 权威依据）
+# 前后端 REST 契约与统一错误码表（Java 内部联调契约）
+
+> 🔴 **定位声明（2026-11-24 / BACKEND-SELECTION 裁决）**：本文档描述的是 **Java 后端（`/api/v1/*`，8088）内部领域计算联调契约**，**不是对外 API**。
+> 生产对外唯一权威机器可读契约是 `docs/OPENAPI-3.1.yaml`（Node 8787），详见 `docs/BACKEND-SELECTION.md`。
+> 两套契约不得同时对外宣称——本文档不再作为「OpenAPI 3.1 权威依据」，该表述已随选型裁决废止。
 
 > 文档编号：MOFENG-RDP-CONTRACT-002
 > 日期：2026-11-16（CONTRACT-002 修订）

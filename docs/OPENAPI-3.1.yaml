@@ -1,0 +1,783 @@
+openapi: 3.1.0
+info:
+  title: 魔程化解研发管理平台 · 生产对外 REST API
+  version: r2.1.0
+  summary: Node 后端（server/index.js）生产对外权威契约——本平台唯一对外宣称的 HTTP API
+  description: |
+    ## 权威声明（BACKEND-SELECTION 裁决）
+    本文件是魔程化解平台**唯一对外宣称**的机器可读 REST 契约，覆盖生产后端 Node（8787）
+    的全部端点。Java 后端（`/api/v1/*`，17 端点，响应 `{code,message,data}`）为**内部领域计算
+    联调契约**，不对外宣称、不在此文件登记，详见 `docs/BACKEND-SELECTION.md` 与 `docs/REST-CONTRACT.md`。
+    两套契约不得同时对外宣称。
+
+    ## 生产安全（P0-1）
+    - 生产模式（`NODE_ENV=production` 或 `MOFENG_PROD=1`）下，除 `/api/health` 与
+      `GET /api/objects/{tenantId}/{objectKey}`（预签名 HMAC）外，全部端点要求
+      `Authorization: Bearer <MOFENG_API_TOKEN>`（网关注入，浏览器不持有）。
+    - CORS 仅回显 `CORS_ORIGIN` 白名单；同源部署不返回 CORS 头。
+    - 租户上下文经 `x-tenant-id` 头或请求体 `tenantId` 传递；跨租户一律 403 `TENANT_FORGED`。
+
+    ## 响应包
+    成功/失败统一为 `{ ok: true|false, code?, message?, ... }`（`ok` 为判别位），非 Java 的
+    `{code,message,data}` 格式。审计链端点额外返回 `chainOk`。
+  contact:
+    name: MOFENG-RDP 项目组
+  license:
+    name: 内部受控
+servers:
+  - url: http://127.0.0.1:8787
+    description: 本地/开发（docker-compose 内由 nginx 反代，不直接暴露）
+  - url: https://{host}/api
+    description: 生产（网关卸载国密 TLS 后转发至 Node 8787）
+    variables:
+      host:
+        default: your-domain.example.com
+
+tags:
+  - name: Health
+    description: 健康检查（探针，免鉴权）
+  - name: State
+    description: 业务状态（乐观锁读写）
+  - name: Audit
+    description: 审计链（append-only + 哈希链）
+  - name: AI
+    description: AI 账号绑定、短信验证码、AI 对话
+  - name: Objects
+    description: 对象存储（预签名 URL + 按租户分目录）
+  - name: Tasks
+    description: 异步任务框架（幂等键 + 租户上下文）
+
+paths:
+  /api/health:
+    get:
+      tags: [Health]
+      summary: 健康检查（生产免鉴权）
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: 服务健康
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, service, version]
+                properties:
+                  ok: { type: boolean, const: true }
+                  service: { type: string, const: mofeng-rdp-server }
+                  version: { type: string }
+                  multiTenant: { type: boolean }
+                  uptimeSec: { type: integer, description: 进程运行秒数 }
+                  hasState: { type: boolean }
+                  stateVersion: { type: [string, 'null'] }
+                  now: { type: string, format: date-time }
+
+  /api/state/version:
+    get:
+      tags: [State]
+      summary: 查询租户状态版本（只读，乐观锁前置）
+      operationId: getStateVersion
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+      responses:
+        '200':
+          description: 版本信息
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tenantId, version]
+                properties:
+                  tenantId: { type: string }
+                  version: { type: [string, 'null'] }
+        '400': { $ref: '#/components/responses/TenantError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/state:
+    get:
+      tags: [State]
+      summary: 读取租户业务状态
+      operationId: getState
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+      responses:
+        '200':
+          description: 状态文档
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, tenantId, state]
+                properties:
+                  ok: { type: boolean, const: true }
+                  tenantId: { type: string }
+                  state: { $ref: '#/components/schemas/StateDoc' }
+        '404':
+          description: 该租户尚无已保存状态
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      tags: [State]
+      summary: 写入租户业务状态（乐观锁 expectedRev）
+      operationId: putState
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/StateDoc'
+                - type: object
+                  properties:
+                    expectedRev:
+                      type: integer
+                      description: 客户端期望的当前 rev；与服务端不一致返回 409 CONFLICT
+      responses:
+        '200':
+          description: 写入成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, saved, rev]
+                properties:
+                  ok: { type: boolean, const: true }
+                  saved: { type: boolean, const: true }
+                  tenantId: { type: string }
+                  version: { type: string }
+                  rev: { type: integer }
+                  hash: { type: string, description: state 内容 SHA256 前 16 位 }
+                  prevRev: { type: [integer, 'null'] }
+                  at: { type: string, format: date-time }
+        '400':
+          description: 非法 JSON 或缺 version（BAD_JSON / VALIDATION_FAILED）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403': { $ref: '#/components/responses/TenantForged' }
+        '409':
+          description: 乐观锁冲突（CONFLICT）
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - type: object
+                    properties:
+                      currentRev: { type: integer }
+        '413':
+          description: 状态文档超过 50MB 上限（PAYLOAD_TOO_LARGE）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500':
+          description: 未预期内部错误（INTERNAL）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/audit:
+    get:
+      tags: [Audit]
+      summary: 读取租户审计链并校验连续性
+      operationId: getAudit
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+      responses:
+        '200':
+          description: 审计链与校验结论
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, count, chainOk]
+                properties:
+                  ok: { type: boolean, const: true }
+                  tenantId: { type: string }
+                  count: { type: integer }
+                  chainOk: { type: boolean, description: 哈希链是否连续（六门禁第 6 项） }
+                  brokenAt: { type: [string, 'null'] }
+                  checked: { type: integer }
+                  rows:
+                    type: array
+                    items: { $ref: '#/components/schemas/AuditRow' }
+        '400': { $ref: '#/components/responses/TenantError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Audit]
+      summary: 追加一条审计（append-only，服务端权威重算哈希）
+      operationId: postAudit
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuditEntryInput'
+      responses:
+        '201':
+          description: 追加成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, saved, seq, rowHash]
+                properties:
+                  ok: { type: boolean, const: true }
+                  tenantId: { type: string }
+                  saved: { type: boolean, const: true }
+                  seq: { type: integer }
+                  rowHash: { type: string }
+                  count: { type: integer }
+                  at: { type: string, format: date-time }
+        '400':
+          description: 非法 JSON 或缺必填字段
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/audit/seed:
+    post:
+      tags: [Audit]
+      summary: 审计链一次性播种（仅空链接受；服务端权威重建整链哈希）
+      operationId: seedAudit
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              minItems: 1
+              items: { $ref: '#/components/schemas/AuditEntryInput' }
+      responses:
+        '201':
+          description: 播种成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, seeded, count, headHash]
+                properties:
+                  ok: { type: boolean, const: true }
+                  tenantId: { type: string }
+                  seeded: { type: boolean, const: true }
+                  count: { type: integer }
+                  headHash: { type: string }
+        '400':
+          description: 非法 JSON 或空数组（BAD_JSON / VALIDATION_FAILED）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: 链已存在，拒绝重复播种（ALREADY_SEEDED）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/ai/workbuddy/status:
+    get:
+      tags: [AI]
+      summary: WorkBuddy 安装检测与真实模型状态
+      operationId: getWorkbuddyStatus
+      responses:
+        '200':
+          description: 检测结论
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean, const: true }
+                  installed: { type: boolean }
+                  realModel: { type: boolean, description: 真实模型 Key 是否就绪（未注入时为 false，如实降级） }
+                  configured: { type: boolean }
+
+  /api/ai/sms/send:
+    post:
+      tags: [AI]
+      summary: 下发短信验证码（未配置网关时 devMode 回显，明示降级）
+      operationId: sendSmsCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone: { type: string, pattern: '^1[3-9]\\d{9}$', description: 中国大陆 11 位手机号 }
+      responses:
+        '200':
+          description: 已下发（或开发模式回显）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, devMode]
+                properties:
+                  ok: { type: boolean, const: true }
+                  devMode: { type: boolean, description: true=未接真实网关，devCode 回显；false=真实下发 }
+                  devCode: { type: string, description: 仅 devMode=true 时回显 }
+                  message: { type: string }
+                  expiresIn: { type: integer, description: 有效期秒 }
+        '400':
+          description: 手机号格式错误（INVALID_PHONE）或非法 JSON
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429':
+          description: 尝试次数过多（SMS_TOO_MANY_ATTEMPTS）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '502':
+          description: 真实网关下发失败（SMS_GATEWAY_FAILED，如实报错不伪装成功）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/ai/sms/verify:
+    post:
+      tags: [AI]
+      summary: 校验短信验证码（5 分钟时效 + 5 次上限 + 成功即失效）
+      operationId: verifySmsCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, code]
+              properties:
+                phone: { type: string }
+                code: { type: string }
+      responses:
+        '200':
+          description: 校验通过
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, verified]
+                properties:
+                  ok: { type: boolean, const: true }
+                  verified: { type: boolean, const: true }
+                  message: { type: string }
+        '400':
+          description: 未发送/过期/错误（SMS_CODE_NOT_FOUND / SMS_CODE_EXPIRED / SMS_CODE_MISMATCH）
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - type: object
+                    properties:
+                      code: { enum: [INVALID_CODE, SMS_CODE_NOT_FOUND, SMS_CODE_EXPIRED, SMS_CODE_MISMATCH] }
+                      attemptsLeft: { type: integer }
+
+  /api/ai/chat:
+    post:
+      tags: [AI]
+      summary: AI 对话（SSE 流式；越权前置过滤 + AI_CALL 审计 + 水印兜底）
+      operationId: aiChat
+      description: |
+        流式响应 `Content-Type: text/event-stream`，逐帧 `data: {"delta":"..."}`。
+        Key 不入审计、不入响应；未注入真实 Key 时以占位降级（realModel=false），不虚假接通。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [messages]
+              properties:
+                messages:
+                  type: array
+                  items:
+                    type: object
+                    required: [role, content]
+                    properties:
+                      role: { type: string, enum: [user, assistant, system] }
+                      content: { type: string }
+                apiKey: { type: string, description: 可选，用户自带 Key（仅 sessionStorage/内存，不落库） }
+                scene: { type: string, description: AI 场景标识（越权前置过滤依据） }
+      responses:
+        '200':
+          description: SSE 流
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: '逐帧 data: {"delta": "..."}，末帧含水印标记'
+        '400':
+          description: 参数/越权校验失败
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/objects/presign:
+    post:
+      tags: [Objects]
+      summary: 签发对象预签名 URL（HMAC，生产免 Token 但凭签名）
+      operationId: presignObject
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [objectKey]
+              properties:
+                tenantId: { type: string }
+                objectKey: { type: string, description: 禁止路径穿越 }
+      responses:
+        '200':
+          description: 预签名结果
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, url, expires, sig]
+                properties:
+                  ok: { type: boolean, const: true }
+                  tenantId: { type: string }
+                  objectKey: { type: string }
+                  url: { type: string, description: 形如 /api/objects/{tenantId}/{key}?expires=&sig= }
+                  expires: { type: integer }
+                  sig: { type: string }
+        '400':
+          description: 非法 objectKey（INVALID_KEY）或非法 JSON
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403': { $ref: '#/components/responses/TenantForged' }
+
+  /api/objects/{tenantId}/{objectKey}:
+    parameters:
+      - name: tenantId
+        in: path
+        required: true
+        schema: { type: string, pattern: '^[A-Za-z0-9-]{1,64}$' }
+      - name: objectKey
+        in: path
+        required: true
+        schema: { type: string }
+      - name: expires
+        in: query
+        required: true
+        schema: { type: integer }
+        description: 预签名过期时间戳
+      - name: sig
+        in: query
+        required: true
+        schema: { type: string }
+        description: HMAC 签名
+    put:
+      tags: [Objects]
+      summary: 上传对象（生产模式下凭网关注入 Token；路径租户须与上下文一致）
+      operationId: putObject
+      security:
+        - ApiToken: []
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        '200':
+          description: 上传成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, objectKey, size]
+                properties:
+                  ok: { type: boolean, const: true }
+                  tenantId: { type: string }
+                  objectKey: { type: string }
+                  size: { type: integer }
+        '403': { $ref: '#/components/responses/TenantForged' }
+    get:
+      tags: [Objects]
+      summary: 下载对象（凭预签名 HMAC，生产免 Token）
+      operationId: getObject
+      security:
+        - Presign: []
+      responses:
+        '200':
+          description: 对象字节流
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '403':
+          description: 预签名无效/过期或跨租户路径（PRESIGN_INVALID / TENANT_FORGED）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: 对象不存在
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/tasks:
+    post:
+      tags: [Tasks]
+      summary: 提交异步任务（幂等键去重 + 显式租户上下文）
+      operationId: createTask
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [taskType, idempotencyKey]
+              properties:
+                tenantId: { type: string }
+                taskType: { type: string }
+                idempotencyKey: { type: string }
+                params: { type: object, additionalProperties: true }
+      responses:
+        '201':
+          description: 新建任务
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskAck' }
+        '200':
+          description: 幂等命中，返回已有任务
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskAck' }
+        '400':
+          description: 缺 taskType/idempotencyKey 或非法 JSON
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403': { $ref: '#/components/responses/TenantForged' }
+
+  /api/tasks/{taskId}:
+    get:
+      tags: [Tasks]
+      summary: 查询任务进度（跨租户返回 404 不泄露存在性）
+      operationId: getTask
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+        - name: taskId
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[A-Za-z0-9-]{1,64}$' }
+      responses:
+        '200':
+          description: 任务详情
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, task]
+                properties:
+                  ok: { type: boolean, const: true }
+                  tenantId: { type: string }
+                  task: { $ref: '#/components/schemas/Task' }
+        '404':
+          description: 任务不存在（不泄露存在性）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/tasks/{taskId}/complete:
+    post:
+      tags: [Tasks]
+      summary: 完成任务并写入产物（按租户隔离）
+      operationId: completeTask
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+        - name: taskId
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[A-Za-z0-9-]{1,64}$' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tenantId: { type: string }
+                result: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: 完成结果
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean, const: true }
+                  tenantId: { type: string }
+                  taskId: { type: string }
+                  status: { type: string }
+        '404':
+          description: 任务不存在
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+components:
+  securitySchemes:
+    ApiToken:
+      type: http
+      scheme: bearer
+      bearerFormat: MOFENG_API_TOKEN
+      description: 生产模式下由网关注入的 Bearer Token（≥32 字符），浏览器不持有
+    Presign:
+      type: apiKey
+      in: query
+      name: sig
+      description: 对象下载的 HMAC 预签名（配合 expires 参数）
+
+  parameters:
+    TenantHeader:
+      name: x-tenant-id
+      in: header
+      required: false
+      description: 租户上下文；缺省时从请求体 tenantId 注入。伪造/不一致返回 403 TENANT_FORGED
+      schema: { type: string }
+
+  responses:
+    Unauthorized:
+      description: 未认证（生产模式缺/错 Token）
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    TenantError:
+      description: 租户上下文错误
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    TenantForged:
+      description: 伪造租户（跨租户访问）
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - type: object
+                properties:
+                  code: { const: TENANT_FORGED }
+
+  schemas:
+    Error:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean, const: false }
+        code:
+          type: string
+          enum:
+            - BAD_JSON
+            - VALIDATION_FAILED
+            - INVALID_PHONE
+            - INVALID_CODE
+            - SMS_CODE_NOT_FOUND
+            - SMS_CODE_EXPIRED
+            - SMS_CODE_MISMATCH
+            - NOT_FOUND
+            - TENANT_FORGED
+            - INVALID_KEY
+            - CONFLICT
+            - ALREADY_SEEDED
+            - SMS_TOO_MANY_ATTEMPTS
+            - SMS_GATEWAY_FAILED
+            - PAYLOAD_TOO_LARGE
+            - PRESIGN_INVALID
+            - INTERNAL
+            - UNAUTHORIZED
+          description: 传输/校验层错误码全集（18 项，与 server/index.js send 调用一一对应；由 test-contract.cjs 双向核对）
+        message: { type: string }
+
+    StateDoc:
+      type: object
+      description: 业务状态文档（domain 数据集合；version 必填，rev 服务端生成）
+      required: [version, data]
+      properties:
+        version: { type: string, description: seed 版本，如 mofeng.rdp.v1.0.41 }
+        tenantId: { type: string }
+        userId: { type: string }
+        projectId: { type: string }
+        spaceId: { type: string }
+        rev: { type: integer, description: 乐观锁版本，PUT 由服务端递增 }
+        data:
+          type: object
+          additionalProperties: true
+          description: 领域实体集合（projects/wbs/reqs/audit/sampleReviews/... 由 domain 定义，前端权威）
+
+    AuditEntryInput:
+      type: object
+      required: [actorId, actorName, actorRole, action, objType, objId]
+      properties:
+        occurredAt: { type: string, format: date-time }
+        actorId: { type: string }
+        actorName: { type: string }
+        actorRole: { type: string }
+        action: { type: string }
+        objType: { type: string }
+        objId: { type: string }
+        before: {}
+        after: {}
+        result: { type: string, default: OK }
+        tenantId: { type: string }
+      description: 客户端仅提供业务字段；prevHash/rowHash/seq 由服务端权威重建（不信任客户端）
+
+    AuditRow:
+      allOf:
+        - $ref: '#/components/schemas/AuditEntryInput'
+        - type: object
+          required: [seq, prevHash, rowHash]
+          properties:
+            seq: { type: integer }
+            prevHash: { type: string }
+            rowHash: { type: string }
+            tenantId: { type: string }
+
+    TaskAck:
+      type: object
+      required: [ok, taskId]
+      properties:
+        ok: { type: boolean, const: true }
+        tenantId: { type: string }
+        taskId: { type: string }
+        idempotent: { type: boolean }
+        status: { type: string }
+        created: { type: boolean }
+
+    Task:
+      type: object
+      required: [id, status]
+      properties:
+        id: { type: string }
+        tenantId: { type: string }
+        taskType: { type: string }
+        idempotencyKey: { type: string }
+        status: { type: string, enum: [queued, running, done, failed] }
+        progress: { type: integer, minimum: 0, maximum: 100 }
+        params: { type: object, additionalProperties: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        productKey: { type: [string, 'null'] }
+        result: {}

@@ -49,7 +49,7 @@
 | 维度 | 11-10 裁决 | 复验裁决 | 依据与保留意见 |
 |---|---|---|---|
 | 单元·组件级（苏雅） | 有条件通过 | ✅ 通过 | vitest **1767/1767（112 文件）**，较原 1333 例增 434；domain 零框架依赖保持。 |
-| 集成·接口级（柯砚） | 不通过 | 🟡 有条件通过 | 契约文档 `REST-CONTRACT.md` 已有；test-security/isolation 集成面 16+12 PASS；**OpenAPI 3.1 机器可读落盘仍缺**，两套契约并存未收口。 |
+| 集成·接口级（柯砚） | 不通过 | ✅ 通过（P0-6 后） | 生产对外契约已冻结：Node 唯一对外（`docs/OPENAPI-3.1.yaml`，17 端点/18 错误码）+ Java 内部联调（`REST-CONTRACT.md` 已标注非对外），选型裁决见 `BACKEND-SELECTION.md`；`test-contract.cjs` 19/19 PASS 且经变异验证（删端点/改错误码均能报 FAIL），两套契约不再并存对外。test-security/isolation 16+12 PASS。 |
 | 系统·验收级（白樾） | 不通过（阻断） | 🟡 有条件通过 | B1 已翻盘、e2e 33 PASS、probe 40/40；85 条 AC 已建执行映射（`ACCEPTANCE-MATRIX.md`：36 通过/38 有条件/11 外部依赖）；**真实 UAT 签署与试点报告仍缺**。 |
 | 测试保障级（闻朔） | 不通过 | 🟡 有条件通过 | 探针已纳入 `npm run probe` 并修复；回归仍无 CI（六门禁靠脚本人肉执行），**CI 流水线仍缺**。 |
 | 性能·可靠性（骆骋） | 不通过 | ⏸ 不通过（外部依赖） | 零压测资产、无 RTO/RPO 演练，11-10 结论**维持**；对应 AC-03/38/39/40/45 已如实登记外部依赖，不以单测替代。 |
@@ -67,7 +67,7 @@
 | 2 | 等保三级 / 密评 / 国密网关 | C-30 如实判 FAIL；AC-24/25 外部依赖 | 有资质机构测评报告 + 网关协议扫描 |
 | 3 | 真实 UAT 签署与试点报告 | 85 条 AC 无真人签署 | 按 `ACCEPTANCE-MATRIX.md` 逐条补证据并 UAT 签署 |
 | 4 | CI / 覆盖率 / 变异测试 | 六门禁靠脚本执行，无自动流水线 | 六门禁进 CI + vitest coverage + jacoco |
-| 5 | OpenAPI 3.1 落盘与契约测试 | 两套契约并存 | 机器可读 OpenAPI + 契约测试，两套不得同时对外宣称 |
+| ~~5~~ | ~~OpenAPI 3.1 落盘与契约测试~~ | ✅ **P0-6 已闭环** | 已落盘 `docs/OPENAPI-3.1.yaml`（Node 唯一对外）+ `BACKEND-SELECTION.md`（选型裁决）+ `test-contract.cjs`（19/19，变异验证通过）；Java 契约标注内部不外宣 |
 | 6 | 无障碍真实 DOM 取证 | 键盘/标签抽查仍硬编码样本 | 抽查输入改取真实渲染 DOM，移除硬编码通过样本 |
 | 7 | 灰度/回滚/无状态部署演练 | AC-22.1/45 外部依赖 | 真实编排环境演练记录 |
 | 8 | AI 真实模型与短信网关凭据 | Key 未注入，降级占位 | 外部注入凭据后跑 `verify-wma.js` 见 realModel:true |
@@ -81,7 +81,7 @@
 - 两项阻断（B1 probe 崩溃、B2 前端自签）均已源码整改 + 实测复跑通过， ONE-VETO 解除。
 - 功能、架构、安全、单元级维度已达到可内测基线（六门禁全绿、1767 例单测、474 例 Java 测试、44 项 Node 安全验收）。
 - 性能、合规、真实 UAT 属**外部依赖**，开发环境不可自证，按 SRS「性能必须测试、合规以报告为证据」维持 FAIL/⏸，**不得**以单测通过替代真实取证，亦不得据此宣称正式生产发布。
-- 按 §四 8 项清零后方可升级为「正式生产发布」门禁结论。
+- 按 §四 7 项（第 5 项契约冻结已由 P0-6 闭环）清零后方可升级为「正式生产发布」门禁结论。
 
 > 本报告为复验意见，不替代有资质机构的测评结论，也不替代用户方 UAT 签署。最终放行由项目方决定。
 
@@ -97,6 +97,7 @@
 | `node server/test-security.cjs` | 16/16 PASS |
 | `node server/test-isolation.cjs` | 12/12 PASS |
 | `node server/test-sms.cjs` | 13/13 PASS |
+| `node server/test-contract.cjs`（P0-6，含变异验证） | 19/19 PASS；删端点/改错误码均能报 FAIL |
 | `mvn test -pl mofeng-application -am`（JDK21） | 474/474 全绿 |
 | `npx vue-tsc --noEmit` | 0 error |
 | `npx vitest run --no-file-parallelism` | 1767/1767 |
