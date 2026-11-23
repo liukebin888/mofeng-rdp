@@ -65,8 +65,9 @@ mybatis-plus:
 mofeng:
   security:
     jwt:
-      # 生产环境必须通过环境变量覆盖（≥32 字节），此处为本地开发默认值
-      secret: ${MOFENG_JWT_SECRET:mofeng-rdp-local-dev-secret-0123456789abcdef}
+      # SEC-012/B2: 禁止内置默认密钥；生产/本机均须外部注入 MOFENG_JWT_SECRET（≥32 字节）。
+      # 缺失或命中示例值黑名单时 SecurityAutoConfiguration 拒绝启动（fail-closed）。
+      secret: ${MOFENG_JWT_SECRET:}
   kafka:
     event-topic: mofeng-events
     task-topic: mofeng-tasks

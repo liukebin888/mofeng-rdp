@@ -199,6 +199,7 @@ SRS 第 23 章明确「国密网关位置：**平台边界，统一卸载与卸�
 | `CORS_ORIGIN` | 跨域 Origin 白名单，逗号分隔 | 空（同源部署不返回 CORS 头） |
 | `NODE_ENV` / `MOFENG_PROD` | 生产模式开关 | `development` / `0` |
 | `MOFENG_DATA_DIR` | 数据目录覆盖 | `server/data` |
+| `MOFENG_JWT_SECRET` | Java 后端 JWT 签名密钥（≥32 字符，外部注入） | 空（必填，fail-closed） |
 
 ### 六·一、生产安全闸门（P0-1，已落地）
 
@@ -219,6 +220,21 @@ node server/test-security.cjs                 # 16 项安全断言，应全 PASS
 - 生产模式下 `/api/health` 免鉴权（探针），`GET /api/objects/...` 凭预签名 HMAC 访问；其余 API 无/错 Token 一律 `401 UNAUTHORIZED`。
 - 非白名单 Origin 不返回任何 CORS 头；同源部署留空 `CORS_ORIGIN` 即可。
 - 若后端被直接暴露到公网（绕过 nginx），生产模式仍要求 Token，但应同时在编排层禁止映射 8787 端口（`docker-compose.yml` 默认未映射）。
+
+### 六·二、Java 后端 JWT 密钥 fail-closed（P0-2，已落地）
+
+Java 后端 `application.yml` 已移除 `MOFENG_JWT_SECRET` 的硬编码默认值（原 `mofeng-rdp-local-dev-secret-*`），改为 `${MOFENG_JWT_SECRET:}` 空占位；`SecurityAutoConfiguration#jwtService` 在任何模式下对空值、已知示例/默认密钥黑名单一律拒绝启动（fail-closed），`JwtService` 另行强制密钥 ≥32 字节。
+
+```bash
+# 启动 Java 后端前必须外部注入（≥32 字符，勿与 Node 后端 Token 复用）
+export MOFENG_JWT_SECRET="$(openssl rand -hex 32)"
+cd backend && mvn -q -DskipTests package && java -jar mofeng-boot/target/mofeng-boot-0.1.0-SNAPSHOT.jar
+# 验收：缺密钥 / 示例密钥启动应失败，合规密钥放行
+mvn -pl mofeng-application -am test   # SecurityAutoConfigurationTest 5 例
+```
+
+- 示例值黑名单：`mofeng-rdp-local-dev-secret-*`、`mofeng-rdp-jwt-secret-key-*`、`another-secret-key-*` 注入后同样拒绝启动。
+- 前端不再持有签名密钥；JWT 由后端 `/api/auth/token` 签发，与 Node 后端网关注入 Token 是两套独立凭据，不可复用。
 
 ## 七、安全与合规要点
 
