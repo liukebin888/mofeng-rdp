@@ -13,7 +13,7 @@ const { chromium } = require('playwright-core')
 const fs = require('node:fs')
 const path = require('node:path')
 
-const exe = 'C:/Users/Administrator/AppData/Local/ms-playwright/chromium-1247/chrome-win64/chrome.exe'
+const exe = require('./browser-path.cjs').resolveChromiumPath()
 const BASE = process.env.E2E_BASE || 'http://127.0.0.1:4180'
 const LS_KEY = 'mofeng.rdp.state.v1'
 

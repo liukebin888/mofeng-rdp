@@ -21,7 +21,7 @@ const { chromium } = require('playwright-core')
 const fs = require('node:fs')
 const path = require('node:path')
 
-const exe = 'C:/Users/Administrator/AppData/Local/ms-playwright/chromium-1247/chrome-win64/chrome.exe'
+const exe = require('./browser-path.cjs').resolveChromiumPath()
 const BASE = process.env.PROBE_BASE || 'http://127.0.0.1:4180'
 const exp = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'shots', 'probe-expected.json'), 'utf8'))
 

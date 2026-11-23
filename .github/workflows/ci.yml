@@ -1,0 +1,143 @@
+name: CI 六门禁 + 覆盖率 + 安全验收
+
+# 触发：push/PR 到 main 或手动。
+# 设计原则（与 docs/CI-PIPELINE.md 同源）：
+#   1. 六门禁（typecheck/vitest/build/smoke/e2e/audit）逐一可复跑，失败即停，不跳过。
+#   2. smoke/e2e 依赖 preview + Chromium：浏览器由 browser-path.cjs 自动解析（CI 先 install）。
+#   3. 数据隔离：后端用临时 MOFENG_DATA_DIR，CI 不污染仓库 server/data，也不依赖演示数据。
+#   4. 覆盖率：domain+store 真实阈值，低于基线即失败（防覆盖率回归）。
+#   5. 安全：Node 安全/隔离/契约/SMS 验收 + npm audit（可验证豁免，非吞错）。
+#   6. Java 后端 mvn test 独立作业，JDK21。
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # ============ 作业一：前端六门禁 + 覆盖率 + Node 安全验收 ============
+  frontend-gates:
+    name: 前端六门禁 / 覆盖率 / 安全
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: 安装前端依赖（锁定版本）
+        working-directory: app
+        run: npm ci
+
+      - name: 门禁 1/6 · vue-tsc 类型检查
+        working-directory: app
+        run: npm run typecheck
+
+      - name: 门禁 2/6 · vitest 单元测试 + 覆盖率阈值
+        working-directory: app
+        run: npm run coverage
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: 上传覆盖率报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: app/coverage/
+          if-no-files-found: warn
+
+      - name: 门禁 3/6 · vite 生产构建
+        working-directory: app
+        run: npm run build
+
+      - name: 安装 Chromium（CI 无预装浏览器）
+        working-directory: app
+        run: npx playwright-core install chromium --with-deps
+
+      - name: 启动隔离后端（临时数据目录）
+        working-directory: server
+        run: |
+          export MOFENG_DATA_DIR="$(mktemp -d)/data"
+          echo "MOFENG_DATA_DIR=$MOFENG_DATA_DIR" >> "$GITHUB_ENV"
+          node index.js > /tmp/mofeng-server.log 2>&1 &
+          echo $! > /tmp/mofeng-server.pid
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8787/api/health >/dev/null; then echo "backend ready"; break; fi
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8787/api/health || { cat /tmp/mofeng-server.log; exit 1; }
+
+      - name: 启动 preview（4180）
+        working-directory: app
+        run: |
+          npm run preview -- --port 4180 > /tmp/mofeng-preview.log 2>&1 &
+          echo $! > /tmp/mofeng-preview.pid
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:4180/ >/dev/null; then echo "preview ready"; break; fi
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:4180/ || { cat /tmp/mofeng-preview.log; exit 1; }
+
+      - name: 门禁 4/6 · 路由冒烟（smoke）
+        working-directory: app
+        run: npm run smoke
+
+      - name: 门禁 5/6 · 端到端交互（e2e）
+        working-directory: app
+        run: npm run e2e
+
+      - name: 门禁 6/6 · 审计链连续性（chainOk）
+        run: |
+          curl -sf -H 'x-tenant-id: T-1001' http://127.0.0.1:8787/api/audit \
+            | node -e "let s='';process.stdin.on('data',c=>s+=c).on('end',()=>{const j=JSON.parse(s);console.log('audit count='+j.count+' chainOk='+j.chainOk);process.exit(j.chainOk?0:1)})"
+
+      - name: 停掉测试服务
+        if: always()
+        run: |
+          [ -f /tmp/mofeng-server.pid ] && kill "$(cat /tmp/mofeng-server.pid)" 2>/dev/null || true
+          [ -f /tmp/mofeng-preview.pid ] && kill "$(cat /tmp/mofeng-preview.pid)" 2>/dev/null || true
+
+      - name: Node 安全验收 · 生产 fail-closed / 隔离 / 契约同源 / 短信
+        run: |
+          node server/test-security.cjs
+          node server/test-isolation.cjs
+          node server/test-contract.cjs
+          node server/test-sms.cjs
+
+      - name: 生产依赖安全审计（可验证豁免，未豁免即失败）
+        working-directory: app
+        run: npm run audit:check
+
+      - name: AI 验证工具链自证（纯函数 + mock 三态，无 Key 不报喜）
+        run: |
+          node server/scripts/verify-wma.js --self-test
+          node server/scripts/verify-wma.js --mock
+
+  # ============ 作业二：Java 后端测试（JDK21）============
+  java-tests:
+    name: Java 后端测试（mvn）
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/**/pom.xml
+
+      - name: mvn test（domain + application）
+        working-directory: backend
+        run: mvn test -pl mofeng-application -am -q

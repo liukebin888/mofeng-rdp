@@ -8,7 +8,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 const { chromium } = require('playwright-core')
 
-const exe = 'C:/Users/Administrator/AppData/Local/ms-playwright/chromium-1247/chrome-win64/chrome.exe'
+const exe = require('./browser-path.cjs').resolveChromiumPath()
 const BASE = 'http://127.0.0.1:4181'
 const KEY = 'mofeng.rdp.state.v1'
 const exp = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'shots', 'qa-expected.json'), 'utf8'))

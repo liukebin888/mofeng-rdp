@@ -13,7 +13,7 @@
  * 运行：node scripts/probe-e2e.cjs
  */
 const { chromium } = require('playwright-core')
-const exe = 'C:/Users/Administrator/AppData/Local/ms-playwright/chromium-1247/chrome-win64/chrome.exe'
+const exe = require('./browser-path.cjs').resolveChromiumPath()
 const BASE = process.env.PROBE_E2E_BASE || 'http://127.0.0.1:5178'
 
 let passed = 0
