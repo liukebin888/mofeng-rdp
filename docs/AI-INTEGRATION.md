@@ -77,13 +77,42 @@ curl -N -X POST http://127.0.0.1:8787/api/ai/chat \
 - **响应**：SSE 流 `data: {...}`，增量取 `choices[0].delta.content`，`[DONE]` 结束；非流式兜底取 `choices[0].message.content`
 - **红线**（AIA-007）：输出强制带水印「AI 生成 · 待人工复核 · 不作为放行依据」，越权上下文前置剔除，每次调用写 `AI_CALL` 审计事件。
 
+## 五·一、验证工具链（P0-4，生产同源自证）
+
+真实 Key / 短信网关凭据为外部依赖，必须由需求方在控制台生成并注入 `server/.env`（AI 不代生成、不在对话处理明文 Key）。为了让「凭据一到位即可一键可信验证」，并提供「无 Key 也能自证工具有效」的能力，验证脚本与生产链路同源：
+
+```bash
+# ① 工具自证（不发网络）：纯函数 7 项断言，验证判定逻辑本身
+node server/scripts/verify-wma.js --self-test
+
+# ② 工具自证（本地 mock SSE，走真实 fetch）：三态 真通 / 401 鉴权失败 / 缺水印
+node server/scripts/verify-wma.js --mock
+
+# ③ 真实连通性（需先配 CODEBUDDY_API_KEY）：stream:true + 水印 + 401 识别
+node server/scripts/verify-wma.js
+#   无 Key 时如实 exit 2「未接通」，绝不报喜；有 Key 才校验流式契约与水印
+
+# ④ 短信验证码验收（开发演示模式，不发真实短信）：13 项断言
+node server/test-sms.cjs
+```
+
+**与生产同源要点**（杜绝「非流式验证通过但生产流式不可用」的假阳性）：
+- 验证脚本用 `stream: true`，与 `callWorkbuddyOpenApi` 一致；`agent_id` 优先于 `model` 同优先级；
+- 解析 SSE `choices[0].delta.content`（含 `choices[0].text` / `text` 兜底）并**强制校验 AI 水印**；
+- HTTP 401/403/404 一律判 FAIL（不报喜），水印缺失判 FAIL（生产链路会强制加水印，契约不一致即视为不通）；
+- Key 仅在脚本内使用，回显掩码、响应摘要 replace 掉 Key，绝不落任何输出。
+
+**短信验收覆盖**：devMode 回显与「未发送真实短信」明示文案、手机号格式、未发送先校验拒绝、错误累计与 5 次封顶、正确码一次性失效、**手机号/验证码不入审计**、审计链连续。真实网关下发（配置 `SMS_*` 三项后）由部署层用真实手机号边界验证，脚本不实际发短信。
+
+> 状态如实登记：当前 `server/.env` 无真实凭据 → AI 走占位降级（`realModel:false`）、短信走 devMode；**P0-4 的"真实凭据接通"为 ⏸ 外部依赖**，凭据到位后跑上述 ③ 验证 `realModel:true` 即闭环。
+
 ## 六、排障
 
 | 现象 | 排查 |
 |---|---|
 | verify 脚本报 401/403 | Key 错误/过期/未绑定该应用 |
 | verify 脚本报 404 | 端点或 agent_id 不对，对照控制台「发布管理」 |
-| verify 脚本 fetch 失败 | 本机无法访问端点，需走透明代理（如 `http://127.0.0.1:13775`） |
+| verify 脚本 fetch 失败 | 本机无法访问端点，需走当前环境注入的透明代理（以运行时 `HTTPS_PROXY` 为准，勿硬编码旧端口） |
 | 前端仍占位 | `.env` 未被读取或后端未重启；确认 `server/.env` 路径正确 |
 
 ## 七、凭证新路径：用户自带 Key + 手机号短信绑定（渐进增强）
