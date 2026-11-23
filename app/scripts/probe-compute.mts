@@ -9,7 +9,7 @@
  *
  * 运行：npx vite-node scripts/probe-compute.mts
  */
-import { writeFileSync, mkdirSync } from 'node:fs'
+import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'node:fs'
 import { buildSeed } from '@/data/seed'
 import { evaluateControlPoints, strengthDistribution } from '@/domain/controlPoints'
 import { runGate } from '@/domain/gate'
@@ -19,7 +19,14 @@ import { rankProjects } from '@/domain/portfolio'
 import { coverage, detectBreaks } from '@/domain/trace'
 import { verifyChain } from '@/domain/audit'
 
-const seed = buildSeed()
+// 数据同源（同源判定铁律）：探针基准必须与「页面所读的数据源」一致，否则会出现
+// 「空态 seed 基准 vs 保留演示数据的运行时 state」的假阳性不一致。
+// - 默认不设 PROBE_STATE_FILE：用 buildSeed() 空态（六门禁/纯代码态）。
+// - 设 PROBE_STATE_FILE=<path>：从运行时 state-<tenant>.json 的 data 段取数，与页面完全同源。
+const stateFile = process.env.PROBE_STATE_FILE
+const seed: ReturnType<typeof buildSeed> = stateFile && existsSync(stateFile)
+  ? (JSON.parse(readFileSync(stateFile, 'utf8')).data as ReturnType<typeof buildSeed>)
+  : buildSeed()
 // 空态优雅降级：seed 去演示化后 buildProjects() 返回 []，不预置任何项目。
 // 探针在无项目时仍须输出有效 JSON（计数归零），而非对 undefined 做非空断言后崩溃。
 // 仅当存在项目时选取首个项目作为跨视图同源基准；不存在则用空态占位对象。
@@ -87,10 +94,10 @@ const counts = {
   audit: seed.audit.length,
   flowInstances: seed.flowInstances.length,
   lessons: seed.lessons.length,
-  meetings: seed.meetings.length,
-  resolutions: seed.resolutions.length,
-  sendAudits: seed.sendAudits.length,
-  supervises: seed.supervises.length
+  // 门户与协同全链路已删除（用户裁决），meetings/resolutions/sendAudits/supervises
+  // 不再存在于 seed。探针计数须与 seed 同源，不得读取已删除字段（否则 B1 崩溃复发）。
+  // 以现存的门户配置段数作为该域的可核计数。
+  portalSections: seed.portalSections.length
 }
 
 const out = {
