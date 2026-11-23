@@ -76,5 +76,6 @@
 - R3 全部方向完成（流程/租户/文档/经验/组合/日历/我的工作/治理/消息/共享/门户配置/草稿/多语言/移动门户/资源/风险/采购/报表/通用PM/接口计划/闸门一致性/OpenAPI/菜单导航）。门户与协同已彻底删除（非 R3 方向，用户主动精简）。
 - 六门禁基线：vue-tsc 0 / vitest 1767 / build 成功 / smoke exit 0（104/104 real）/ e2e 33 / chainOk true。
 - **当前 state 含保留的演示数据（用户 2026-11-23 明确要求保留，勿当脏数据清除）**：项目 PRJ-DEMO-AI + 1 样件需求(SO-REQ-01 已关闭) + 3 采购单(SMP-PUR-DEMO-01/02/03 均已关闭)；审计 count 16 chainOk true。下次跑六门禁会重置，跑完如需恢复演示态须重新注入（脚本从会话 JSONL 的 Write `_restore-demo.cjs` 提取，执行后删除）。
-- **P0-5 验收资产**：`docs/ACCEPTANCE-MATRIX.md`（85 条 AC 逐条证据映射，✅36/🟡38/⏸11，由 `app/scripts/_gen-ac-matrix.cjs` 生成且自检证据存在）+ `docs/EXPERT-REVIEW-RECHECK-2026-11-23.md`（8 维复验，B1/B2 翻盘，总裁决「有条件放行内测版，未达生产发布」）。11-10 原「不通过」8 项阻断已清 2 项阻断，余 8 项外部依赖（压测/等保国密/UAT/CI/OpenAPI/无障碍真DOM/灰度演练/AI凭据）。**发布口径：只能宣称内测/演示版，不得宣称正式生产发布**。
+- **P0-5 验收资产**：`docs/ACCEPTANCE-MATRIX.md`（85 条 AC 逐条证据映射，✅36/🟡38/⏸11，由 `app/scripts/_gen-ac-matrix.cjs` 生成且自检证据存在）+ `docs/EXPERT-REVIEW-RECHECK-2026-11-23.md`（8 维复验，B1/B2 翻盘，总裁决「有条件放行内测版，未达生产发布」）。**发布口径：只能宣称内测/演示版，不得宣称正式生产发布**。
+- **P0-6 契约冻结**：生产对外唯一后端=Node 8787，Java /api/v1 内部联调不外宣（裁决 `docs/BACKEND-SELECTION.md`）。对外权威契约 `docs/OPENAPI-3.1.yaml`（17 端点/18 错误码）；`docs/REST-CONTRACT.md` 已标注 Java 内部非对外。`server/test-contract.cjs` 19/19（OpenAPI↔源码双向零遗漏+错误码覆盖+变异验证）。复验报告 §四剩 7 项外部依赖（压测/等保密评/真实UAT/CI覆盖率/无障碍真DOM/灰度演练/AI凭据），第5项契约已闭环。
 - 本地 main 与 origin/main 完全同步（`0 0`，远端 HEAD `c0d8a6e`）；2026-11-20 晚直连推送恢复，累积的 12 个待推提交已全部同步（含样件评审流程、样件需求申请 AI 闭环）；2026-11-21 问题管理 AI 协助闭环 2 提交亦已推送。AI 真实模型 Key ⏸ 待用户提供。
