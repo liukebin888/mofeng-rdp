@@ -12,6 +12,12 @@ services:
     environment:
       - PORT=8787
       - HOST=0.0.0.0
+      # P0-1：生产由 .env 注入 NODE_ENV=production + Token/密钥；不填则保持开发演示行为
+      - NODE_ENV=${NODE_ENV:-development}
+      - MOFENG_PROD=${MOFENG_PROD:-0}
+      - MOFENG_API_TOKEN=${MOFENG_API_TOKEN:-}
+      - PRESIGN_SECRET=${PRESIGN_SECRET:-}
+      - CORS_ORIGIN=${CORS_ORIGIN:-}
     volumes:
       - mofeng-data:/app/data          # 持久化 state/audit（挂载命名卷，容器重建数据不丢）
     restart: unless-stopped
@@ -29,6 +35,9 @@ services:
     container_name: mofeng-rdp-web
     ports:
       - "8080:80"                       # 宿主机 8080 -> 容器 80
+    environment:
+      # 仅网关容器持有后端 Token；浏览器拿不到（P0-1）
+      - MOFENG_API_TOKEN=${MOFENG_API_TOKEN:-}
     depends_on:
       - mofeng-server
     restart: unless-stopped

@@ -76,9 +76,29 @@ cd app && npm run dev
 环境变量：
 - `PORT`：后端端口（默认 8787）
 - `HOST`：监听地址（默认 127.0.0.1）
-- `PRESIGN_SECRET`：预签名 HMAC 密钥（默认内置，生产须覆盖）
+- `PRESIGN_SECRET`：预签名 HMAC 密钥（**不再有代码内默认值**；开发留空则用进程内临时密钥，生产必填）
 - `PRESIGN_TTL_MS`：预签名有效期（默认 15 分钟）
+- `MOFENG_DATA_DIR`：数据目录（默认 `server/data`，测试可指向临时目录）
 - 前端 `VITE_API_BASE`：覆盖后端地址（默认 `http://127.0.0.1:8787`）
+
+### 生产安全模式（P0-1）
+
+开发/演示模式保持开箱即跑；生产模式由 `NODE_ENV=production` 或 `MOFENG_PROD=1` 触发，**缺凭据即拒绝启动**：
+
+| 变量 | 生产要求 | 说明 |
+|---|---|---|
+| `MOFENG_API_TOKEN` | 必填，≥32 字符 | 后端 API Bearer Token；浏览器不持有，由 nginx 在 `/api` 反代时注入 |
+| `PRESIGN_SECRET` | 必填 | 对象预签名 HMAC 密钥，外部注入，代码内无默认值 |
+| `CORS_ORIGIN` | 可选 | 允许的 Origin 白名单（逗号分隔）；同源部署留空即不返回任何 CORS 头 |
+| `NODE_ENV` / `MOFENG_PROD` | 二选一置生产 | 任一命中即启用生产闸门 |
+
+生产模式下：`/api/health` 免鉴权供探针使用；`GET /api/objects/...` 凭预签名 HMAC 访问（浏览器无法注入网关 Token）；其余 API 无 Token / 错 Token 一律 `401 UNAUTHORIZED`。网关配置模板见 `deploy/nginx.conf.template`，由 nginx 官方镜像 entrypoint 用 `MOFENG_API_TOKEN` 渲染，**Token 不下发浏览器**。
+
+验收脚本（零依赖，使用临时数据目录与空闲端口，不触碰业务数据）：
+
+```bash
+node server/test-security.cjs   # 16 项断言组：fail-closed / CORS 白名单 / Token / 预签名例外
+```
 
 ## 数据落点
 

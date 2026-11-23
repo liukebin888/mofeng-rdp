@@ -54,9 +54,22 @@ function loadDotEnv(filePath) {
 }
 loadDotEnv(path.join(__dirname, '.env'))
 
+// —— 生产安全配置（P0-1）：生产缺凭据即拒绝启动，开发/演示保持开箱即跑 ——
+const { loadSecurityConfig, corsHeaders, isTokenAuthorized, isAuthExempt } = require('./security')
+let SECURITY
+try {
+  SECURITY = loadSecurityConfig()
+} catch (err) {
+  console.error('[mofeng-rdp-server] 安全配置校验失败：' + err.message)
+  process.exit(1)
+}
+for (const warning of SECURITY.warnings) console.warn('[mofeng-rdp-server] 安全警告：' + warning)
+
 const PORT = Number(process.env.PORT || 8787)
 const HOST = process.env.HOST || '127.0.0.1'
-const DATA_DIR = path.join(__dirname, 'data')
+const DATA_DIR = process.env.MOFENG_DATA_DIR
+  ? path.resolve(process.env.MOFENG_DATA_DIR)
+  : path.join(__dirname, 'data')
 const STATE_FILE = path.join(DATA_DIR, 'state.json')
 const AUDIT_FILE = path.join(DATA_DIR, 'audit.json')
 
@@ -307,9 +320,7 @@ function send(res, status, payload) {
   const body = JSON.stringify(payload)
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET,PUT,POST,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    ...corsHeaders(res.__mofengReq, SECURITY),
     'Cache-Control': 'no-store'
   })
   res.end(body)
@@ -452,7 +463,8 @@ function detectWorkbuddyDesktop() {
   })
 }
 const STORAGE_DIR = path.join(DATA_DIR, 'storage')
-const PRESIGN_SECRET = process.env.PRESIGN_SECRET || 'mofeng-rdp-presign-secret'
+// 预签名密钥来自安全配置：开发模式为进程内临时随机值，生产模式必须外部注入（P0-1）
+const PRESIGN_SECRET = SECURITY.presignSecret
 const PRESIGN_TTL_MS = Number(process.env.PRESIGN_TTL_MS || 15 * 60 * 1000) // 默认 15 分钟
 
 function storageDirFor(tenantId) {
@@ -546,17 +558,24 @@ function writeIdempotency(tenantId, map) {
 }
 
 const server = http.createServer(async (req, res) => {
+  // 让 send() 无需改动全部调用点即可按请求生成 CORS 头（生产白名单 / 开发 '*'）
+  res.__mofengReq = req
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`)
   const p = url.pathname
 
-  // CORS 预检
+  // CORS 预检：预检请求不带 Token，必须在鉴权闸门之前处理
   if (req.method === 'OPTIONS') {
-    res.writeHead(204, {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET,PUT,POST,OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, x-tenant-id'
-    })
+    res.writeHead(204, corsHeaders(req, SECURITY))
     return res.end()
+  }
+
+  // 生产模式鉴权闸门（P0-1）：健康探针与已签名对象下载例外，其余 API 必须由网关注入 Token
+  if (SECURITY.production && !isAuthExempt(req.method, p) && !isTokenAuthorized(req, SECURITY)) {
+    return send(res, 401, {
+      ok: false,
+      code: 'UNAUTHORIZED',
+      message: '生产模式需网关注入 Authorization: Bearer <MOFENG_API_TOKEN>（P0-1）'
+    })
   }
 
   try {
@@ -856,8 +875,7 @@ const server = http.createServer(async (req, res) => {
       // ② 组装 SSE 流式响应头
       res.writeHead(200, {
         'Content-Type': 'text/event-stream; charset=utf-8',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type, x-tenant-id',
+        ...corsHeaders(req, SECURITY),
         'Cache-Control': 'no-cache',
         Connection: 'keep-alive'
       })
@@ -973,7 +991,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, {
         'Content-Type': 'application/octet-stream',
         'Content-Length': buf.length,
-        'Access-Control-Allow-Origin': '*',
+        ...corsHeaders(req, SECURITY),
         'Cache-Control': 'no-store'
       })
       return res.end(buf)
@@ -1080,11 +1098,17 @@ const server = http.createServer(async (req, res) => {
   }
 })
 
+// 直接执行时启动监听；被测试 require 时不自动监听，由测试显式 listen(0)
+if (require.main === module) {
 server.listen(PORT, HOST, () => {
   const state = readState()
   const audit = readAudit()
   const chain = verifyAuditChain(audit)
   console.log('[mofeng-rdp-server] 已启动  http://%s:%d', HOST, PORT)
+  console.log('[mofeng-rdp-server] 安全模式  %s / CORS %s / 预签名密钥 %s',
+    SECURITY.production ? '生产（Token 必填）' : '开发演示',
+    SECURITY.production ? (SECURITY.corsOrigins.length ? `白名单 ${SECURITY.corsOrigins.join(',')}` : '同源（无 CORS 头）') : '*',
+    SECURITY.presignSecretSource === 'external' ? '外部注入' : '进程内临时')
   console.log('[mofeng-rdp-server] 多租户    分文件存储 state-<tenantId>.json / audit-<tenantId>.json（TEN-004）')
   console.log('[mofeng-rdp-server] 对象存储  按租户前缀分目录 + 短时预签名（TEN-005）')
   console.log('[mofeng-rdp-server] 异步任务  幂等键 + 租户上下文显式传递（ARC-009）')
@@ -1094,9 +1118,14 @@ server.listen(PORT, HOST, () => {
   console.log('[mofeng-rdp-server] 已有状态  %s', state ? `version=${state.version} rev=${state.rev}` : '（空，待前端播种）')
   console.log('[mofeng-rdp-server] 审计链    %d 条 / 校验 %s', audit.length, chain.ok ? '连续' : `断裂@${chain.brokenAt}`)
 })
+}
 
 // 优雅退出
 process.on('SIGINT', () => {
   console.log('\n[mofeng-rdp-server] 收到 SIGINT，退出')
   process.exit(0)
 })
+
+// 供安全验收脚本显式 listen(0) 使用；不影响 node server/index.js 直接运行
+module.exports = { server, SECURITY, DEFAULT_TENANT }
+

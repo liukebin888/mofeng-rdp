@@ -1,0 +1,38 @@
+# MOFENG-RDP 前端 nginx 配置（生产模板）
+# 由 nginx 官方镜像 entrypoint 用 envsubst 渲染：/etc/nginx/templates/*.template -> /etc/nginx/conf.d/*.conf
+# 生产必须在前端容器注入 MOFENG_API_TOKEN；该 Token 只在网关层加入后端请求，不下发浏览器。
+# 注意：nginx 自身变量用 ${DOLLAR} 前缀书写，避免被 envsubst 当成环境变量清空。
+
+server {
+    listen 80;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript image/svg+xml;
+    gzip_min_length 1024;
+
+    location / {
+        try_files ${DOLLAR}uri ${DOLLAR}uri/ /index.html;
+    }
+
+    location /assets/ {
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # API 反向代理：后端在内网 mofeng-server:8787，不对外暴露端口
+    location /api/ {
+        proxy_pass http://mofeng-server:8787;
+        proxy_http_version 1.1;
+        proxy_set_header Host ${DOLLAR}host;
+        proxy_set_header X-Real-IP ${DOLLAR}remote_addr;
+        proxy_set_header X-Forwarded-For ${DOLLAR}proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto ${DOLLAR}scheme;
+        # P0-1：覆盖客户端可能自带的 Authorization，由网关注入服务端 Token
+        proxy_set_header Authorization "Bearer ${MOFENG_API_TOKEN}";
+        proxy_read_timeout 60s;
+    }
+}

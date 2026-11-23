@@ -194,6 +194,31 @@ SRS 第 23 章明确「国密网关位置：**平台边界，统一卸载与卸�
 |---|---|---|
 | `PORT` | 后端服务端口 | `8787` |
 | `HOST` | 后端绑定地址 | `127.0.0.1`（容器内 `0.0.0.0`） |
+| `MOFENG_API_TOKEN` | 生产 API Bearer Token（≥32 字符，网关注入） | 空（生产必填） |
+| `PRESIGN_SECRET` | 对象预签名 HMAC 密钥 | 空（生产必填；开发为进程内临时值） |
+| `CORS_ORIGIN` | 跨域 Origin 白名单，逗号分隔 | 空（同源部署不返回 CORS 头） |
+| `NODE_ENV` / `MOFENG_PROD` | 生产模式开关 | `development` / `0` |
+| `MOFENG_DATA_DIR` | 数据目录覆盖 | `server/data` |
+
+### 六·一、生产安全闸门（P0-1，已落地）
+
+生产模式由 `NODE_ENV=production` 或 `MOFENG_PROD=1` 触发，`MOFENG_API_TOKEN` 与 `PRESIGN_SECRET` 缺任一即**拒绝启动**（fail-closed），不再有代码内硬编码密钥与 `CORS: *`。
+
+```bash
+# 项目根目录 .env（不入库；docker compose 自动读取）
+NODE_ENV=production
+MOFENG_API_TOKEN=至少32字符的随机Token
+PRESIGN_SECRET=独立的随机HMAC密钥
+CORS_ORIGIN=https://your-domain.example.com   # 同源部署可留空
+
+docker compose up -d --build
+node server/test-security.cjs                 # 16 项安全断言，应全 PASS
+```
+
+- 浏览器**不持有** `MOFENG_API_TOKEN`：前端使用同源 `/api`，由 `deploy/nginx.conf.template` 在反向代理时注入 `Authorization: Bearer ...`。
+- 生产模式下 `/api/health` 免鉴权（探针），`GET /api/objects/...` 凭预签名 HMAC 访问；其余 API 无/错 Token 一律 `401 UNAUTHORIZED`。
+- 非白名单 Origin 不返回任何 CORS 头；同源部署留空 `CORS_ORIGIN` 即可。
+- 若后端被直接暴露到公网（绕过 nginx），生产模式仍要求 Token，但应同时在编排层禁止映射 8787 端口（`docker-compose.yml` 默认未映射）。
 
 ## 七、安全与合规要点
 
