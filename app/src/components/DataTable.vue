@@ -1,7 +1,7 @@
 <template>
   <div class="dt">
     <div class="row wrap head">
-      <el-input v-model="kw" placeholder="搜索…" clearable style="width: 200px" />
+      <el-input v-model="kw" aria-label="表格搜索" placeholder="搜索…" clearable style="width: 200px" />
       <slot name="filters" />
       <span class="dim">共 {{ filtered.length }} 条<span v-if="filtered.length > pageSize">（第 {{ page }}/{{ pages }} 页）</span></span>
       <div class="row" style="margin-left: auto; gap: 6px">

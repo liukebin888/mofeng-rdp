@@ -2,7 +2,7 @@
   <div>
     <PageHeader title="文档库与版本" desc="草稿→会签中→已发布→已作废；未发布不计入齐套（PMC-037）；多专业会签并行，任一否决整体退回（DOC-014）">
       <template #actions>
-        <el-input v-model="query" placeholder="全文检索（DOC-008）" size="small" style="width: 200px" clearable @input="onSearch" />
+        <el-input v-model="query" aria-label="文档全文检索" placeholder="全文检索（DOC-008）" size="small" style="width: 200px" clearable @input="onSearch" />
       </template>
     </PageHeader>
 

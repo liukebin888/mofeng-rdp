@@ -54,17 +54,17 @@
     <div class="panel" style="margin-top: 12px">
       <div class="panel-title">经验库检索（C-35：按项目 / 阶段 / 问题类型 / 关键词，跨项目复用）</div>
       <div class="grid" style="grid-template-columns: 1.2fr 1fr 1fr 1.6fr auto; gap: 8px; align-items: center; margin-bottom: 10px">
-        <el-select v-model="q.projectId" size="small" placeholder="项目">
+        <el-select v-model="q.projectId" aria-label="检索项目" size="small" placeholder="项目">
           <el-option label="全部项目（立项复用）" value="*" />
           <el-option v-for="p in store.visibleProjects" :key="p.id" :label="p.name" :value="p.id" />
         </el-select>
-        <el-select v-model="q.stage" size="small" clearable placeholder="阶段">
+        <el-select v-model="q.stage" aria-label="检索阶段" size="small" clearable placeholder="阶段">
           <el-option v-for="s in LESSON_STAGES" :key="s" :label="s" :value="s" />
         </el-select>
-        <el-select v-model="q.category" size="small" clearable placeholder="问题类型">
+        <el-select v-model="q.category" aria-label="检索问题类型" size="small" clearable placeholder="问题类型">
           <el-option v-for="c in LESSON_CATEGORIES" :key="c" :label="c" :value="c" />
         </el-select>
-        <el-input v-model="q.keyword" size="small" placeholder="关键词检索标题/内容/标签" clearable />
+        <el-input v-model="q.keyword" aria-label="经验库关键词检索" size="small" placeholder="关键词检索标题/内容/标签" clearable />
         <el-button size="small" type="primary" @click="doSearch">检索</el-button>
       </div>
 

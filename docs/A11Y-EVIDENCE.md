@@ -1,6 +1,6 @@
 # 魔程化解研发管理平台 · NFR-017 真实 DOM 可访问性取证报告
 
-> 生成时间：2026-11-24T06:21:14.509Z　基准地址：`http://127.0.0.1:4181`
+> 生成时间：2026-11-24T10:34:46.651Z　基准地址：`http://127.0.0.1:4181`
 > 取证方式：真实 Chromium 渲染 DOM + 页面同源取证接口 window.__MOFENG_A11Y__.collect()（判定与 domain/accessibility.ts 同源）
 > 只读声明：不写业务数据、不调用保存/提交接口；focus/blur 仅用于读取焦点态 computed style 并立即还原。
 
@@ -17,10 +17,10 @@
 | 表单控件总数 | 103 |
 | 不同页样本数去重（内容变化数） | 18 |
 | 键盘违规数 | 27 |
-| 标签违规数 | 57 |
+| 标签违规数 | 0 |
 | 焦点指示缺失数 | 4 |
 | 排除的布局容器数（仅 tabindex，WCAG 2.1.1 不约束） | 1164 |
-| 未通过页数 | 27 |
+| 未通过页数 | 9 |
 | 页面 JS 异常数 | 0 |
 
 ## 二、已知违规样本变异验证（回退验证）
@@ -40,7 +40,7 @@
 |---|---:|---:|---:|---|---|---|
 | `/workbench/today` | 31 | 15 | 0 | OK | OK | N/A |
 | `/workbench/tasks` | 31 | 15 | 0 | OK | OK | N/A |
-| `/workbench/todos` | 66 | 48 | 1 | OK | OK | FAIL |
+| `/workbench/todos` | 66 | 48 | 1 | OK | OK | OK |
 | `/workbench/messages` | 32 | 14 | 0 | OK | OK | N/A |
 | `/workbench/hours` | 40 | 19 | 3 | OK | FAIL | OK |
 | `/workbench/light-task-board` | 32 | 17 | 3 | OK | OK | OK |
@@ -53,7 +53,7 @@
 | `/presale/scheme` | 33 | 14 | 0 | OK | OK | N/A |
 | `/presale/apply` | 33 | 14 | 0 | OK | OK | N/A |
 | `/presale/review` | 37 | 16 | 3 | OK | OK | OK |
-| `/presale/flow` | 31 | 13 | 1 | OK | OK | FAIL |
+| `/presale/flow` | 31 | 13 | 1 | OK | OK | OK |
 | `/presale/analysis` | 28 | 12 | 0 | OK | OK | N/A |
 | `/project/task` | 33 | 14 | 0 | OK | OK | N/A |
 | `/project/plan` | 30 | 15 | 0 | OK | OK | N/A |
@@ -71,19 +71,19 @@
 | `/plan/weight` | 33 | 16 | 0 | OK | OK | N/A |
 | `/plan/quality` | 32 | 14 | 0 | OK | OK | N/A |
 | `/plan/milestone` | 32 | 14 | 0 | OK | OK | N/A |
-| `/plan/deviation` | 29 | 14 | 1 | OK | OK | FAIL |
+| `/plan/deviation` | 29 | 14 | 1 | OK | OK | OK |
 | `/plan/resource` | 34 | 15 | 0 | OK | OK | N/A |
 | `/plan/change` | 29 | 13 | 0 | OK | OK | N/A |
 | `/plan/alert` | 28 | 13 | 0 | OK | OK | N/A |
 | `/plan/interface` | 28 | 13 | 0 | OK | OK | N/A |
 | `/dev/part-number-apply` | 33 | 14 | 0 | OK | OK | N/A |
-| `/dev/requirements` | 50 | 18 | 1 | OK | OK | FAIL |
+| `/dev/requirements` | 50 | 18 | 1 | OK | OK | OK |
 | `/dev/grading` | 29 | 13 | 0 | OK | OK | N/A |
-| `/dev/trace` | 31 | 13 | 1 | OK | OK | FAIL |
+| `/dev/trace` | 31 | 13 | 1 | OK | OK | OK |
 | `/dev/ebom` | 31 | 15 | 0 | OK | OK | N/A |
-| `/dev/ecr` | 33 | 14 | 1 | OK | OK | FAIL |
+| `/dev/ecr` | 33 | 14 | 1 | OK | OK | OK |
 | `/dev/gate` | 47 | 27 | 9 | OK | OK | OK |
-| `/dev/baseline` | 32 | 14 | 1 | OK | OK | FAIL |
+| `/dev/baseline` | 32 | 14 | 1 | OK | OK | OK |
 | `/dev/version` | 31 | 13 | 0 | OK | OK | N/A |
 | `/dev/software-release` | 33 | 14 | 0 | OK | OK | N/A |
 | `/dev/external-part-approval` | 33 | 14 | 0 | OK | OK | N/A |
@@ -94,9 +94,9 @@
 | `/quality/risk` | 37 | 20 | 0 | OK | OK | N/A |
 | `/quality/criteria` | 28 | 12 | 0 | OK | OK | N/A |
 | `/quality/vuln` | 37 | 20 | 0 | OK | OK | N/A |
-| `/quality/coverage` | 31 | 13 | 1 | OK | OK | FAIL |
+| `/quality/coverage` | 31 | 13 | 1 | OK | OK | OK |
 | `/quality/pdca` | 29 | 13 | 0 | OK | OK | N/A |
-| `/quality/knowledge` | 51 | 23 | 9 | OK | OK | FAIL |
+| `/quality/knowledge` | 51 | 23 | 9 | OK | OK | OK |
 | `/quality/report` | 31 | 13 | 0 | OK | OK | N/A |
 | `/quality/nonconformity` | 33 | 13 | 0 | OK | OK | N/A |
 | `/cost/budget` | 29 | 12 | 0 | OK | OK | N/A |
@@ -108,13 +108,13 @@
 | `/cost/analysis` | 42 | 18 | 5 | OK | OK | OK |
 | `/cost/eps` | 28 | 12 | 0 | OK | OK | N/A |
 | `/cost/gate-consistency` | 28 | 12 | 0 | OK | OK | N/A |
-| `/doc/library` | 34 | 16 | 1 | OK | OK | FAIL |
+| `/doc/library` | 34 | 16 | 1 | OK | OK | OK |
 | `/doc/master-plan-templates` | 27 | 12 | 0 | OK | OK | N/A |
-| `/doc/mdr` | 34 | 16 | 1 | OK | OK | FAIL |
-| `/doc/signoff` | 34 | 16 | 1 | OK | OK | FAIL |
-| `/flow/start` | 66 | 48 | 1 | OK | OK | FAIL |
-| `/flow/approvals` | 66 | 48 | 1 | OK | OK | FAIL |
-| `/flow/monitor` | 66 | 48 | 1 | OK | OK | FAIL |
+| `/doc/mdr` | 34 | 16 | 1 | OK | OK | OK |
+| `/doc/signoff` | 34 | 16 | 1 | OK | OK | OK |
+| `/flow/start` | 66 | 48 | 1 | OK | OK | OK |
+| `/flow/approvals` | 66 | 48 | 1 | OK | OK | OK |
+| `/flow/monitor` | 66 | 48 | 1 | OK | OK | OK |
 | `/flow/apqp` | 76 | 17 | 0 | OK | FAIL | N/A |
 | `/flow/config` | 29 | 13 | 0 | OK | OK | N/A |
 | `/supply/supplier` | 50 | 18 | 0 | OK | OK | N/A |
@@ -125,19 +125,19 @@
 | `/supply/deliverables` | 32 | 16 | 0 | OK | OK | N/A |
 | `/supply/ship` | 32 | 16 | 0 | OK | OK | N/A |
 | `/supply/soft` | 30 | 12 | 0 | OK | OK | N/A |
-| `/ai/assist` | 46 | 16 | 1 | OK | FAIL | FAIL |
+| `/ai/assist` | 46 | 16 | 1 | OK | FAIL | OK |
 | `/basic/customer` | 186 | 169 | 0 | OK | OK | N/A |
 | `/basic/product` | 40 | 24 | 0 | OK | OK | N/A |
 | `/basic/product-code` | 66 | 18 | 0 | OK | FAIL | N/A |
-| `/basic/naming` | 102 | 84 | 24 | OK | OK | FAIL |
-| `/basic/deliverable-control` | 39 | 18 | 2 | OK | FAIL | FAIL |
+| `/basic/naming` | 102 | 84 | 24 | OK | OK | OK |
+| `/basic/deliverable-control` | 39 | 18 | 2 | OK | FAIL | OK |
 | `/admin/org` | 477 | 239 | 0 | OK | FAIL | N/A |
 | `/admin/roles` | 30 | 12 | 0 | OK | OK | N/A |
 | `/admin/overload` | 34 | 18 | 0 | OK | OK | N/A |
-| `/admin/pool` | 41 | 21 | 3 | OK | OK | FAIL |
+| `/admin/pool` | 41 | 21 | 3 | OK | OK | OK |
 | `/system/audit` | 32 | 14 | 0 | OK | OK | N/A |
 | `/system/dict` | 54 | 20 | 2 | OK | FAIL | OK |
-| `/system/rejection` | 99 | 31 | 18 | OK | OK | FAIL |
+| `/system/rejection` | 99 | 31 | 18 | OK | OK | OK |
 | `/system/calendar` | 50 | 24 | 7 | OK | FAIL | OK |
 | `/system/ops` | 34 | 17 | 0 | OK | OK | N/A |
 | `/system/probe` | 29 | 14 | 0 | OK | OK | N/A |
@@ -179,65 +179,7 @@
 
 ### 表单可读标签
 
-| 路由 | 元素 |
-|---|---|
-| `/workbench/todos` | `el-id-2949-56` |
-| `/presale/flow` | `el-id-2949-106` |
-| `/plan/deviation` | `el-id-2949-133` |
-| `/dev/requirements` | `el-id-2949-153` |
-| `/dev/trace` | `el-id-2949-157` |
-| `/dev/ecr` | `el-id-2949-158` |
-| `/dev/baseline` | `el-id-2949-169` |
-| `/quality/coverage` | `el-id-2949-193` |
-| `/quality/knowledge` | `el-id-2949-249` |
-| `/quality/knowledge` | `el-id-2949-250` |
-| `/quality/knowledge` | `el-id-2949-251` |
-| `/quality/knowledge` | `el-id-2949-252` |
-| `/doc/library` | `el-id-2949-279` |
-| `/doc/mdr` | `el-id-2949-284` |
-| `/doc/signoff` | `el-id-2949-284` |
-| `/flow/start` | `el-id-2949-323` |
-| `/flow/approvals` | `el-id-2949-323` |
-| `/flow/monitor` | `el-id-2949-323` |
-| `/ai/assist` | `el-id-2949-370` |
-| `/basic/naming` | `el-id-2949-563` |
-| `/basic/naming` | `el-id-2949-564` |
-| `/basic/naming` | `el-id-2949-565` |
-| `/basic/naming` | `el-id-2949-566` |
-| `/basic/naming` | `el-id-2949-567` |
-| `/basic/naming` | `el-id-2949-568` |
-| `/basic/naming` | `el-id-2949-569` |
-| `/basic/naming` | `el-id-2949-570` |
-| `/basic/naming` | `el-id-2949-571` |
-| `/basic/naming` | `el-id-2949-572` |
-| `/basic/naming` | `el-id-2949-573` |
-| `/basic/naming` | `el-id-2949-574` |
-| `/basic/naming` | `el-id-2949-575` |
-| `/basic/naming` | `el-id-2949-576` |
-| `/basic/naming` | `el-id-2949-577` |
-| `/basic/deliverable-control` | `el-id-2949-591` |
-| `/basic/deliverable-control` | `el-id-2949-592` |
-| `/admin/pool` | `el-id-2949-601` |
-| `/admin/pool` | `el-id-2949-602` |
-| `/admin/pool` | `el-id-2949-603` |
-| `/system/rejection` | `el-id-2949-748` |
-| `/system/rejection` | `el-id-2949-749` |
-| `/system/rejection` | `el-id-2949-750` |
-| `/system/rejection` | `el-id-2949-751` |
-| `/system/rejection` | `el-id-2949-753` |
-| `/system/rejection` | `el-id-2949-754` |
-| `/system/rejection` | `el-id-2949-755` |
-| `/system/rejection` | `el-id-2949-756` |
-| `/system/rejection` | `el-id-2949-758` |
-| `/system/rejection` | `el-id-2949-759` |
-| `/system/rejection` | `el-id-2949-760` |
-| `/system/rejection` | `el-id-2949-761` |
-| `/system/rejection` | `el-id-2949-762` |
-| `/system/rejection` | `el-id-2949-763` |
-| `/system/rejection` | `el-id-2949-764` |
-| `/system/rejection` | `el-id-2949-765` |
-| `/system/rejection` | `el-id-2949-769` |
-| `/system/rejection` | `el-id-2949-771` |
+无。
 
 ## 五、口径说明
 
@@ -257,35 +199,34 @@
 | `span#*`（el-input-number 增减按钮，role="button"） | 4 | 无 tabindex，等价功能由同组 input 提供；焦点指示无从谈起 |
 | 其余 | 0 | 需逐项核查 |
 
-> 上述框架内部控件**既不判「确认缺陷」也不判「已通过」**，统一列为「待人工键盘实测」；
-> 本轮取证工具不验证通过 `addEventListener` 注册的键盘处理器，如实披露能力边界。
+> 上述框架内部控件是**静态快照口径的能力边界**（快照不识别 `addEventListener` 注册的键盘处理器），
+> 静态违规计数保持原样、不因补充证据改为 0；真实键盘行为由 `npm run a11y:keyboard` 动态实测，结论见下节。
 > DOM 结构证据可用 `node scripts/a11y-inspect.cjs` 复跑查看。
 
 ### 标签违规（真实待整改项，按路由聚合）
 
 | 路由 | 缺标签控件数 |
 |---|---:|
-| `/workbench/todos` | 1 |
-| `/presale/flow` | 1 |
-| `/plan/deviation` | 1 |
-| `/dev/requirements` | 1 |
-| `/dev/trace` | 1 |
-| `/dev/ecr` | 1 |
-| `/dev/baseline` | 1 |
-| `/quality/coverage` | 1 |
-| `/quality/knowledge` | 4 |
-| `/doc/library` | 1 |
-| `/doc/mdr` | 1 |
-| `/doc/signoff` | 1 |
-| `/flow/start` | 1 |
-| `/flow/approvals` | 1 |
-| `/flow/monitor` | 1 |
-| `/ai/assist` | 1 |
-| `/basic/naming` | 15 |
-| `/basic/deliverable-control` | 2 |
-| `/admin/pool` | 3 |
-| `/system/rejection` | 18 |
 
-> 整改方式：为对应 `el-input` / `el-select` / `el-date-editor` 补 `aria-label`，
-> 或纳入 `el-form-item label` 形成真实关联；placeholder 不计入可读标签。
-> 本轮**不宣称无障碍 100% 达标**，剩余项按上表逐视图整改后需复跑本取证脚本。
+> 本轮标签违规已清零：逐视图为 `el-input` / `el-select` / `el-switch` / `el-textarea` 补 `aria-label`，
+> 全部落到 Element Plus 渲染出的原生 input 上；采样元素总数与内容变化数保持不变，非靠删样本翻盘。
+
+> 本轮**不宣称无障碍 100% 达标**：静态键盘违规计数与动态实测能力边界均如实保留。
+
+### 动态键盘实测结论（补充证据）
+
+> 证据：`docs/A11Y-KEYBOARD.json` / `.md`　生成时间 2026-11-24T10:30:30.460Z
+
+| 指标 | 值 |
+|---|---|
+| 实测路由数 | 104 |
+| tab 组 / tab 元素 | 7 / 23 |
+| 方向键 PASS / FAIL / 未验证 | 7 / 0 / 0 |
+| 焦点跟随到新 tab | 7 |
+| input-number ArrowUp PASS / FAIL / 未验证 | 2 / 0 / 0 |
+| 变异验证 | PASS |
+
+- 静态快照无法识别 `addEventListener` 注册的键盘处理器，故 `tab-*` / `span#*` 被计入键盘违规；
+- 静态报告的「焦点指示缺失 4」对应 el-input-number 增减 span：它们按设计不可 focus，等价键盘功能由同组 input 提供且已实测生效，故不构成真实焦点缺陷；
+- 动态实测对同一批控件真实按键并观察 `aria-selected` / `input.value` 变化，与静态计数**口径不同、互为补充**；
+- 动态实测未覆盖 Space / Enter / Home / End 与屏幕阅读器，剩余能力边界如实保留。

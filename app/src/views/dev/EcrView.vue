@@ -41,12 +41,12 @@
           <div v-for="c in ecr?.closure || []" :key="c.objId" class="crow">
             <span class="mono">{{ c.objCode }}</span>
             <span class="dim">{{ c.objType }}</span>
-            <el-select :model-value="c.decision" size="small" style="width: 130px" placeholder="选择结论" @change="(v: string) => choose(c.objId, v)">
+            <el-select :model-value="c.decision" aria-label="影响确认结论" size="small" style="width: 130px" placeholder="选择结论" @change="(v: string) => choose(c.objId, v)">
               <el-option value="修改" label="修改" />
               <el-option value="确认无影响" label="确认无影响" />
               <el-option value="废弃" label="废弃" />
             </el-select>
-            <el-input :model-value="c.note" size="small" placeholder="理由（必填）" style="flex: 1" @change="(v: string) => choose(c.objId, c.decision, v)" />
+            <el-input :model-value="c.note" aria-label="确认理由" size="small" placeholder="理由（必填）" style="flex: 1" @change="(v: string) => choose(c.objId, c.decision, v)" />
             <span class="tag" :class="c.decision ? 'ok' : 'fail'">{{ c.decision || '未确认' }}</span>
           </div>
         </div>
@@ -57,7 +57,7 @@
             <span class="tag" :class="ecr?.ecnVerification?.verified ? 'ok' : 'fail'">{{ ecr?.ecnVerification?.verified ? '验证通过' : ecr?.ecnVerification ? '验证不通过' : '未验证' }}</span>
           </div>
           <div class="row">
-            <el-input v-model="verifyNote" size="small" placeholder="验证结论说明（必填）" style="flex: 1" />
+            <el-input v-model="verifyNote" aria-label="验证结论说明" size="small" placeholder="验证结论说明（必填）" style="flex: 1" />
             <el-button size="small" type="success" :disabled="!verifyNote" @click="verifyEcn(true)">标记验证通过</el-button>
             <el-button size="small" type="warning" :disabled="!verifyNote" @click="verifyEcn(false)">标记验证不通过</el-button>
           </div>

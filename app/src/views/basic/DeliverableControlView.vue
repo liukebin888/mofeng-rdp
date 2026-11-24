@@ -17,8 +17,8 @@
       <!-- ① 输出物矩阵 -->
       <el-tab-pane label="① 输出物矩阵" name="matrix">
         <div class="toolbar">
-          <el-input v-model="kw" placeholder="搜索部门或输出物名称" clearable style="width: 300px" />
-          <el-select v-model="selDept" placeholder="选择部门" clearable style="width: 200px" @change="onDeptChange">
+          <el-input v-model="kw" aria-label="搜索部门或输出物名称" placeholder="搜索部门或输出物名称" clearable style="width: 300px" />
+          <el-select v-model="selDept" aria-label="选择部门" placeholder="选择部门" clearable style="width: 200px" @change="onDeptChange">
             <el-option v-for="d in CONTROL_DEPTS" :key="d.name" :label="d.name" :value="d.name" />
           </el-select>
         </div>

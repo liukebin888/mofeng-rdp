@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-24T06:21:14.509Z",
+  "generatedAt": "2026-11-24T10:34:46.651Z",
   "base": "http://127.0.0.1:4181",
   "method": "真实 Chromium 渲染 DOM + 页面同源取证接口 window.__MOFENG_A11Y__.collect()（判定与 domain/accessibility.ts 同源）",
   "metrics": {
@@ -12,10 +12,10 @@
     "totalControls": 103,
     "distinctSampleCounts": 18,
     "keyboardViolationCount": 27,
-    "labelViolationCount": 57,
+    "labelViolationCount": 0,
     "focusIndicatorMissing": 4,
     "excludedContainers": 1164,
-    "failedPageCount": 27,
+    "failedPageCount": 9,
     "pageErrorCount": 0
   },
   "mutation": {
@@ -94,9 +94,7 @@
         "interactiveCount": 48,
         "controlCount": 1,
         "keyboardViolations": [],
-        "labelViolations": [
-          "el-id-2949-56"
-        ],
+        "labelViolations": [],
         "focusIndicatorMissing": 0,
         "excludedContainers": 7,
         "evidenceCollected": true
@@ -105,12 +103,10 @@
       "contrastMin": 4.75,
       "keyboardOk": true,
       "keyboardNote": "真实 DOM 取证 48 个交互元素键盘可达",
-      "labelOk": false,
-      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 1 个表单控件具备可读标签",
       "keyboardViolations": [],
-      "labelViolations": [
-        "el-id-2949-56"
-      ]
+      "labelViolations": []
     },
     {
       "path": "/workbench/messages",
@@ -387,9 +383,7 @@
         "interactiveCount": 13,
         "controlCount": 1,
         "keyboardViolations": [],
-        "labelViolations": [
-          "el-id-2949-106"
-        ],
+        "labelViolations": [],
         "focusIndicatorMissing": 0,
         "excludedContainers": 7,
         "evidenceCollected": true
@@ -398,12 +392,10 @@
       "contrastMin": 4.75,
       "keyboardOk": true,
       "keyboardNote": "真实 DOM 取证 13 个交互元素键盘可达",
-      "labelOk": false,
-      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 1 个表单控件具备可读标签",
       "keyboardViolations": [],
-      "labelViolations": [
-        "el-id-2949-106"
-      ]
+      "labelViolations": []
     },
     {
       "path": "/presale/analysis",
@@ -769,9 +761,7 @@
         "interactiveCount": 14,
         "controlCount": 1,
         "keyboardViolations": [],
-        "labelViolations": [
-          "el-id-2949-133"
-        ],
+        "labelViolations": [],
         "focusIndicatorMissing": 0,
         "excludedContainers": 4,
         "evidenceCollected": true
@@ -780,12 +770,10 @@
       "contrastMin": 4.75,
       "keyboardOk": true,
       "keyboardNote": "真实 DOM 取证 14 个交互元素键盘可达",
-      "labelOk": false,
-      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 1 个表单控件具备可读标签",
       "keyboardViolations": [],
-      "labelViolations": [
-        "el-id-2949-133"
-      ]
+      "labelViolations": []
     },
     {
       "path": "/plan/resource",
@@ -899,9 +887,7 @@
         "interactiveCount": 18,
         "controlCount": 1,
         "keyboardViolations": [],
-        "labelViolations": [
-          "el-id-2949-153"
-        ],
+        "labelViolations": [],
         "focusIndicatorMissing": 0,
         "excludedContainers": 10,
         "evidenceCollected": true
@@ -910,12 +896,10 @@
       "contrastMin": 4.75,
       "keyboardOk": true,
       "keyboardNote": "真实 DOM 取证 18 个交互元素键盘可达",
-      "labelOk": false,
-      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 1 个表单控件具备可读标签",
       "keyboardViolations": [],
-      "labelViolations": [
-        "el-id-2949-153"
-      ]
+      "labelViolations": []
     },
     {
       "path": "/dev/grading",
@@ -945,9 +929,7 @@
         "interactiveCount": 13,
         "controlCount": 1,
         "keyboardViolations": [],
-        "labelViolations": [
-          "el-id-2949-157"
-        ],
+        "labelViolations": [],
         "focusIndicatorMissing": 0,
         "excludedContainers": 7,
         "evidenceCollected": true
@@ -956,12 +938,10 @@
       "contrastMin": 4.75,
       "keyboardOk": true,
       "keyboardNote": "真实 DOM 取证 13 个交互元素键盘可达",
-      "labelOk": false,
-      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 1 个表单控件具备可读标签",
       "keyboardViolations": [],
-      "labelViolations": [
-        "el-id-2949-157"
-      ]
+      "labelViolations": []
     },
     {
       "path": "/dev/ebom",
@@ -991,9 +971,7 @@
         "interactiveCount": 14,
         "controlCount": 1,
         "keyboardViolations": [],
-        "labelViolations": [
-          "el-id-2949-158"
-        ],
+        "labelViolations": [],
         "focusIndicatorMissing": 0,
         "excludedContainers": 5,
         "evidenceCollected": true
@@ -1002,12 +980,10 @@
       "contrastMin": 4.75,
       "keyboardOk": true,
       "keyboardNote": "真实 DOM 取证 14 个交互元素键盘可达",
-      "labelOk": false,
-      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 1 个表单控件具备可读标签",
       "keyboardViolations": [],
-      "labelViolations": [
-        "el-id-2949-158"
-      ]
+      "labelViolations": []
     },
     {
       "path": "/dev/gate",
@@ -1037,9 +1013,7 @@
         "interactiveCount": 14,
         "controlCount": 1,
         "keyboardViolations": [],
-        "labelViolations": [
-          "el-id-2949-169"
-        ],
+        "labelViolations": [],
         "focusIndicatorMissing": 0,
         "excludedContainers": 7,
         "evidenceCollected": true
@@ -1048,12 +1022,10 @@
       "contrastMin": 4.75,
       "keyboardOk": true,
       "keyboardNote": "真实 DOM 取证 14 个交互元素键盘可达",
-      "labelOk": false,
-      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 1 个表单控件具备可读标签",
       "keyboardViolations": [],
-      "labelViolations": [
-        "el-id-2949-169"
-      ]
+      "labelViolations": []
     },
     {
       "path": "/dev/version",
@@ -1272,9 +1244,7 @@
         "interactiveCount": 13,
         "controlCount": 1,
         "keyboardViolations": [],
-        "labelViolations": [
-          "el-id-2949-193"
-        ],
+        "labelViolations": [],
         "focusIndicatorMissing": 0,
         "excludedContainers": 7,
         "evidenceCollected": true
@@ -1283,12 +1253,10 @@
       "contrastMin": 4.75,
       "keyboardOk": true,
       "keyboardNote": "真实 DOM 取证 13 个交互元素键盘可达",
-      "labelOk": false,
-      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 1 个表单控件具备可读标签",
       "keyboardViolations": [],
-      "labelViolations": [
-        "el-id-2949-193"
-      ]
+      "labelViolations": []
     },
     {
       "path": "/quality/pdca",
@@ -1318,12 +1286,7 @@
         "interactiveCount": 23,
         "controlCount": 9,
         "keyboardViolations": [],
-        "labelViolations": [
-          "el-id-2949-249",
-          "el-id-2949-250",
-          "el-id-2949-251",
-          "el-id-2949-252"
-        ],
+        "labelViolations": [],
         "focusIndicatorMissing": 0,
         "excludedContainers": 17,
         "evidenceCollected": true
@@ -1332,15 +1295,10 @@
       "contrastMin": 4.75,
       "keyboardOk": true,
       "keyboardNote": "真实 DOM 取证 23 个交互元素键盘可达",
-      "labelOk": false,
-      "labelNote": "真实 DOM 取证 4/9 个控件缺标签",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 9 个表单控件具备可读标签",
       "keyboardViolations": [],
-      "labelViolations": [
-        "el-id-2949-249",
-        "el-id-2949-250",
-        "el-id-2949-251",
-        "el-id-2949-252"
-      ]
+      "labelViolations": []
     },
     {
       "path": "/quality/report",
@@ -1580,9 +1538,7 @@
         "interactiveCount": 16,
         "controlCount": 1,
         "keyboardViolations": [],
-        "labelViolations": [
-          "el-id-2949-279"
-        ],
+        "labelViolations": [],
         "focusIndicatorMissing": 0,
         "excludedContainers": 7,
         "evidenceCollected": true
@@ -1591,12 +1547,10 @@
       "contrastMin": 4.75,
       "keyboardOk": true,
       "keyboardNote": "真实 DOM 取证 16 个交互元素键盘可达",
-      "labelOk": false,
-      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 1 个表单控件具备可读标签",
       "keyboardViolations": [],
-      "labelViolations": [
-        "el-id-2949-279"
-      ]
+      "labelViolations": []
     },
     {
       "path": "/doc/master-plan-templates",
@@ -1626,9 +1580,7 @@
         "interactiveCount": 16,
         "controlCount": 1,
         "keyboardViolations": [],
-        "labelViolations": [
-          "el-id-2949-284"
-        ],
+        "labelViolations": [],
         "focusIndicatorMissing": 0,
         "excludedContainers": 7,
         "evidenceCollected": true
@@ -1637,12 +1589,10 @@
       "contrastMin": 4.75,
       "keyboardOk": true,
       "keyboardNote": "真实 DOM 取证 16 个交互元素键盘可达",
-      "labelOk": false,
-      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 1 个表单控件具备可读标签",
       "keyboardViolations": [],
-      "labelViolations": [
-        "el-id-2949-284"
-      ]
+      "labelViolations": []
     },
     {
       "path": "/doc/signoff",
@@ -1651,9 +1601,7 @@
         "interactiveCount": 16,
         "controlCount": 1,
         "keyboardViolations": [],
-        "labelViolations": [
-          "el-id-2949-284"
-        ],
+        "labelViolations": [],
         "focusIndicatorMissing": 0,
         "excludedContainers": 7,
         "evidenceCollected": true
@@ -1662,12 +1610,10 @@
       "contrastMin": 4.75,
       "keyboardOk": true,
       "keyboardNote": "真实 DOM 取证 16 个交互元素键盘可达",
-      "labelOk": false,
-      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 1 个表单控件具备可读标签",
       "keyboardViolations": [],
-      "labelViolations": [
-        "el-id-2949-284"
-      ]
+      "labelViolations": []
     },
     {
       "path": "/flow/start",
@@ -1676,9 +1622,7 @@
         "interactiveCount": 48,
         "controlCount": 1,
         "keyboardViolations": [],
-        "labelViolations": [
-          "el-id-2949-323"
-        ],
+        "labelViolations": [],
         "focusIndicatorMissing": 0,
         "excludedContainers": 7,
         "evidenceCollected": true
@@ -1687,12 +1631,10 @@
       "contrastMin": 4.75,
       "keyboardOk": true,
       "keyboardNote": "真实 DOM 取证 48 个交互元素键盘可达",
-      "labelOk": false,
-      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 1 个表单控件具备可读标签",
       "keyboardViolations": [],
-      "labelViolations": [
-        "el-id-2949-323"
-      ]
+      "labelViolations": []
     },
     {
       "path": "/flow/approvals",
@@ -1701,9 +1643,7 @@
         "interactiveCount": 48,
         "controlCount": 1,
         "keyboardViolations": [],
-        "labelViolations": [
-          "el-id-2949-323"
-        ],
+        "labelViolations": [],
         "focusIndicatorMissing": 0,
         "excludedContainers": 7,
         "evidenceCollected": true
@@ -1712,12 +1652,10 @@
       "contrastMin": 4.75,
       "keyboardOk": true,
       "keyboardNote": "真实 DOM 取证 48 个交互元素键盘可达",
-      "labelOk": false,
-      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 1 个表单控件具备可读标签",
       "keyboardViolations": [],
-      "labelViolations": [
-        "el-id-2949-323"
-      ]
+      "labelViolations": []
     },
     {
       "path": "/flow/monitor",
@@ -1726,9 +1664,7 @@
         "interactiveCount": 48,
         "controlCount": 1,
         "keyboardViolations": [],
-        "labelViolations": [
-          "el-id-2949-323"
-        ],
+        "labelViolations": [],
         "focusIndicatorMissing": 0,
         "excludedContainers": 7,
         "evidenceCollected": true
@@ -1737,12 +1673,10 @@
       "contrastMin": 4.75,
       "keyboardOk": true,
       "keyboardNote": "真实 DOM 取证 48 个交互元素键盘可达",
-      "labelOk": false,
-      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 1 个表单控件具备可读标签",
       "keyboardViolations": [],
-      "labelViolations": [
-        "el-id-2949-323"
-      ]
+      "labelViolations": []
     },
     {
       "path": "/flow/apqp",
@@ -1994,9 +1928,7 @@
           "tab-rules",
           "tab-chat"
         ],
-        "labelViolations": [
-          "el-id-2949-370"
-        ],
+        "labelViolations": [],
         "focusIndicatorMissing": 0,
         "excludedContainers": 8,
         "evidenceCollected": true
@@ -2005,8 +1937,8 @@
       "contrastMin": 4.75,
       "keyboardOk": false,
       "keyboardNote": "真实 DOM 取证 2/16 个交互元素不达标",
-      "labelOk": false,
-      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 1 个表单控件具备可读标签",
       "keyboardViolations": [
         {
           "id": "tab-rules",
@@ -2021,9 +1953,7 @@
           "focusIndicator": true
         }
       ],
-      "labelViolations": [
-        "el-id-2949-370"
-      ]
+      "labelViolations": []
     },
     {
       "path": "/basic/customer",
@@ -2139,23 +2069,7 @@
         "interactiveCount": 84,
         "controlCount": 24,
         "keyboardViolations": [],
-        "labelViolations": [
-          "el-id-2949-563",
-          "el-id-2949-564",
-          "el-id-2949-565",
-          "el-id-2949-566",
-          "el-id-2949-567",
-          "el-id-2949-568",
-          "el-id-2949-569",
-          "el-id-2949-570",
-          "el-id-2949-571",
-          "el-id-2949-572",
-          "el-id-2949-573",
-          "el-id-2949-574",
-          "el-id-2949-575",
-          "el-id-2949-576",
-          "el-id-2949-577"
-        ],
+        "labelViolations": [],
         "focusIndicatorMissing": 0,
         "excludedContainers": 6,
         "evidenceCollected": true
@@ -2164,26 +2078,10 @@
       "contrastMin": 4.75,
       "keyboardOk": true,
       "keyboardNote": "真实 DOM 取证 84 个交互元素键盘可达",
-      "labelOk": false,
-      "labelNote": "真实 DOM 取证 15/24 个控件缺标签",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 24 个表单控件具备可读标签",
       "keyboardViolations": [],
-      "labelViolations": [
-        "el-id-2949-563",
-        "el-id-2949-564",
-        "el-id-2949-565",
-        "el-id-2949-566",
-        "el-id-2949-567",
-        "el-id-2949-568",
-        "el-id-2949-569",
-        "el-id-2949-570",
-        "el-id-2949-571",
-        "el-id-2949-572",
-        "el-id-2949-573",
-        "el-id-2949-574",
-        "el-id-2949-575",
-        "el-id-2949-576",
-        "el-id-2949-577"
-      ]
+      "labelViolations": []
     },
     {
       "path": "/basic/deliverable-control",
@@ -2196,10 +2094,7 @@
           "tab-level",
           "tab-duty"
         ],
-        "labelViolations": [
-          "el-id-2949-591",
-          "el-id-2949-592"
-        ],
+        "labelViolations": [],
         "focusIndicatorMissing": 0,
         "excludedContainers": 10,
         "evidenceCollected": true
@@ -2208,8 +2103,8 @@
       "contrastMin": 4.75,
       "keyboardOk": false,
       "keyboardNote": "真实 DOM 取证 3/18 个交互元素不达标",
-      "labelOk": false,
-      "labelNote": "真实 DOM 取证 2/2 个控件缺标签",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 2 个表单控件具备可读标签",
       "keyboardViolations": [
         {
           "id": "tab-matrix",
@@ -2230,10 +2125,7 @@
           "focusIndicator": true
         }
       ],
-      "labelViolations": [
-        "el-id-2949-591",
-        "el-id-2949-592"
-      ]
+      "labelViolations": []
     },
     {
       "path": "/admin/org",
@@ -2321,11 +2213,7 @@
         "interactiveCount": 21,
         "controlCount": 3,
         "keyboardViolations": [],
-        "labelViolations": [
-          "el-id-2949-601",
-          "el-id-2949-602",
-          "el-id-2949-603"
-        ],
+        "labelViolations": [],
         "focusIndicatorMissing": 0,
         "excludedContainers": 9,
         "evidenceCollected": true
@@ -2334,14 +2222,10 @@
       "contrastMin": 4.75,
       "keyboardOk": true,
       "keyboardNote": "真实 DOM 取证 21 个交互元素键盘可达",
-      "labelOk": false,
-      "labelNote": "真实 DOM 取证 3/3 个控件缺标签",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 3 个表单控件具备可读标签",
       "keyboardViolations": [],
-      "labelViolations": [
-        "el-id-2949-601",
-        "el-id-2949-602",
-        "el-id-2949-603"
-      ]
+      "labelViolations": []
     },
     {
       "path": "/system/audit",
@@ -2422,26 +2306,7 @@
         "interactiveCount": 31,
         "controlCount": 18,
         "keyboardViolations": [],
-        "labelViolations": [
-          "el-id-2949-748",
-          "el-id-2949-749",
-          "el-id-2949-750",
-          "el-id-2949-751",
-          "el-id-2949-753",
-          "el-id-2949-754",
-          "el-id-2949-755",
-          "el-id-2949-756",
-          "el-id-2949-758",
-          "el-id-2949-759",
-          "el-id-2949-760",
-          "el-id-2949-761",
-          "el-id-2949-762",
-          "el-id-2949-763",
-          "el-id-2949-764",
-          "el-id-2949-765",
-          "el-id-2949-769",
-          "el-id-2949-771"
-        ],
+        "labelViolations": [],
         "focusIndicatorMissing": 0,
         "excludedContainers": 51,
         "evidenceCollected": true
@@ -2450,29 +2315,10 @@
       "contrastMin": 4.75,
       "keyboardOk": true,
       "keyboardNote": "真实 DOM 取证 31 个交互元素键盘可达",
-      "labelOk": false,
-      "labelNote": "真实 DOM 取证 18/18 个控件缺标签",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 18 个表单控件具备可读标签",
       "keyboardViolations": [],
-      "labelViolations": [
-        "el-id-2949-748",
-        "el-id-2949-749",
-        "el-id-2949-750",
-        "el-id-2949-751",
-        "el-id-2949-753",
-        "el-id-2949-754",
-        "el-id-2949-755",
-        "el-id-2949-756",
-        "el-id-2949-758",
-        "el-id-2949-759",
-        "el-id-2949-760",
-        "el-id-2949-761",
-        "el-id-2949-762",
-        "el-id-2949-763",
-        "el-id-2949-764",
-        "el-id-2949-765",
-        "el-id-2949-769",
-        "el-id-2949-771"
-      ]
+      "labelViolations": []
     },
     {
       "path": "/system/calendar",
@@ -2782,235 +2628,6 @@
       "focusIndicator": true
     }
   ],
-  "labelViolations": [
-    {
-      "path": "/workbench/todos",
-      "id": "el-id-2949-56"
-    },
-    {
-      "path": "/presale/flow",
-      "id": "el-id-2949-106"
-    },
-    {
-      "path": "/plan/deviation",
-      "id": "el-id-2949-133"
-    },
-    {
-      "path": "/dev/requirements",
-      "id": "el-id-2949-153"
-    },
-    {
-      "path": "/dev/trace",
-      "id": "el-id-2949-157"
-    },
-    {
-      "path": "/dev/ecr",
-      "id": "el-id-2949-158"
-    },
-    {
-      "path": "/dev/baseline",
-      "id": "el-id-2949-169"
-    },
-    {
-      "path": "/quality/coverage",
-      "id": "el-id-2949-193"
-    },
-    {
-      "path": "/quality/knowledge",
-      "id": "el-id-2949-249"
-    },
-    {
-      "path": "/quality/knowledge",
-      "id": "el-id-2949-250"
-    },
-    {
-      "path": "/quality/knowledge",
-      "id": "el-id-2949-251"
-    },
-    {
-      "path": "/quality/knowledge",
-      "id": "el-id-2949-252"
-    },
-    {
-      "path": "/doc/library",
-      "id": "el-id-2949-279"
-    },
-    {
-      "path": "/doc/mdr",
-      "id": "el-id-2949-284"
-    },
-    {
-      "path": "/doc/signoff",
-      "id": "el-id-2949-284"
-    },
-    {
-      "path": "/flow/start",
-      "id": "el-id-2949-323"
-    },
-    {
-      "path": "/flow/approvals",
-      "id": "el-id-2949-323"
-    },
-    {
-      "path": "/flow/monitor",
-      "id": "el-id-2949-323"
-    },
-    {
-      "path": "/ai/assist",
-      "id": "el-id-2949-370"
-    },
-    {
-      "path": "/basic/naming",
-      "id": "el-id-2949-563"
-    },
-    {
-      "path": "/basic/naming",
-      "id": "el-id-2949-564"
-    },
-    {
-      "path": "/basic/naming",
-      "id": "el-id-2949-565"
-    },
-    {
-      "path": "/basic/naming",
-      "id": "el-id-2949-566"
-    },
-    {
-      "path": "/basic/naming",
-      "id": "el-id-2949-567"
-    },
-    {
-      "path": "/basic/naming",
-      "id": "el-id-2949-568"
-    },
-    {
-      "path": "/basic/naming",
-      "id": "el-id-2949-569"
-    },
-    {
-      "path": "/basic/naming",
-      "id": "el-id-2949-570"
-    },
-    {
-      "path": "/basic/naming",
-      "id": "el-id-2949-571"
-    },
-    {
-      "path": "/basic/naming",
-      "id": "el-id-2949-572"
-    },
-    {
-      "path": "/basic/naming",
-      "id": "el-id-2949-573"
-    },
-    {
-      "path": "/basic/naming",
-      "id": "el-id-2949-574"
-    },
-    {
-      "path": "/basic/naming",
-      "id": "el-id-2949-575"
-    },
-    {
-      "path": "/basic/naming",
-      "id": "el-id-2949-576"
-    },
-    {
-      "path": "/basic/naming",
-      "id": "el-id-2949-577"
-    },
-    {
-      "path": "/basic/deliverable-control",
-      "id": "el-id-2949-591"
-    },
-    {
-      "path": "/basic/deliverable-control",
-      "id": "el-id-2949-592"
-    },
-    {
-      "path": "/admin/pool",
-      "id": "el-id-2949-601"
-    },
-    {
-      "path": "/admin/pool",
-      "id": "el-id-2949-602"
-    },
-    {
-      "path": "/admin/pool",
-      "id": "el-id-2949-603"
-    },
-    {
-      "path": "/system/rejection",
-      "id": "el-id-2949-748"
-    },
-    {
-      "path": "/system/rejection",
-      "id": "el-id-2949-749"
-    },
-    {
-      "path": "/system/rejection",
-      "id": "el-id-2949-750"
-    },
-    {
-      "path": "/system/rejection",
-      "id": "el-id-2949-751"
-    },
-    {
-      "path": "/system/rejection",
-      "id": "el-id-2949-753"
-    },
-    {
-      "path": "/system/rejection",
-      "id": "el-id-2949-754"
-    },
-    {
-      "path": "/system/rejection",
-      "id": "el-id-2949-755"
-    },
-    {
-      "path": "/system/rejection",
-      "id": "el-id-2949-756"
-    },
-    {
-      "path": "/system/rejection",
-      "id": "el-id-2949-758"
-    },
-    {
-      "path": "/system/rejection",
-      "id": "el-id-2949-759"
-    },
-    {
-      "path": "/system/rejection",
-      "id": "el-id-2949-760"
-    },
-    {
-      "path": "/system/rejection",
-      "id": "el-id-2949-761"
-    },
-    {
-      "path": "/system/rejection",
-      "id": "el-id-2949-762"
-    },
-    {
-      "path": "/system/rejection",
-      "id": "el-id-2949-763"
-    },
-    {
-      "path": "/system/rejection",
-      "id": "el-id-2949-764"
-    },
-    {
-      "path": "/system/rejection",
-      "id": "el-id-2949-765"
-    },
-    {
-      "path": "/system/rejection",
-      "id": "el-id-2949-769"
-    },
-    {
-      "path": "/system/rejection",
-      "id": "el-id-2949-771"
-    }
-  ],
+  "labelViolations": [],
   "pageErrors": []
 }

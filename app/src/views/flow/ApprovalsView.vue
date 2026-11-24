@@ -2,7 +2,7 @@
   <div>
     <PageHeader title="待我审批" desc="配置驱动流程引擎（SRS 4.4）：节点、条件分支、会签/或签、加签转签、超时升级；放行人≠提交人（SOD-01）">
       <template #actions>
-        <el-select v-model="newDefId" size="small" placeholder="选择流程模板" style="width: 180px; margin-right: 8px">
+        <el-select v-model="newDefId" aria-label="选择流程模板" size="small" placeholder="选择流程模板" style="width: 180px; margin-right: 8px">
           <el-option v-for="d in store.flowDefinitions" :key="d.id" :label="d.name" :value="d.id" />
         </el-select>
         <el-button size="small" type="primary" @click="launch">发起流程</el-button>

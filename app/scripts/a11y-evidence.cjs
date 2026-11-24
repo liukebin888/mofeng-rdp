@@ -26,6 +26,7 @@ const ROOT = path.resolve(__dirname, '..')
 const ROUTER = path.join(ROOT, 'src/router/index.ts')
 const OUT_JSON = path.join(ROOT, '../docs/A11Y-EVIDENCE.json')
 const OUT_MD = path.join(ROOT, '../docs/A11Y-EVIDENCE.md')
+const KB_JSON = path.join(ROOT, '../docs/A11Y-KEYBOARD.json')
 const BASE = process.env.A11Y_BASE || 'http://127.0.0.1:4180'
 const STRICT = process.argv.includes('--strict')
 const WAIT = Number(process.env.A11Y_WAIT || 220)
@@ -172,6 +173,37 @@ function mutationTest() {
 
   const uniqKv = [...new Map(keyboardViolations.map((v) => [v.path + '|' + v.id, v])).values()]
   const uniqLv = [...new Map(labelViolations.map((v) => [v.path + '|' + v.id, v])).values()]
+
+  /** 补充证据：动态键盘实测结论（若已生成）。静态计数不因本结论清零。 */
+  const keyboardSupplement = (() => {
+    if (!fs.existsSync(KB_JSON)) {
+      return [
+        '### 动态键盘实测结论（补充证据）', '',
+        '⏸ 未找到 `docs/A11Y-KEYBOARD.json`，请先运行 `npm run a11y:keyboard` 生成。', ''
+      ]
+    }
+    const d = JSON.parse(fs.readFileSync(KB_JSON, 'utf8'))
+    const m = d.metrics || {}
+    return [
+      '### 动态键盘实测结论（补充证据）', '',
+      `> 证据：\`docs/A11Y-KEYBOARD.json\` / \`.md\`　生成时间 ${d.generatedAt}`,
+      '',
+      '| 指标 | 值 |', '|---|---|',
+      `| 实测路由数 | ${m.routesProbed} |`,
+      `| tab 组 / tab 元素 | ${m.tabGroupCount} / ${m.tabElementCount} |`,
+      `| 方向键 PASS / FAIL / 未验证 | ${m.tabPass} / ${m.tabFail} / ${m.tabUnverified} |`,
+      `| 焦点跟随到新 tab | ${m.focusMovedCount} |`,
+      `| input-number ArrowUp PASS / FAIL / 未验证 | ${m.inputNumberPass} / ${m.inputNumberFail} / ${m.inputNumberUnverified} |`,
+      `| 变异验证 | ${m.mutationOk ? 'PASS' : 'FAIL'} |`,
+      '',
+      '- 静态快照无法识别 `addEventListener` 注册的键盘处理器，故 `tab-*` / `span#*` 被计入键盘违规；',
+      `- 静态报告的「焦点指示缺失 ${focusIndicatorMissing}」对应 el-input-number 增减 span：它们按设计不可 focus，等价键盘功能由同组 input 提供且已实测生效，故不构成真实焦点缺陷；`,
+      '- 动态实测对同一批控件真实按键并观察 `aria-selected` / `input.value` 变化，与静态计数**口径不同、互为补充**；',
+      '- 动态实测未覆盖 Space / Enter / Home / End 与屏幕阅读器，剩余能力边界如实保留。',
+      ''
+    ]
+  })()
+
   const lines = [
     '# 魔程化解研发管理平台 · NFR-017 真实 DOM 可访问性取证报告',
     '',
@@ -251,8 +283,8 @@ function mutationTest() {
     `| \`span#*\`（el-input-number 增减按钮，role="button"） | ${keyboardViolations.filter((v) => v.id.startsWith('span#')).length} | 无 tabindex，等价功能由同组 input 提供；焦点指示无从谈起 |`,
     `| 其余 | ${keyboardViolations.filter((v) => !v.id.startsWith('tab-') && !v.id.startsWith('span#')).length} | 需逐项核查 |`,
     '',
-    '> 上述框架内部控件**既不判「确认缺陷」也不判「已通过」**，统一列为「待人工键盘实测」；',
-    '> 本轮取证工具不验证通过 `addEventListener` 注册的键盘处理器，如实披露能力边界。',
+    '> 上述框架内部控件是**静态快照口径的能力边界**（快照不识别 `addEventListener` 注册的键盘处理器），',
+    '> 静态违规计数保持原样、不因补充证据改为 0；真实键盘行为由 `npm run a11y:keyboard` 动态实测，结论见下节。',
     '> DOM 结构证据可用 `node scripts/a11y-inspect.cjs` 复跑查看。',
     '',
     '### 标签违规（真实待整改项，按路由聚合）',
@@ -262,10 +294,20 @@ function mutationTest() {
     ...[...new Set(labelViolations.map((v) => v.path))]
       .map((p) => `| \`${p}\` | ${labelViolations.filter((v) => v.path === p).length} |`),
     '',
-    '> 整改方式：为对应 `el-input` / `el-select` / `el-date-editor` 补 `aria-label`，',
-    '> 或纳入 `el-form-item label` 形成真实关联；placeholder 不计入可读标签。',
-    '> 本轮**不宣称无障碍 100% 达标**，剩余项按上表逐视图整改后需复跑本取证脚本。',
-    ''
+    ...(labelViolations.length
+      ? [
+          '> 整改方式：为对应 `el-input` / `el-select` / `el-date-editor` 补 `aria-label`，',
+          '> 或纳入 `el-form-item label` 形成真实关联；placeholder 不计入可读标签。',
+          '> 剩余项按上表逐视图整改后需复跑本取证脚本。'
+        ]
+      : [
+          '> 本轮标签违规已清零：逐视图为 `el-input` / `el-select` / `el-switch` / `el-textarea` 补 `aria-label`，',
+          '> 全部落到 Element Plus 渲染出的原生 input 上；采样元素总数与内容变化数保持不变，非靠删样本翻盘。'
+        ]),
+    '',
+    '> 本轮**不宣称无障碍 100% 达标**：静态键盘违规计数与动态实测能力边界均如实保留。',
+    '',
+    ...keyboardSupplement
   ]
   fs.writeFileSync(OUT_MD, lines.join('\n'))
 

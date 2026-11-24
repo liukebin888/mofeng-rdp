@@ -33,6 +33,7 @@
           <template #default="{ row }">
             <el-select
               :model-value="row.severity"
+              :aria-label="'拦截档位：' + row.name"
               size="small"
               style="width: 130px"
               :disabled="row.locked"
@@ -53,6 +54,7 @@
               <el-select
                 v-if="row.fieldOptions && row.fieldOptions.length"
                 :model-value="String(row.fieldValue)"
+                :aria-label="'配置字段值：' + row.name"
                 size="small"
                 style="width: 90px"
                 @update:model-value="(v: string | number | boolean | undefined) => change(row, 'CONFIGURABLE', String(v))"

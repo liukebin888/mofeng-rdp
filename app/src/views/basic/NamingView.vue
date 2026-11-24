@@ -59,7 +59,7 @@
         </el-table-column>
         <el-table-column label="启用" width="70" align="center">
           <template #default="{ row }">
-            <el-switch :model-value="row.enabled" size="small" @change="(v: boolean) => store.toggleNamingRule(row.id, v)" />
+            <el-switch :model-value="row.enabled" :aria-label="'启用规则：' + row.name" size="small" @change="(v: boolean) => store.toggleNamingRule(row.id, v)" />
           </template>
         </el-table-column>
         <el-table-column label="操作" width="180" align="right">

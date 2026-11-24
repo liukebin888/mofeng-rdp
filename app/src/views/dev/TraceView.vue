@@ -38,7 +38,7 @@
 
         <div class="panel">
           <div class="panel-title">影响闭包计算（选对象 → BFS ≤6 跳，遇冻结基线停止并单列）</div>
-          <el-select v-model="source" size="small" style="width: 100%" placeholder="选择变更源对象">
+          <el-select v-model="source" aria-label="选择变更源对象" size="small" style="width: 100%" placeholder="选择变更源对象">
             <el-option v-for="r in store.projectReqs" :key="r.id" :value="r.id" :label="`${r.code} ${r.title.slice(0, 18)}`" />
           </el-select>
           <div class="grid grid-3" style="margin-top: 10px">

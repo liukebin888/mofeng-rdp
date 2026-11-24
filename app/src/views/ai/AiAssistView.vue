@@ -25,7 +25,7 @@
               </div>
             </div>
             <div style="margin-top: 8px">
-              <el-input v-model="query" size="small" :placeholder="`输入检索词（当前场景：${scene}）`" clearable @keyup.enter="runScene" />
+              <el-input v-model="query" aria-label="智能辅助检索词" size="small" :placeholder="`输入检索词（当前场景：${scene}）`" clearable @keyup.enter="runScene" />
               <el-button size="small" type="primary" style="margin-top: 8px" :disabled="!aiSwitch.enabled" @click="runScene">执行预审</el-button>
             </div>
             <div v-if="lastResult" class="result-box" style="margin-top: 10px">

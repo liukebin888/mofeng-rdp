@@ -30,7 +30,7 @@
     <div class="panel">
       <div class="panel-title">
         基线条目（逐项快照 + 行哈希，用于定位篡改）
-        <el-select v-model="bid" size="small" style="width: 220px">
+        <el-select v-model="bid" aria-label="选择基线" size="small" style="width: 220px">
           <el-option v-for="b in store.projectBaselines" :key="b.id" :value="b.id" :label="b.no" />
         </el-select>
       </div>

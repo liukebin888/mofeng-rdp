@@ -99,6 +99,10 @@ jobs:
           curl -sf -H 'x-tenant-id: T-1001' http://127.0.0.1:8787/api/audit \
             | node -e "let s='';process.stdin.on('data',c=>s+=c).on('end',()=>{const j=JSON.parse(s);console.log('audit count='+j.count+' chainOk='+j.chainOk);process.exit(j.chainOk?0:1)})"
 
+      - name: NFR-017 动态键盘实测（真实方向键/上下键，FAIL 或未验证即失败）
+        working-directory: app
+        run: npm run a11y:keyboard -- --strict
+
       - name: NFR-017 真实 DOM 可访问性取证（产出证据，不宣称达标）
         working-directory: app
         run: npm run a11y:evidence
@@ -111,6 +115,8 @@ jobs:
           path: |
             docs/A11Y-EVIDENCE.json
             docs/A11Y-EVIDENCE.md
+            docs/A11Y-KEYBOARD.json
+            docs/A11Y-KEYBOARD.md
           if-no-files-found: warn
 
       - name: 停掉测试服务

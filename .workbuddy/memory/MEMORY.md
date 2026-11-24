@@ -87,3 +87,9 @@
 - 实测整改：键盘违规 745→27、焦点指示缺失 657→4；**如实保留 57 项表单控件缺可读标签 + 27 项 Element Plus 框架内部控件（role=tab / el-input-number）待人工键盘实测，不宣称无障碍 100% 达标**。六门禁基线更新：vitest **1792/1792（113 文件）**、coverage 84.54%、e2e 33 PASS、chainOk true（非空链复核）。
 - **e2e 隔离坑（重要）**：`app/scripts/e2e-click.cjs` 的 `resetBackendState()` 原硬编码清仓库 `server/data`，绕过 `MOFENG_DATA_DIR`，会误删正式演示数据；已改为优先读 `MOFENG_DATA_DIR`。本地跑六门禁**必须**设该变量指向临时目录。若已被删：从会话 JSONL line 44239 的 `providerData.toolResult.renderer.value` 取回 `server/scripts/_restore-demo.cjs`，复制隔离空态 state 作基线后执行（恢复 1 项目/1 样件/1 试制单/3 采购单 + audit 16 chainOk true），随后删临时脚本。本次已恢复并复核正式数据完好。
 - 剩余外部依赖 5 项（压测/等保密评/真实UAT/灰度演练/AI凭据）+ 无障碍真实缺陷；**发布口径仍为内测/演示版**。
+
+## 2026-11-24 二次补充（P2-2 标签清零 + 动态键盘实测）
+- 按上轮建议收口：15 文件 / 28 处为 Element Plus 内部原生 input 补 `aria-label`（已核实 prop 真实落到 `el-select__input` / `el-switch__input` / `el-input__inner`；映射表 `app/scripts/a11y-label-patches.cjs` 可审计，锚点唯一性严格校验、重复运行安全中止）；**标签违规 57→0**，采样元素 4867 / 内容变化 18 不变（非删样本翻盘）。页面文案/菜单/标题零改动。
+- 新增 `npm run a11y:keyboard`（`app/scripts/a11y-keyboard.cjs`，默认全量 104 路由、可用 `A11Y_KEYBOARD_ROUTES` 指定子集，`--strict` 时 FAIL/未验证即阻断）：真实键盘实测 7 tab 组 / 23 个 tab 元素方向键 7/7 PASS、焦点跟随 7/7，2 input-number 组 ArrowUp 2/2 PASS，死/活样本变异验证 PASS。证据 `docs/A11Y-KEYBOARD.json/.md`；`a11y-evidence.cjs` §六 自动引用该结论；CI 先 `a11y:keyboard -- --strict` 再 `a11y:evidence`，上传 4 份 artifact。
+- 结论：静态 27 项键盘违规 + 4 项焦点缺失是「快照不识别 `addEventListener`」的口径边界、**非真实键盘缺陷**；**静态计数保持原样不改为 0**，两份证据互补。仍保留能力边界（Space/Enter/Home/End、读屏器、弹窗/抽屉内控件、对比度仅 6 组令牌色值），不判无障碍 100% 达标。
+- 六门禁复跑全绿（vue-tsc 0 / vitest 1792 / coverage 84.54% / build OK / smoke 104 / e2e 33 / chainOk true 非空链）；Node 16+12+19+13、audit:check、AI 自证全过；正式演示数据完好（1 项目/1 样件/3 采购/16 审计）。复验报告 §四第 6 项与八维无障碍维度改判「真实缺陷已闭环 / 覆盖边界保留」。外部依赖仍 5 项，**发布口径仍为内测/演示版**。

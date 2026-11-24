@@ -2,7 +2,7 @@
   <div>
     <PageHeader title="项目前期审批流程" desc="纯监视视图：按项目/产品聚合前期五条审批流程（前期交流申请 → 技术方案 TR → 报价 → 立项申请 → 立项评审）的过程与结果，只读、不提供发起与审批操作">
       <template #actions>
-        <el-select v-model="selectedProjectId" size="small" placeholder="选择项目/产品" style="width: 260px" filterable>
+        <el-select v-model="selectedProjectId" aria-label="选择项目或产品" size="small" placeholder="选择项目/产品" style="width: 260px" filterable>
           <el-option v-for="p in selectableProjects" :key="p.id" :label="`${p.code} · ${p.name}`" :value="p.id" />
         </el-select>
       </template>

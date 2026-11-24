@@ -5,7 +5,7 @@
 
 ## 一、目的与边界
 
-把此前「靠脚本人肉跑」的六门禁和安全验收，固化为**代码仓库内可复跑、失败即阻断**的自动化流水线。它是复验报告 §四剩余 7 项中**唯一纯代码可闭环**的一项；其余 6 项（性能压测、等保密评/国密网关、真实 UAT 签署、无障碍真实 DOM 取证、灰度/回滚演练、AI 真实 Key）仍是外部依赖，CI **不伪造通过**。
+把此前「靠脚本人肉跑」的六门禁和安全验收，固化为**代码仓库内可复跑、失败即阻断**的自动化流水线。它是复验报告 §四剩余 7 项中**唯一纯代码可闭环**的一项；其余 5 项（性能压测、等保密评/国密网关、真实 UAT 签署、灰度/回滚演练、AI 真实 Key）仍是外部依赖，CI **不伪造通过**。NFR-017 无障碍取证于 2026-11-24 二次补充后已纳入 CI（`a11y:evidence` 产出证据 + `a11y:keyboard --strict` 真实门禁），但其取证覆盖边界（其余键位 / 读屏器 / 弹窗内控件）仍如实保留，不判 100% 达标。
 
 ## 二、触发方式与作业划分
 
@@ -87,7 +87,7 @@
 # 前端六门禁 + 覆盖率
 cd app && npm ci && npm run typecheck && npm run coverage && npm run build
 #（另开终端）node server/index.js  +  cd app && npm run preview -- --port 4180
-cd app && npm run smoke && npm run e2e && npm run a11y:evidence
+cd app && npm run smoke && npm run e2e && npm run a11y:keyboard -- --strict && npm run a11y:evidence
 # 安全与验收
 cd .. && node server/test-security.cjs && node server/test-isolation.cjs \
   && node server/test-contract.cjs && node server/test-sms.cjs
@@ -104,7 +104,7 @@ mvn test -pl mofeng-application -am   # JDK21 + Maven 在 PATH
 | 性能压测 / 5000 并发 / RTO-RPO 演练 | ⏸ | k6 压测报告 + 备份恢复演练记录 |
 | 等保三级 / 密评 / 国密 SM2 双证书网关 | ⏸ | 有资质机构测评报告 + 协议套件扫描 |
 | 真实 UAT 签署 | ⏸ | 用户方签字记录 |
-| 无障碍真实 DOM 取证 | ✅ 机制已闭环（CI 产出证据）；🟡 真实缺陷待整改 | `npm run a11y:evidence` → `docs/A11Y-EVIDENCE.json/.md`；57 项标签违规 + 27 项框架控件待人工实测，见报告 §六 |
+| 无障碍真实 DOM 取证 | ✅ 机制 + 真实缺陷已闭环（CI 双门禁）；🟡 覆盖边界保留 | `npm run a11y:keyboard -- --strict` + `npm run a11y:evidence` → `docs/A11Y-KEYBOARD.json/.md`、`A11Y-EVIDENCE.json/.md`；标签违规 57→0、动态键盘 7 组 tab + 2 组 input-number 全 PASS，静态 27 项键盘违规为快照口径边界、计数如实保留 |
 
 **NFR-017 取证步骤**（2026-11-24 追加，位于门禁 6/6 之后、停服务之前）：真实 Chromium 遍历 `router/index.ts` 全部静态路由，逐页调用页面自身的 `window.__MOFENG_A11Y__.collect()`（判定与 `domain/accessibility.ts` 同源，脚本不另写一份判定），产出 `docs/A11Y-EVIDENCE.json/.md` 并上传 artifact。脚本披露取样页数 / total>0 页数 / 采样元素数 / 内容变化数 / 违规数，并做「注入已知违规样本 → 必须检出 → 移除后恢复」的变异验证；样本为空或变异验证失败即 `exit 1`。**取证只产出证据、不宣称无障碍达标**，故 CI 不加 `--strict`。
 | 灰度 / 回滚演练 | ⏸ | 演练记录 |

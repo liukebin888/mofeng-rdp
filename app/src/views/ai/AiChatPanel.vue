@@ -1,7 +1,7 @@
 <template>
   <div class="ai-chat">
     <div class="chat-toolbar">
-      <el-switch v-model="withContext" active-text="带当前项目上下文" inactive-text="仅通用问答" size="small" />
+      <el-switch v-model="withContext" aria-label="带当前项目上下文" active-text="带当前项目上下文" inactive-text="仅通用问答" size="small" />
       <span v-if="withContext" class="muted ctx-note">自动携带当前项目 {{ contextSummary }}（越权前置过滤）</span>
       <el-button size="small" type="primary" plain :disabled="!draft.trim()" @click="openWorkbuddy">唤起 WorkBuddy 桌面端</el-button>
       <el-button size="small" type="primary" @click="send">账号绑定对话</el-button>
@@ -29,9 +29,9 @@
       <!-- Step 1：手机号短信绑定 -->
       <template v-if="bindStep === 1">
         <div class="account-row">
-          <el-input v-model="bindPhone" size="small" clearable class="phone-input" :placeholder="t('ai.bind.phonePh')" />
+          <el-input v-model="bindPhone" aria-label="绑定手机号" size="small" clearable class="phone-input" :placeholder="t('ai.bind.phonePh')" />
           <el-button size="small" :loading="smsSending" :disabled="!validPhone || smsSending" @click="sendCode">{{ t('ai.bind.sendCode') }}</el-button>
-          <el-input v-model="bindCode" size="small" clearable class="code-input" :placeholder="t('ai.bind.codePh')" @keyup.enter="confirmBind" />
+          <el-input v-model="bindCode" aria-label="短信验证码" size="small" clearable class="code-input" :placeholder="t('ai.bind.codePh')" @keyup.enter="confirmBind" />
           <el-button size="small" type="primary" :loading="binding" :disabled="!validPhone || !bindCode.trim() || binding" @click="confirmBind">{{ t('ai.bind.confirm') }}</el-button>
         </div>
         <div v-if="devTip" class="dev-tip">{{ devTip }}</div>
@@ -52,7 +52,7 @@
           <div class="guide-head">{{ t('ai.bind.keyTip') }}</div>
           <div class="account-row key-row">
             <span class="key-label">{{ t('ai.bind.keyLabel') }}</span>
-            <el-input v-model="sessionKey" :type="showKey ? 'text' : 'password'" size="small" clearable class="key-input" :placeholder="t('ai.bind.keyPh')" @keyup.enter="saveKey" />
+            <el-input v-model="sessionKey" aria-label="WorkBuddy API Key" :type="showKey ? 'text' : 'password'" size="small" clearable class="key-input" :placeholder="t('ai.bind.keyPh')" @keyup.enter="saveKey" />
             <el-button size="small" @click="showKey = !showKey">{{ showKey ? t('ai.bind.hideKey') : t('ai.bind.showKey') }}</el-button>
             <el-button size="small" type="primary" plain @click="saveKey">{{ t('ai.bind.keySave') }}</el-button>
             <el-button size="small" text @click="clearKey">{{ t('ai.bind.keyClear') }}</el-button>
@@ -82,6 +82,7 @@
     <div class="chat-input">
       <el-input
         v-model="draft"
+        aria-label="AI 提问内容"
         type="textarea"
         :rows="3"
         :placeholder="aiEnabled ? '输入问题，回车发送（Shift+Enter 换行）' : 'AI 未开启：请先在顶部打开项目 AI 开关'"

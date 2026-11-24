@@ -41,7 +41,7 @@
         <div v-if="store.evm.spiZone === 'green'" class="src-note">当前 SPI ≥ 0.9，未触发预警；仍须每周重算（C-05 每周时点）。</div>
         <div v-else>
           <div class="warn">SPI={{ store.evm.spi }} 已进入{{ store.evm.spiZone === 'red' ? '红' : '黄' }}区，需提交纠偏计划并纳入周会。</div>
-          <el-input v-model="plan" type="textarea" :rows="3" placeholder="填写纠偏措施（须可回写计划，否则纠偏项不得关闭 C-46）" style="margin-top: 8px" />
+          <el-input v-model="plan" aria-label="纠偏措施" type="textarea" :rows="3" placeholder="填写纠偏措施（须可回写计划，否则纠偏项不得关闭 C-46）" style="margin-top: 8px" />
           <el-button size="small" type="primary" style="margin-top: 8px" @click="submitPlan">登记纠偏项</el-button>
         </div>
       </div>

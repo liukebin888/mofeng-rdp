@@ -63,8 +63,8 @@
       <div class="panel">
         <div class="panel-title">技能检索（RES-002 · 角色 + 技能匹配）</div>
         <div class="crow">
-          <el-input v-model="skillForm.role" size="small" style="width: 130px" placeholder="角色" />
-          <el-input v-model="skillForm.skills" size="small" style="flex: 1" placeholder="技能（逗号分隔）" />
+          <el-input v-model="skillForm.role" aria-label="技能角色" size="small" style="width: 130px" placeholder="角色" />
+          <el-input v-model="skillForm.skills" aria-label="技能列表（逗号分隔）" size="small" style="flex: 1" placeholder="技能（逗号分隔）" />
           <el-button size="small" type="primary" @click="doSearch">检索</el-button>
         </div>
         <div v-for="c in store.skillSearchResult" :key="c.id" class="crow">
@@ -128,7 +128,7 @@
       <div class="panel">
         <div class="panel-title">情景副本（RES-010 · 隔离 + 选定后回写）</div>
         <div class="crow">
-          <el-input v-model="scenarioName" size="small" style="flex: 1" placeholder="情景名称" />
+          <el-input v-model="scenarioName" aria-label="情景名称" size="small" style="flex: 1" placeholder="情景名称" />
           <el-button size="small" type="primary" @click="createSc">新建情景</el-button>
         </div>
         <div v-for="s in store.resourceScenarios" :key="s.id" class="crow">
