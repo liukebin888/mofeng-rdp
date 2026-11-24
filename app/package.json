@@ -17,7 +17,9 @@
     "probe:compute": "vite-node scripts/probe-compute.mts",
     "probe": "vite-node scripts/probe-compute.mts && node scripts/probe-consistency.cjs",
     "a11y:evidence": "node scripts/a11y-evidence.cjs",
-    "a11y:keyboard": "node scripts/a11y-keyboard.cjs"
+    "a11y:keyboard": "node scripts/a11y-keyboard.cjs",
+    "a11y:overlay": "node scripts/a11y-overlay.cjs",
+    "a11y:gate-selftest": "node scripts/a11y-gate-policy.cjs --self-test"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",

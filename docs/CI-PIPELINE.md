@@ -32,8 +32,12 @@
 | 附加 | Node 安全验收 | `test-security` / `test-isolation` / `test-contract` / `test-sms` | fail-closed、隔离、契约同源、短信验证码回归 |
 | 附加 | 依赖安全审计 | `npm run audit:check` | 存在**未豁免**生产依赖漏洞 |
 | 附加 | AI 验证自证 | `verify-wma.js --self-test` / `--mock` | 验证工具自身失准（真实 Key 仍 ⏸ 外部依赖） |
+| 附加 | NFR-017 门禁策略自证（P2-3） | `npm run a11y:gate-selftest` | 门禁自身变异/回退验证失败（阻断型未阻断、记录型被吞、还原后未恢复） |
+| 附加 | NFR-017 动态键盘实测（P2-3） | `npm run a11y:keyboard -- --strict` | **阻断型**信号：方向键/上下键 FAIL 或未验证、变异验证失败、pageerror；**记录型**（Home/End/Enter/Space 可选增强键 FAIL）如实打印但不阻断 |
+| 附加 | NFR-017 弹窗/抽屉补充取证（P2-3） | `npm run a11y:overlay` | 仅「取证有效性 / 零写入红线」失败时阻断；发现真实违规不阻断（定位为产出证据） |
+| 附加 | NFR-017 真实 DOM 取证 | `npm run a11y:evidence` | 取证机制失效（样本为空 / 接口不可用 / 变异验证失败）；真实违规如实披露不阻断 |
 
-覆盖率报告通过 `actions/upload-artifact` 上传（`if: always()`，失败也留证据）。
+覆盖率、无障碍 6 份证据均通过 `actions/upload-artifact` 上传（`if: always()`，失败也留证据）。**P2-3 门禁语义分层说明**：strict 只让 WCAG 2.1.1 强制键位与取证有效性触发 `exit 1`；WAI-ARIA APG 可选增强键（Home/End）与自动激活模式下不适用的 Enter/Space 属**记录型**，实测 FAIL 原样保留、逐条打印、写入证据，但不让 CI 永久变红。分层**不改判定逻辑、不改实测数字、不删样本**；门禁自身由 `a11y:gate-selftest` 的 11 项变异/回退断言证明未架空。overlay / evidence 步骤加 `if: always()`，任何前置失败仍产出全部证据，job 仍由失败步骤判红。
 
 ## 四、覆盖率口径与阈值（基于真实基线，非拍脑袋）
 
@@ -87,7 +91,7 @@
 # 前端六门禁 + 覆盖率
 cd app && npm ci && npm run typecheck && npm run coverage && npm run build
 #（另开终端）node server/index.js  +  cd app && npm run preview -- --port 4180
-cd app && npm run smoke && npm run e2e && npm run a11y:keyboard -- --strict && npm run a11y:evidence
+cd app && npm run smoke && npm run e2e && npm run a11y:gate-selftest && npm run a11y:keyboard -- --strict && npm run a11y:overlay && npm run a11y:evidence
 # 安全与验收
 cd .. && node server/test-security.cjs && node server/test-isolation.cjs \
   && node server/test-contract.cjs && node server/test-sms.cjs
@@ -104,7 +108,7 @@ mvn test -pl mofeng-application -am   # JDK21 + Maven 在 PATH
 | 性能压测 / 5000 并发 / RTO-RPO 演练 | ⏸ | k6 压测报告 + 备份恢复演练记录 |
 | 等保三级 / 密评 / 国密 SM2 双证书网关 | ⏸ | 有资质机构测评报告 + 协议套件扫描 |
 | 真实 UAT 签署 | ⏸ | 用户方签字记录 |
-| 无障碍真实 DOM 取证 | ✅ 机制 + 真实缺陷已闭环（CI 双门禁）；🟡 覆盖边界保留 | `npm run a11y:keyboard -- --strict` + `npm run a11y:evidence` → `docs/A11Y-KEYBOARD.json/.md`、`A11Y-EVIDENCE.json/.md`；标签违规 57→0、动态键盘 7 组 tab + 2 组 input-number 全 PASS，静态 27 项键盘违规为快照口径边界、计数如实保留 |
+| 无障碍真实 DOM 取证 | ✅ 机制 + 真实缺陷闭环 + P2-3 覆盖压缩（CI 四门禁）；🟡 更窄覆盖边界保留 | `npm run a11y:gate-selftest` + `a11y:keyboard -- --strict` + `a11y:overlay` + `a11y:evidence` → 6 份 `docs/A11Y-*.json/.md`；标签违规 57→0、动态键盘方向键/上下键全 PASS、四键矩阵 28 项记录型 FAIL 属 APG 可选增强键能力边界（如实保留）、弹窗/抽屉 14 overlay / 235 元素 / `writeAttempts=0` 零写入硬证据；静态基线 4867/18/27/0/4 逐项未变 |
 
 **NFR-017 取证步骤**（2026-11-24 追加，位于门禁 6/6 之后、停服务之前）：真实 Chromium 遍历 `router/index.ts` 全部静态路由，逐页调用页面自身的 `window.__MOFENG_A11Y__.collect()`（判定与 `domain/accessibility.ts` 同源，脚本不另写一份判定），产出 `docs/A11Y-EVIDENCE.json/.md` 并上传 artifact。脚本披露取样页数 / total>0 页数 / 采样元素数 / 内容变化数 / 违规数，并做「注入已知违规样本 → 必须检出 → 移除后恢复」的变异验证；样本为空或变异验证失败即 `exit 1`。**取证只产出证据、不宣称无障碍达标**，故 CI 不加 `--strict`。
 | 灰度 / 回滚演练 | ⏸ | 演练记录 |

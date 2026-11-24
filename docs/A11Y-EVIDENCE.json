@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-24T10:34:46.651Z",
+  "generatedAt": "2026-11-24T12:11:04.678Z",
   "base": "http://127.0.0.1:4181",
   "method": "真实 Chromium 渲染 DOM + 页面同源取证接口 window.__MOFENG_A11Y__.collect()（判定与 domain/accessibility.ts 同源）",
   "metrics": {

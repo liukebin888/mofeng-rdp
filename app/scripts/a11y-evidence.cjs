@@ -27,9 +27,47 @@ const ROUTER = path.join(ROOT, 'src/router/index.ts')
 const OUT_JSON = path.join(ROOT, '../docs/A11Y-EVIDENCE.json')
 const OUT_MD = path.join(ROOT, '../docs/A11Y-EVIDENCE.md')
 const KB_JSON = path.join(ROOT, '../docs/A11Y-KEYBOARD.json')
+const OVL_JSON = path.join(ROOT, '../docs/A11Y-OVERLAY.json')
 const BASE = process.env.A11Y_BASE || 'http://127.0.0.1:4180'
 const STRICT = process.argv.includes('--strict')
 const WAIT = Number(process.env.A11Y_WAIT || 220)
+
+/** 补充证据：弹窗/抽屉首屏之外覆盖结论（若已生成）。不改任何已有指标数字，不与静态计数合并。 */
+const overlaySupplement = (() => {
+  if (!fs.existsSync(OVL_JSON)) {
+    return [
+      '### 弹窗/抽屉补充取证（首屏之外）', '',
+      '⏸ 未找到 `docs/A11Y-OVERLAY.json`，请先运行 `npm run a11y:overlay` 生成。', ''
+    ]
+  }
+  try {
+    const o = JSON.parse(fs.readFileSync(OVL_JSON, 'utf8'))
+    const m = o.metrics || {}
+    return [
+      '### 弹窗/抽屉补充取证（首屏之外）', '',
+      `> 证据：\`docs/A11Y-OVERLAY.json\` / \`.md\`　生成时间 ${o.generatedAt}`,
+      '',
+      '| 指标 | 值 |', '|---|---|',
+      `| 路由总数 / 访问页 / 尝试按钮 | ${m.routesTotal} / ${m.pagesVisited} / ${m.triggerAttempts} |`,
+      `| 成功打开 overlay / SKIP | ${m.overlayOpened} / ${m.skipCount} |`,
+      `| overlay 内采集元素 / 交互元素 / 表单控件 | ${m.totalElements} / ${m.totalInteractive} / ${m.totalControls} |`,
+      `| 内容变化数（不同页样本去重） | ${m.distinctSampleCounts} |`,
+      `| 键盘违规 / 标签违规 / 焦点缺失 | ${m.keyboardViolationCount} / ${m.labelViolationCount} / ${m.focusIndicatorMissing} |`,
+      `| 取证窗口写尝试 / 全程非 GET 请求 | ${m.writeAttempts} / ${m.nonGetRequestCount} |`,
+      `| state rev 前→后 / audit count 前→后 | ${m.stateRevBefore} → ${m.stateRevAfter} / ${m.auditCountBefore} → ${m.auditCountAfter} |`,
+      `| 变异验证 | ${m.mutationOk ? 'PASS' : 'FAIL'} |`,
+      '',
+      '- 该维度为**首屏之外的补充取证**：静态 104 路由的违规计数保持原样，**不与 overlay 数据合并抵消**；',
+      '- overlay 内发现的真实标签/键盘违规按路由聚合列出，属后续整改项，本轮不修正、不宣称达标。',
+      ''
+    ]
+  } catch (e) {
+    return [
+      '### 弹窗/抽屉补充取证（首屏之外）', '',
+      `⏸ 读取 \`docs/A11Y-OVERLAY.json\` 失败：${e && e.message ? e.message : e}`, ''
+    ]
+  }
+})()
 
 function readRoutes() {
   const src = fs.readFileSync(ROUTER, 'utf8')
@@ -194,12 +232,16 @@ function mutationTest() {
       `| 方向键 PASS / FAIL / 未验证 | ${m.tabPass} / ${m.tabFail} / ${m.tabUnverified} |`,
       `| 焦点跟随到新 tab | ${m.focusMovedCount} |`,
       `| input-number ArrowUp PASS / FAIL / 未验证 | ${m.inputNumberPass} / ${m.inputNumberFail} / ${m.inputNumberUnverified} |`,
-      `| 变异验证 | ${m.mutationOk ? 'PASS' : 'FAIL'} |`,
+      `| 新增键位矩阵 Home/End/Enter/Space 合计 PASS / FAIL / 未验证 | ${m.keyMatrixPass ?? '—'} / ${m.keyMatrixFail ?? '—'} / ${m.keyMatrixUnverified ?? '—'} |`,
+      `| 变异验证（方向键 / 四键矩阵） | ${m.mutationOk ? 'PASS' : 'FAIL'} / ${m.keyMutationOk ? 'PASS' : 'FAIL'} |`,
       '',
       '- 静态快照无法识别 `addEventListener` 注册的键盘处理器，故 `tab-*` / `span#*` 被计入键盘违规；',
       `- 静态报告的「焦点指示缺失 ${focusIndicatorMissing}」对应 el-input-number 增减 span：它们按设计不可 focus，等价键盘功能由同组 input 提供且已实测生效，故不构成真实焦点缺陷；`,
       '- 动态实测对同一批控件真实按键并观察 `aria-selected` / `input.value` 变化，与静态计数**口径不同、互为补充**；',
-      '- 动态实测未覆盖 Space / Enter / Home / End 与屏幕阅读器，剩余能力边界如实保留。',
+      '- 动态实测已覆盖 Home / End / Enter / Space（见 `docs/A11Y-KEYBOARD.md` 键位矩阵）：这四个键在 Element Plus el-tabs 上无有效响应，',
+      `  合计 ${m.keyMatrixFail ?? '—'} 项 FAIL 属 **WAI-ARIA APG 可选增强键 / 自动激活模式不适用键位**（记录型），如实保留、不改写为 PASS，`,
+      '  WCAG 2.1.1 要求的 tab 切换功能已由方向键完整提供；该结论**不等于无障碍达标**，补齐键位需框架层整改（下一轮）。',
+      '- 仍不覆盖屏幕阅读器实测与 Ctrl+Tab 等复合键，剩余能力边界如实保留。',
       ''
     ]
   })()
@@ -307,7 +349,8 @@ function mutationTest() {
     '',
     '> 本轮**不宣称无障碍 100% 达标**：静态键盘违规计数与动态实测能力边界均如实保留。',
     '',
-    ...keyboardSupplement
+    ...keyboardSupplement,
+    ...overlaySupplement
   ]
   fs.writeFileSync(OUT_MD, lines.join('\n'))
 

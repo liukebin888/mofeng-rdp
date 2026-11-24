@@ -13,6 +13,7 @@ import App from './App.vue'
 import router from './router'
 import { createI18n } from './infra/i18nPlugin'
 import { useAppStore } from './store/app'
+import { probeAccessibility, DEFAULT_CONTRAST_PAIRS } from './infra/accessibilityProbe'
 
 const app = createApp(App)
 app.use(createPinia())
@@ -38,5 +39,21 @@ app.mount('#app')
 ;(window as unknown as { __MOFENG_A11Y__?: unknown }).__MOFENG_A11Y__ = {
   collect: () => store.collectAccessibilityEvidence(),
   audit: () => store.accessibilityAudit,
-  evidence: () => store.accessibilityEvidence
+  evidence: () => store.accessibilityEvidence,
+  /**
+   * 限定容器取证（首屏之外的 el-dialog / el-drawer 补充证据）。
+   * 与 collect() 判定完全同源：仍走 infra/accessibilityProbe 的
+   * probeAccessibility → auditFromSnapshots，绝不另写一套判定。
+   * root 支持 CSS 选择器字符串或 DOM 元素；选择器未命中时传 null，
+   * 由采集器返回空快照、domain 空样本 fail-closed，不伪装成全页取证。
+   * 不传 root（undefined）时等价于 collect()，采全 document。
+   */
+  collectIn: (root?: ParentNode | string | null) => {
+    const node: ParentNode | null | undefined =
+      typeof root === 'string' ? document.querySelector(root) : root
+    return probeAccessibility(
+      DEFAULT_CONTRAST_PAIRS,
+      root === undefined ? {} : { root: node ?? null }
+    )
+  }
 }

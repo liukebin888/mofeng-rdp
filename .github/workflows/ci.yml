@@ -99,11 +99,25 @@ jobs:
           curl -sf -H 'x-tenant-id: T-1001' http://127.0.0.1:8787/api/audit \
             | node -e "let s='';process.stdin.on('data',c=>s+=c).on('end',()=>{const j=JSON.parse(s);console.log('audit count='+j.count+' chainOk='+j.chainOk);process.exit(j.chainOk?0:1)})"
 
-      - name: NFR-017 动态键盘实测（真实方向键/上下键，FAIL 或未验证即失败）
+      # 门禁自身回退验证：阻断型异常必阻断、记录型不阻断、还原后恢复放行（11 断言）
+      - name: NFR-017 门禁策略自证（阻断/记录分层变异验证）
+        working-directory: app
+        run: npm run a11y:gate-selftest
+
+      # strict 分层：阻断型=WCAG 强制键位(方向键/上下键)+取证有效性(变异验证/pageerror)；
+      # 记录型=WAI-ARIA APG 可选增强键(Home/End/Enter/Space)，如实披露但不阻断 exit 1。
+      - name: NFR-017 动态键盘实测（强制键位 FAIL/未验证或取证无效即失败；可选增强键记录不阻断）
         working-directory: app
         run: npm run a11y:keyboard -- --strict
 
+      # if: always() 保底：即使前置步骤失败，三份证据仍全部产出并上传；job 仍由失败步骤判红。
+      - name: NFR-017 弹窗/抽屉补充取证（首屏之外，产出证据不宣称达标）
+        if: always()
+        working-directory: app
+        run: npm run a11y:overlay
+
       - name: NFR-017 真实 DOM 可访问性取证（产出证据，不宣称达标）
+        if: always()
         working-directory: app
         run: npm run a11y:evidence
 
@@ -117,6 +131,8 @@ jobs:
             docs/A11Y-EVIDENCE.md
             docs/A11Y-KEYBOARD.json
             docs/A11Y-KEYBOARD.md
+            docs/A11Y-OVERLAY.json
+            docs/A11Y-OVERLAY.md
           if-no-files-found: warn
 
       - name: 停掉测试服务
