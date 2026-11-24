@@ -18,8 +18,11 @@ const BASE = process.env.E2E_BASE || 'http://127.0.0.1:4180'
 const LS_KEY = 'mofeng.rdp.state.v1'
 
 // 重置后端分文件存储（保证测试确定性：后端持久化不得污染 e2e 初始状态）
+// 尊重 MOFENG_DATA_DIR：CI / 本地隔离实例只清临时目录，绝不误删仓库 server/data 的正式演示数据
 function resetBackendState() {
-  const dataDir = path.join(__dirname, '..', '..', 'server', 'data')
+  const dataDir = process.env.MOFENG_DATA_DIR
+    ? path.resolve(process.env.MOFENG_DATA_DIR)
+    : path.join(__dirname, '..', '..', 'server', 'data')
   try {
     if (fs.existsSync(dataDir)) {
       for (const f of fs.readdirSync(dataDir)) {

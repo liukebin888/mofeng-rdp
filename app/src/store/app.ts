@@ -183,7 +183,8 @@ import type { ReportDef, MetricDictEntry } from '@/domain/reportLibrary'
 import { threeWayConsistency } from '@/domain/dataQuality'
 import { validateImport, type FieldMapping } from '@/domain/interop'
 import { defineForm, runHooksAtPoint, apiContractComplete, extensionPointsComplete, type CustomFormDef, type EventHook, type OpenApiEndpoint } from '@/domain/extensionPoint'
-import { checkContrast, checkKeyboardAccessible, checkFormLabels, accessibilityPassRate } from '@/domain/accessibility'
+import { accessibilityPassRate, auditFromSnapshots, type DomElementSnapshot, type A11yEvidenceSummary } from '@/domain/accessibility'
+import { collectDomSnapshots, DEFAULT_CONTRAST_PAIRS } from '@/infra/accessibilityProbe'
 import { validateRegister, validateAccept, validateDispose, summarizeArrivals, type GoodsArrival } from '@/domain/goodsArrival'
 import { evaluatePerformance, validatePerfScore, gradeOf, weightedTotal, summarizePerformance, PERF_GRADES, type SupplierPerfScore, type PerfGrade } from '@/domain/supplierPerformance'
 import { transitionSupplier, checkAdmission, checkNomination, checkPpapComplete, SUPPLIER_STATUSES, type SupplierStatus, type SupplierEvent } from '@/domain/supplier'
@@ -1269,36 +1270,39 @@ export const useAppStore = defineStore('app', () => {
     })
   )
   /**
-   * NFR-017 可访问性审计（设计令牌级抽查）。
+   * NFR-017 可访问性审计（真实 DOM 取证）。
    *
-   * 抽查对象为 tokens.css 真实定义的主题颜色对（非人为填「合格」的假样本）：
-   * 深浅两套主题的正文/次要/弱化文字分别在各自内容背景上必须 ≥4.5:1。
-   * 键盘可达与表单标签为代表性交互元素抽查点（运行时 DOM 全量采样需 e2e 采集，
-   * 本期以 token 静态校验兜底，避免「恒报 100%」假取证）。
+   * 铁律：键盘可达与表单标签的判定输入只能来自 infra/accessibilityProbe.ts
+   * 对真实渲染 DOM 的采集快照，禁止填入人工「合格」样本；
+   * 未取证时 domain 空样本 fail-closed，一律不判通过（不恒报 100%）。
+   * 对比度取 tokens.css 真实令牌色值，判定与评估同源（auditFromSnapshots）。
    */
-  const accessibilityAudit = computed(() => {
-    const contrastChecks = [
-      // 深色主题：正文/次要/弱化文字 对 深色内容背景
-      checkContrast('#e8eefb', '#070c16'), // --text-1 / --bg-0
-      checkContrast('#a9bad4', '#0d1523'), // --text-2 / --bg-1
-      checkContrast('#6f83a3', '#0d1523'), // --text-3 / --bg-1
-      // 浅色主题：正文/次要/弱化文字 对 浅色内容背景（含已整改的 --text-3）
-      checkContrast('#1b2735', '#f4f6fa'), // --text-1 / --bg-0
-      checkContrast('#45546a', '#ffffff'), // --text-2 / --bg-1
-      checkContrast('#5b6b80', '#ffffff') // --text-3 / --bg-1（NFR-017 整改后 ≥4.5:1）
-    ]
-    const keyboardCheck = checkKeyboardAccessible([
-      { id: 'nav', tabbable: true, keyboardActivatable: true, focusIndicator: true },
-      { id: 'btn', tabbable: true, keyboardActivatable: true, focusIndicator: true }
-    ])
-    const labelCheck = checkFormLabels([
-      { id: 'name', hasLabel: true, labelText: '项目名称' },
-      { id: 'owner', hasLabel: true, labelText: '负责人' }
-    ])
-    return { contrastChecks, keyboardCheck, labelCheck }
-  })
+  const accessibilityEvidence = ref<{
+    snapshots: DomElementSnapshot[]
+    sampledAt: string
+    source: string
+    summary: A11yEvidenceSummary
+  } | null>(null)
+  const accessibilityAudit = computed(() =>
+    auditFromSnapshots(
+      DEFAULT_CONTRAST_PAIRS,
+      accessibilityEvidence.value?.snapshots ?? []
+    ).audit
+  )
   /** NFR-017 关键页面抽查通过率 */
   const accessibilityRate = computed(() => accessibilityPassRate([accessibilityAudit.value]))
+  /** 真实 DOM 取证（页面挂载 / 审核脚本调用；只读 DOM，不写业务数据） */
+  function collectAccessibilityEvidence() {
+    const snapshots = collectDomSnapshots()
+    const { audit, evidence } = auditFromSnapshots(DEFAULT_CONTRAST_PAIRS, snapshots)
+    accessibilityEvidence.value = {
+      snapshots,
+      sampledAt: new Date().toISOString(),
+      source: 'runtime-dom',
+      summary: evidence
+    }
+    return { audit, evidence, snapshots }
+  }
   /** ARC-020 事件钩子执行（失败不影响主流程） */
   function fireHook(point: EventHook['point'], payload: unknown) {
     const r = runHooksAtPoint(eventHooks.value, point, payload)
@@ -5418,6 +5422,8 @@ export const useAppStore = defineStore('app', () => {
     extensionCheck,
     accessibilityAudit,
     accessibilityRate,
+    accessibilityEvidence,
+    collectAccessibilityEvidence,
     fireHook,
     projectBaselines,
     projectDeliverables,

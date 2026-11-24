@@ -99,6 +99,20 @@ jobs:
           curl -sf -H 'x-tenant-id: T-1001' http://127.0.0.1:8787/api/audit \
             | node -e "let s='';process.stdin.on('data',c=>s+=c).on('end',()=>{const j=JSON.parse(s);console.log('audit count='+j.count+' chainOk='+j.chainOk);process.exit(j.chainOk?0:1)})"
 
+      - name: NFR-017 真实 DOM 可访问性取证（产出证据，不宣称达标）
+        working-directory: app
+        run: npm run a11y:evidence
+
+      - name: 上传无障碍取证证据
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a11y-evidence
+          path: |
+            docs/A11Y-EVIDENCE.json
+            docs/A11Y-EVIDENCE.md
+          if-no-files-found: warn
+
       - name: 停掉测试服务
         if: always()
         run: |

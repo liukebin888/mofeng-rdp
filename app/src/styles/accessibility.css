@@ -1,0 +1,28 @@
+/**
+ * NFR-017 全局可见焦点指示
+ *
+ * 真实 DOM 取证（scripts/a11y-evidence.cjs）发现：约 85 个原生/ARIA 可操作控件
+ * 在 focus 态既无 outline、也无 box-shadow、也无边框变色，键盘用户无法定位焦点。
+ * Element Plus 组件样式常把 outline 置为 none，而焦点指示属于可访问性底线，
+ * 不允许被组件样式覆盖，故此处用 !important 保证真实可见。
+ *
+ * 作用域仅为「可操作控件」；仅带 tabindex 的布局容器不在此列，避免误加焦点环。
+ */
+button:focus,
+a[href]:focus,
+input:focus,
+select:focus,
+textarea:focus,
+summary:focus,
+[role='button']:focus,
+[role='link']:focus,
+[role='tab']:focus,
+[role='checkbox']:focus,
+[role='menuitem']:focus,
+[role='switch']:focus,
+[role='radio']:focus,
+[role='combobox']:focus,
+[data-keyboard-activatable]:focus {
+  outline: 2px solid var(--brand, #3b82f6) !important;
+  outline-offset: 2px !important;
+}

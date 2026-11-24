@@ -1,0 +1,3016 @@
+{
+  "generatedAt": "2026-11-24T06:21:14.509Z",
+  "base": "http://127.0.0.1:4181",
+  "method": "真实 Chromium 渲染 DOM + 页面同源取证接口 window.__MOFENG_A11Y__.collect()（判定与 domain/accessibility.ts 同源）",
+  "metrics": {
+    "routesTotal": 104,
+    "pagesVisited": 104,
+    "pagesWithSamples": 104,
+    "apiMissing": 0,
+    "totalElements": 4867,
+    "totalInteractive": 2420,
+    "totalControls": 103,
+    "distinctSampleCounts": 18,
+    "keyboardViolationCount": 27,
+    "labelViolationCount": 57,
+    "focusIndicatorMissing": 4,
+    "excludedContainers": 1164,
+    "failedPageCount": 27,
+    "pageErrorCount": 0
+  },
+  "mutation": {
+    "ok": true,
+    "labelDetected": true,
+    "keyboardDetected": true,
+    "labelRecovered": true,
+    "keyboardRecovered": true,
+    "during": {
+      "sampledElements": 479,
+      "keyboardViolations": [
+        "tab-org",
+        "tab-users",
+        "A11Y-MUTATION-NO-FOCUS"
+      ],
+      "labelViolations": [
+        "A11Y-MUTATION-NO-LABEL"
+      ]
+    },
+    "after": {
+      "sampledElements": 477,
+      "keyboardViolations": [
+        "tab-org",
+        "tab-users"
+      ],
+      "labelViolations": []
+    }
+  },
+  "rows": [
+    {
+      "path": "/workbench/today",
+      "evidence": {
+        "sampledElements": 31,
+        "interactiveCount": 15,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 15 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/workbench/tasks",
+      "evidence": {
+        "sampledElements": 31,
+        "interactiveCount": 15,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 15 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/workbench/todos",
+      "evidence": {
+        "sampledElements": 66,
+        "interactiveCount": 48,
+        "controlCount": 1,
+        "keyboardViolations": [],
+        "labelViolations": [
+          "el-id-2949-56"
+        ],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 7,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 48 个交互元素键盘可达",
+      "labelOk": false,
+      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "keyboardViolations": [],
+      "labelViolations": [
+        "el-id-2949-56"
+      ]
+    },
+    {
+      "path": "/workbench/messages",
+      "evidence": {
+        "sampledElements": 32,
+        "interactiveCount": 14,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 14 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/workbench/hours",
+      "evidence": {
+        "sampledElements": 40,
+        "interactiveCount": 19,
+        "controlCount": 3,
+        "keyboardViolations": [
+          "span#18",
+          "span#19"
+        ],
+        "labelViolations": [],
+        "focusIndicatorMissing": 2,
+        "excludedContainers": 10,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": false,
+      "keyboardNote": "真实 DOM 取证 2/19 个交互元素不达标",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 3 个表单控件具备可读标签",
+      "keyboardViolations": [
+        {
+          "id": "span#18",
+          "tabbable": false,
+          "keyboardActivatable": false,
+          "focusIndicator": false
+        },
+        {
+          "id": "span#19",
+          "tabbable": false,
+          "keyboardActivatable": false,
+          "focusIndicator": false
+        }
+      ],
+      "labelViolations": []
+    },
+    {
+      "path": "/workbench/light-task-board",
+      "evidence": {
+        "sampledElements": 32,
+        "interactiveCount": 17,
+        "controlCount": 3,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 4,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 17 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 3 个表单控件具备可读标签",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/workbench/dashboard",
+      "evidence": {
+        "sampledElements": 30,
+        "interactiveCount": 13,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 6,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 13 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/workbench/portfolio",
+      "evidence": {
+        "sampledElements": 28,
+        "interactiveCount": 12,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 12 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/workbench/audit",
+      "evidence": {
+        "sampledElements": 32,
+        "interactiveCount": 16,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 16 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/workbench/rules",
+      "evidence": {
+        "sampledElements": 30,
+        "interactiveCount": 13,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 6,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 13 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/presale/presale-apply",
+      "evidence": {
+        "sampledElements": 33,
+        "interactiveCount": 14,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 4,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 14 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/presale/quote-apply",
+      "evidence": {
+        "sampledElements": 33,
+        "interactiveCount": 14,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 4,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 14 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/presale/scheme",
+      "evidence": {
+        "sampledElements": 33,
+        "interactiveCount": 14,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 4,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 14 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/presale/apply",
+      "evidence": {
+        "sampledElements": 33,
+        "interactiveCount": 14,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 4,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 14 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/presale/review",
+      "evidence": {
+        "sampledElements": 37,
+        "interactiveCount": 16,
+        "controlCount": 3,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 9,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 16 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 3 个表单控件具备可读标签",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/presale/flow",
+      "evidence": {
+        "sampledElements": 31,
+        "interactiveCount": 13,
+        "controlCount": 1,
+        "keyboardViolations": [],
+        "labelViolations": [
+          "el-id-2949-106"
+        ],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 7,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 13 个交互元素键盘可达",
+      "labelOk": false,
+      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "keyboardViolations": [],
+      "labelViolations": [
+        "el-id-2949-106"
+      ]
+    },
+    {
+      "path": "/presale/analysis",
+      "evidence": {
+        "sampledElements": 28,
+        "interactiveCount": 12,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 12 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/project/task",
+      "evidence": {
+        "sampledElements": 33,
+        "interactiveCount": 14,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 4,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 14 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/project/plan",
+      "evidence": {
+        "sampledElements": 30,
+        "interactiveCount": 15,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 4,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 15 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/project/sample-request",
+      "evidence": {
+        "sampledElements": 32,
+        "interactiveCount": 15,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 15 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/project/ots",
+      "evidence": {
+        "sampledElements": 33,
+        "interactiveCount": 14,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 4,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 14 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/project/ots-attachment-a",
+      "evidence": {
+        "sampledElements": 45,
+        "interactiveCount": 27,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 7,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 27 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/project/ots-attachment-b",
+      "evidence": {
+        "sampledElements": 27,
+        "interactiveCount": 12,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 4,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 12 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/project/ots-attachment-c",
+      "evidence": {
+        "sampledElements": 27,
+        "interactiveCount": 12,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 4,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 12 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/project/ppap",
+      "evidence": {
+        "sampledElements": 33,
+        "interactiveCount": 14,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 4,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 14 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/project/sop",
+      "evidence": {
+        "sampledElements": 33,
+        "interactiveCount": 14,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 4,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 14 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/issue-risk/issue",
+      "evidence": {
+        "sampledElements": 34,
+        "interactiveCount": 18,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 18 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/issue-risk/risk",
+      "evidence": {
+        "sampledElements": 37,
+        "interactiveCount": 20,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 6,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 20 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/plan/list",
+      "evidence": {
+        "sampledElements": 34,
+        "interactiveCount": 18,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 18 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/plan/wbs",
+      "evidence": {
+        "sampledElements": 33,
+        "interactiveCount": 16,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 6,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 16 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/plan/weight",
+      "evidence": {
+        "sampledElements": 33,
+        "interactiveCount": 16,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 6,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 16 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/plan/quality",
+      "evidence": {
+        "sampledElements": 32,
+        "interactiveCount": 14,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 6,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 14 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/plan/milestone",
+      "evidence": {
+        "sampledElements": 32,
+        "interactiveCount": 14,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 6,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 14 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/plan/deviation",
+      "evidence": {
+        "sampledElements": 29,
+        "interactiveCount": 14,
+        "controlCount": 1,
+        "keyboardViolations": [],
+        "labelViolations": [
+          "el-id-2949-133"
+        ],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 4,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 14 个交互元素键盘可达",
+      "labelOk": false,
+      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "keyboardViolations": [],
+      "labelViolations": [
+        "el-id-2949-133"
+      ]
+    },
+    {
+      "path": "/plan/resource",
+      "evidence": {
+        "sampledElements": 34,
+        "interactiveCount": 15,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 8,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 15 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/plan/change",
+      "evidence": {
+        "sampledElements": 29,
+        "interactiveCount": 13,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 13 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/plan/alert",
+      "evidence": {
+        "sampledElements": 28,
+        "interactiveCount": 13,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 4,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 13 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/plan/interface",
+      "evidence": {
+        "sampledElements": 28,
+        "interactiveCount": 13,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 4,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 13 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/dev/part-number-apply",
+      "evidence": {
+        "sampledElements": 33,
+        "interactiveCount": 14,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 4,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 14 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/dev/requirements",
+      "evidence": {
+        "sampledElements": 50,
+        "interactiveCount": 18,
+        "controlCount": 1,
+        "keyboardViolations": [],
+        "labelViolations": [
+          "el-id-2949-153"
+        ],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 10,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 18 个交互元素键盘可达",
+      "labelOk": false,
+      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "keyboardViolations": [],
+      "labelViolations": [
+        "el-id-2949-153"
+      ]
+    },
+    {
+      "path": "/dev/grading",
+      "evidence": {
+        "sampledElements": 29,
+        "interactiveCount": 13,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 13 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/dev/trace",
+      "evidence": {
+        "sampledElements": 31,
+        "interactiveCount": 13,
+        "controlCount": 1,
+        "keyboardViolations": [],
+        "labelViolations": [
+          "el-id-2949-157"
+        ],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 7,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 13 个交互元素键盘可达",
+      "labelOk": false,
+      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "keyboardViolations": [],
+      "labelViolations": [
+        "el-id-2949-157"
+      ]
+    },
+    {
+      "path": "/dev/ebom",
+      "evidence": {
+        "sampledElements": 31,
+        "interactiveCount": 15,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 15 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/dev/ecr",
+      "evidence": {
+        "sampledElements": 33,
+        "interactiveCount": 14,
+        "controlCount": 1,
+        "keyboardViolations": [],
+        "labelViolations": [
+          "el-id-2949-158"
+        ],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 14 个交互元素键盘可达",
+      "labelOk": false,
+      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "keyboardViolations": [],
+      "labelViolations": [
+        "el-id-2949-158"
+      ]
+    },
+    {
+      "path": "/dev/gate",
+      "evidence": {
+        "sampledElements": 47,
+        "interactiveCount": 27,
+        "controlCount": 9,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 7,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 27 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 9 个表单控件具备可读标签",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/dev/baseline",
+      "evidence": {
+        "sampledElements": 32,
+        "interactiveCount": 14,
+        "controlCount": 1,
+        "keyboardViolations": [],
+        "labelViolations": [
+          "el-id-2949-169"
+        ],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 7,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 14 个交互元素键盘可达",
+      "labelOk": false,
+      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "keyboardViolations": [],
+      "labelViolations": [
+        "el-id-2949-169"
+      ]
+    },
+    {
+      "path": "/dev/version",
+      "evidence": {
+        "sampledElements": 31,
+        "interactiveCount": 13,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 7,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 13 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/dev/software-release",
+      "evidence": {
+        "sampledElements": 33,
+        "interactiveCount": 14,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 4,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 14 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/dev/external-part-approval",
+      "evidence": {
+        "sampledElements": 33,
+        "interactiveCount": 14,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 4,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 14 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/trial/samples",
+      "evidence": {
+        "sampledElements": 34,
+        "interactiveCount": 17,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 6,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 17 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/trial/kitting",
+      "evidence": {
+        "sampledElements": 34,
+        "interactiveCount": 17,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 6,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 17 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/trial/workorder",
+      "evidence": {
+        "sampledElements": 30,
+        "interactiveCount": 12,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 6,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 12 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/trial/inspect",
+      "evidence": {
+        "sampledElements": 31,
+        "interactiveCount": 13,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 7,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 13 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/quality/risk",
+      "evidence": {
+        "sampledElements": 37,
+        "interactiveCount": 20,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 6,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 20 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/quality/criteria",
+      "evidence": {
+        "sampledElements": 28,
+        "interactiveCount": 12,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 12 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/quality/vuln",
+      "evidence": {
+        "sampledElements": 37,
+        "interactiveCount": 20,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 6,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 20 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/quality/coverage",
+      "evidence": {
+        "sampledElements": 31,
+        "interactiveCount": 13,
+        "controlCount": 1,
+        "keyboardViolations": [],
+        "labelViolations": [
+          "el-id-2949-193"
+        ],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 7,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 13 个交互元素键盘可达",
+      "labelOk": false,
+      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "keyboardViolations": [],
+      "labelViolations": [
+        "el-id-2949-193"
+      ]
+    },
+    {
+      "path": "/quality/pdca",
+      "evidence": {
+        "sampledElements": 29,
+        "interactiveCount": 13,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 13 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/quality/knowledge",
+      "evidence": {
+        "sampledElements": 51,
+        "interactiveCount": 23,
+        "controlCount": 9,
+        "keyboardViolations": [],
+        "labelViolations": [
+          "el-id-2949-249",
+          "el-id-2949-250",
+          "el-id-2949-251",
+          "el-id-2949-252"
+        ],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 17,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 23 个交互元素键盘可达",
+      "labelOk": false,
+      "labelNote": "真实 DOM 取证 4/9 个控件缺标签",
+      "keyboardViolations": [],
+      "labelViolations": [
+        "el-id-2949-249",
+        "el-id-2949-250",
+        "el-id-2949-251",
+        "el-id-2949-252"
+      ]
+    },
+    {
+      "path": "/quality/report",
+      "evidence": {
+        "sampledElements": 31,
+        "interactiveCount": 13,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 7,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 13 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/quality/nonconformity",
+      "evidence": {
+        "sampledElements": 33,
+        "interactiveCount": 13,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 9,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 13 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/cost/budget",
+      "evidence": {
+        "sampledElements": 29,
+        "interactiveCount": 12,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 6,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 12 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/cost/deviation",
+      "evidence": {
+        "sampledElements": 34,
+        "interactiveCount": 18,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 18 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/cost/hours",
+      "evidence": {
+        "sampledElements": 34,
+        "interactiveCount": 18,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 18 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/cost/evm",
+      "evidence": {
+        "sampledElements": 34,
+        "interactiveCount": 18,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 18 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/cost/score",
+      "evidence": {
+        "sampledElements": 30,
+        "interactiveCount": 14,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 14 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/cost/capacity",
+      "evidence": {
+        "sampledElements": 30,
+        "interactiveCount": 14,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 14 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/cost/analysis",
+      "evidence": {
+        "sampledElements": 42,
+        "interactiveCount": 18,
+        "controlCount": 5,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 13,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 18 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 5 个表单控件具备可读标签",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/cost/eps",
+      "evidence": {
+        "sampledElements": 28,
+        "interactiveCount": 12,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 12 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/cost/gate-consistency",
+      "evidence": {
+        "sampledElements": 28,
+        "interactiveCount": 12,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 12 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/doc/library",
+      "evidence": {
+        "sampledElements": 34,
+        "interactiveCount": 16,
+        "controlCount": 1,
+        "keyboardViolations": [],
+        "labelViolations": [
+          "el-id-2949-279"
+        ],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 7,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 16 个交互元素键盘可达",
+      "labelOk": false,
+      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "keyboardViolations": [],
+      "labelViolations": [
+        "el-id-2949-279"
+      ]
+    },
+    {
+      "path": "/doc/master-plan-templates",
+      "evidence": {
+        "sampledElements": 27,
+        "interactiveCount": 12,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 4,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 12 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/doc/mdr",
+      "evidence": {
+        "sampledElements": 34,
+        "interactiveCount": 16,
+        "controlCount": 1,
+        "keyboardViolations": [],
+        "labelViolations": [
+          "el-id-2949-284"
+        ],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 7,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 16 个交互元素键盘可达",
+      "labelOk": false,
+      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "keyboardViolations": [],
+      "labelViolations": [
+        "el-id-2949-284"
+      ]
+    },
+    {
+      "path": "/doc/signoff",
+      "evidence": {
+        "sampledElements": 34,
+        "interactiveCount": 16,
+        "controlCount": 1,
+        "keyboardViolations": [],
+        "labelViolations": [
+          "el-id-2949-284"
+        ],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 7,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 16 个交互元素键盘可达",
+      "labelOk": false,
+      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "keyboardViolations": [],
+      "labelViolations": [
+        "el-id-2949-284"
+      ]
+    },
+    {
+      "path": "/flow/start",
+      "evidence": {
+        "sampledElements": 66,
+        "interactiveCount": 48,
+        "controlCount": 1,
+        "keyboardViolations": [],
+        "labelViolations": [
+          "el-id-2949-323"
+        ],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 7,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 48 个交互元素键盘可达",
+      "labelOk": false,
+      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "keyboardViolations": [],
+      "labelViolations": [
+        "el-id-2949-323"
+      ]
+    },
+    {
+      "path": "/flow/approvals",
+      "evidence": {
+        "sampledElements": 66,
+        "interactiveCount": 48,
+        "controlCount": 1,
+        "keyboardViolations": [],
+        "labelViolations": [
+          "el-id-2949-323"
+        ],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 7,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 48 个交互元素键盘可达",
+      "labelOk": false,
+      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "keyboardViolations": [],
+      "labelViolations": [
+        "el-id-2949-323"
+      ]
+    },
+    {
+      "path": "/flow/monitor",
+      "evidence": {
+        "sampledElements": 66,
+        "interactiveCount": 48,
+        "controlCount": 1,
+        "keyboardViolations": [],
+        "labelViolations": [
+          "el-id-2949-323"
+        ],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 7,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 48 个交互元素键盘可达",
+      "labelOk": false,
+      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "keyboardViolations": [],
+      "labelViolations": [
+        "el-id-2949-323"
+      ]
+    },
+    {
+      "path": "/flow/apqp",
+      "evidence": {
+        "sampledElements": 76,
+        "interactiveCount": 17,
+        "controlCount": 0,
+        "keyboardViolations": [
+          "tab-flow",
+          "tab-template",
+          "tab-gate",
+          "tab-calendar"
+        ],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 30,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": false,
+      "keyboardNote": "真实 DOM 取证 4/17 个交互元素不达标",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [
+        {
+          "id": "tab-flow",
+          "tabbable": true,
+          "keyboardActivatable": false,
+          "focusIndicator": true
+        },
+        {
+          "id": "tab-template",
+          "tabbable": false,
+          "keyboardActivatable": false,
+          "focusIndicator": true
+        },
+        {
+          "id": "tab-gate",
+          "tabbable": false,
+          "keyboardActivatable": false,
+          "focusIndicator": true
+        },
+        {
+          "id": "tab-calendar",
+          "tabbable": false,
+          "keyboardActivatable": false,
+          "focusIndicator": true
+        }
+      ],
+      "labelViolations": []
+    },
+    {
+      "path": "/flow/config",
+      "evidence": {
+        "sampledElements": 29,
+        "interactiveCount": 13,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 13 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/supply/supplier",
+      "evidence": {
+        "sampledElements": 50,
+        "interactiveCount": 18,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 14,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 18 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/supply/portal",
+      "evidence": {
+        "sampledElements": 30,
+        "interactiveCount": 13,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 6,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 13 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/supply/purchase-plan",
+      "evidence": {
+        "sampledElements": 31,
+        "interactiveCount": 14,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 6,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 14 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/supply/tender",
+      "evidence": {
+        "sampledElements": 29,
+        "interactiveCount": 13,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 13 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/supply/sample-purchase",
+      "evidence": {
+        "sampledElements": 31,
+        "interactiveCount": 15,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 15 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/supply/deliverables",
+      "evidence": {
+        "sampledElements": 32,
+        "interactiveCount": 16,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 16 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/supply/ship",
+      "evidence": {
+        "sampledElements": 32,
+        "interactiveCount": 16,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 16 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/supply/soft",
+      "evidence": {
+        "sampledElements": 30,
+        "interactiveCount": 12,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 6,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 12 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/ai/assist",
+      "evidence": {
+        "sampledElements": 46,
+        "interactiveCount": 16,
+        "controlCount": 1,
+        "keyboardViolations": [
+          "tab-rules",
+          "tab-chat"
+        ],
+        "labelViolations": [
+          "el-id-2949-370"
+        ],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 8,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": false,
+      "keyboardNote": "真实 DOM 取证 2/16 个交互元素不达标",
+      "labelOk": false,
+      "labelNote": "真实 DOM 取证 1/1 个控件缺标签",
+      "keyboardViolations": [
+        {
+          "id": "tab-rules",
+          "tabbable": true,
+          "keyboardActivatable": false,
+          "focusIndicator": true
+        },
+        {
+          "id": "tab-chat",
+          "tabbable": false,
+          "keyboardActivatable": false,
+          "focusIndicator": true
+        }
+      ],
+      "labelViolations": [
+        "el-id-2949-370"
+      ]
+    },
+    {
+      "path": "/basic/customer",
+      "evidence": {
+        "sampledElements": 186,
+        "interactiveCount": 169,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 169 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/basic/product",
+      "evidence": {
+        "sampledElements": 40,
+        "interactiveCount": 24,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 4,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 24 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/basic/product-code",
+      "evidence": {
+        "sampledElements": 66,
+        "interactiveCount": 18,
+        "controlCount": 0,
+        "keyboardViolations": [
+          "tab-rule",
+          "tab-customer",
+          "tab-vehicle",
+          "tab-ptype",
+          "tab-build",
+          "tab-agg"
+        ],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 24,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": false,
+      "keyboardNote": "真实 DOM 取证 6/18 个交互元素不达标",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [
+        {
+          "id": "tab-rule",
+          "tabbable": true,
+          "keyboardActivatable": false,
+          "focusIndicator": true
+        },
+        {
+          "id": "tab-customer",
+          "tabbable": false,
+          "keyboardActivatable": false,
+          "focusIndicator": true
+        },
+        {
+          "id": "tab-vehicle",
+          "tabbable": false,
+          "keyboardActivatable": false,
+          "focusIndicator": true
+        },
+        {
+          "id": "tab-ptype",
+          "tabbable": false,
+          "keyboardActivatable": false,
+          "focusIndicator": true
+        },
+        {
+          "id": "tab-build",
+          "tabbable": false,
+          "keyboardActivatable": false,
+          "focusIndicator": true
+        },
+        {
+          "id": "tab-agg",
+          "tabbable": false,
+          "keyboardActivatable": false,
+          "focusIndicator": true
+        }
+      ],
+      "labelViolations": []
+    },
+    {
+      "path": "/basic/naming",
+      "evidence": {
+        "sampledElements": 102,
+        "interactiveCount": 84,
+        "controlCount": 24,
+        "keyboardViolations": [],
+        "labelViolations": [
+          "el-id-2949-563",
+          "el-id-2949-564",
+          "el-id-2949-565",
+          "el-id-2949-566",
+          "el-id-2949-567",
+          "el-id-2949-568",
+          "el-id-2949-569",
+          "el-id-2949-570",
+          "el-id-2949-571",
+          "el-id-2949-572",
+          "el-id-2949-573",
+          "el-id-2949-574",
+          "el-id-2949-575",
+          "el-id-2949-576",
+          "el-id-2949-577"
+        ],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 6,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 84 个交互元素键盘可达",
+      "labelOk": false,
+      "labelNote": "真实 DOM 取证 15/24 个控件缺标签",
+      "keyboardViolations": [],
+      "labelViolations": [
+        "el-id-2949-563",
+        "el-id-2949-564",
+        "el-id-2949-565",
+        "el-id-2949-566",
+        "el-id-2949-567",
+        "el-id-2949-568",
+        "el-id-2949-569",
+        "el-id-2949-570",
+        "el-id-2949-571",
+        "el-id-2949-572",
+        "el-id-2949-573",
+        "el-id-2949-574",
+        "el-id-2949-575",
+        "el-id-2949-576",
+        "el-id-2949-577"
+      ]
+    },
+    {
+      "path": "/basic/deliverable-control",
+      "evidence": {
+        "sampledElements": 39,
+        "interactiveCount": 18,
+        "controlCount": 2,
+        "keyboardViolations": [
+          "tab-matrix",
+          "tab-level",
+          "tab-duty"
+        ],
+        "labelViolations": [
+          "el-id-2949-591",
+          "el-id-2949-592"
+        ],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 10,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": false,
+      "keyboardNote": "真实 DOM 取证 3/18 个交互元素不达标",
+      "labelOk": false,
+      "labelNote": "真实 DOM 取证 2/2 个控件缺标签",
+      "keyboardViolations": [
+        {
+          "id": "tab-matrix",
+          "tabbable": true,
+          "keyboardActivatable": false,
+          "focusIndicator": true
+        },
+        {
+          "id": "tab-level",
+          "tabbable": false,
+          "keyboardActivatable": false,
+          "focusIndicator": true
+        },
+        {
+          "id": "tab-duty",
+          "tabbable": false,
+          "keyboardActivatable": false,
+          "focusIndicator": true
+        }
+      ],
+      "labelViolations": [
+        "el-id-2949-591",
+        "el-id-2949-592"
+      ]
+    },
+    {
+      "path": "/admin/org",
+      "evidence": {
+        "sampledElements": 477,
+        "interactiveCount": 239,
+        "controlCount": 0,
+        "keyboardViolations": [
+          "tab-org",
+          "tab-users"
+        ],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 225,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": false,
+      "keyboardNote": "真实 DOM 取证 2/239 个交互元素不达标",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [
+        {
+          "id": "tab-org",
+          "tabbable": true,
+          "keyboardActivatable": false,
+          "focusIndicator": true
+        },
+        {
+          "id": "tab-users",
+          "tabbable": false,
+          "keyboardActivatable": false,
+          "focusIndicator": true
+        }
+      ],
+      "labelViolations": []
+    },
+    {
+      "path": "/admin/roles",
+      "evidence": {
+        "sampledElements": 30,
+        "interactiveCount": 12,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 7,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 12 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/admin/overload",
+      "evidence": {
+        "sampledElements": 34,
+        "interactiveCount": 18,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 18 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/admin/pool",
+      "evidence": {
+        "sampledElements": 41,
+        "interactiveCount": 21,
+        "controlCount": 3,
+        "keyboardViolations": [],
+        "labelViolations": [
+          "el-id-2949-601",
+          "el-id-2949-602",
+          "el-id-2949-603"
+        ],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 9,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 21 个交互元素键盘可达",
+      "labelOk": false,
+      "labelNote": "真实 DOM 取证 3/3 个控件缺标签",
+      "keyboardViolations": [],
+      "labelViolations": [
+        "el-id-2949-601",
+        "el-id-2949-602",
+        "el-id-2949-603"
+      ]
+    },
+    {
+      "path": "/system/audit",
+      "evidence": {
+        "sampledElements": 32,
+        "interactiveCount": 14,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 6,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 14 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/system/dict",
+      "evidence": {
+        "sampledElements": 54,
+        "interactiveCount": 20,
+        "controlCount": 2,
+        "keyboardViolations": [
+          "tab-dict",
+          "tab-udf",
+          "tab-step",
+          "tab-extension"
+        ],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 15,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": false,
+      "keyboardNote": "真实 DOM 取证 4/20 个交互元素不达标",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 2 个表单控件具备可读标签",
+      "keyboardViolations": [
+        {
+          "id": "tab-dict",
+          "tabbable": true,
+          "keyboardActivatable": false,
+          "focusIndicator": true
+        },
+        {
+          "id": "tab-udf",
+          "tabbable": false,
+          "keyboardActivatable": false,
+          "focusIndicator": true
+        },
+        {
+          "id": "tab-step",
+          "tabbable": false,
+          "keyboardActivatable": false,
+          "focusIndicator": true
+        },
+        {
+          "id": "tab-extension",
+          "tabbable": false,
+          "keyboardActivatable": false,
+          "focusIndicator": true
+        }
+      ],
+      "labelViolations": []
+    },
+    {
+      "path": "/system/rejection",
+      "evidence": {
+        "sampledElements": 99,
+        "interactiveCount": 31,
+        "controlCount": 18,
+        "keyboardViolations": [],
+        "labelViolations": [
+          "el-id-2949-748",
+          "el-id-2949-749",
+          "el-id-2949-750",
+          "el-id-2949-751",
+          "el-id-2949-753",
+          "el-id-2949-754",
+          "el-id-2949-755",
+          "el-id-2949-756",
+          "el-id-2949-758",
+          "el-id-2949-759",
+          "el-id-2949-760",
+          "el-id-2949-761",
+          "el-id-2949-762",
+          "el-id-2949-763",
+          "el-id-2949-764",
+          "el-id-2949-765",
+          "el-id-2949-769",
+          "el-id-2949-771"
+        ],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 51,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 31 个交互元素键盘可达",
+      "labelOk": false,
+      "labelNote": "真实 DOM 取证 18/18 个控件缺标签",
+      "keyboardViolations": [],
+      "labelViolations": [
+        "el-id-2949-748",
+        "el-id-2949-749",
+        "el-id-2949-750",
+        "el-id-2949-751",
+        "el-id-2949-753",
+        "el-id-2949-754",
+        "el-id-2949-755",
+        "el-id-2949-756",
+        "el-id-2949-758",
+        "el-id-2949-759",
+        "el-id-2949-760",
+        "el-id-2949-761",
+        "el-id-2949-762",
+        "el-id-2949-763",
+        "el-id-2949-764",
+        "el-id-2949-765",
+        "el-id-2949-769",
+        "el-id-2949-771"
+      ]
+    },
+    {
+      "path": "/system/calendar",
+      "evidence": {
+        "sampledElements": 50,
+        "interactiveCount": 24,
+        "controlCount": 7,
+        "keyboardViolations": [
+          "span#18",
+          "span#19"
+        ],
+        "labelViolations": [],
+        "focusIndicatorMissing": 2,
+        "excludedContainers": 15,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": false,
+      "keyboardNote": "真实 DOM 取证 2/24 个交互元素不达标",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 7 个表单控件具备可读标签",
+      "keyboardViolations": [
+        {
+          "id": "span#18",
+          "tabbable": false,
+          "keyboardActivatable": false,
+          "focusIndicator": false
+        },
+        {
+          "id": "span#19",
+          "tabbable": false,
+          "keyboardActivatable": false,
+          "focusIndicator": false
+        }
+      ],
+      "labelViolations": []
+    },
+    {
+      "path": "/system/ops",
+      "evidence": {
+        "sampledElements": 34,
+        "interactiveCount": 17,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 6,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 17 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/system/probe",
+      "evidence": {
+        "sampledElements": 29,
+        "interactiveCount": 14,
+        "controlCount": 0,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 4,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 14 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/system/data",
+      "evidence": {
+        "sampledElements": 477,
+        "interactiveCount": 239,
+        "controlCount": 0,
+        "keyboardViolations": [
+          "tab-org",
+          "tab-users"
+        ],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 225,
+        "evidenceCollected": true
+      },
+      "contrastOk": true,
+      "contrastMin": 4.75,
+      "keyboardOk": false,
+      "keyboardNote": "真实 DOM 取证 2/239 个交互元素不达标",
+      "labelOk": true,
+      "labelNote": "本页无表单控件（不适用）",
+      "keyboardViolations": [
+        {
+          "id": "tab-org",
+          "tabbable": true,
+          "keyboardActivatable": false,
+          "focusIndicator": true
+        },
+        {
+          "id": "tab-users",
+          "tabbable": false,
+          "keyboardActivatable": false,
+          "focusIndicator": true
+        }
+      ],
+      "labelViolations": []
+    }
+  ],
+  "keyboardViolations": [
+    {
+      "path": "/workbench/hours",
+      "id": "span#18",
+      "tabbable": false,
+      "keyboardActivatable": false,
+      "focusIndicator": false
+    },
+    {
+      "path": "/workbench/hours",
+      "id": "span#19",
+      "tabbable": false,
+      "keyboardActivatable": false,
+      "focusIndicator": false
+    },
+    {
+      "path": "/flow/apqp",
+      "id": "tab-flow",
+      "tabbable": true,
+      "keyboardActivatable": false,
+      "focusIndicator": true
+    },
+    {
+      "path": "/flow/apqp",
+      "id": "tab-template",
+      "tabbable": false,
+      "keyboardActivatable": false,
+      "focusIndicator": true
+    },
+    {
+      "path": "/flow/apqp",
+      "id": "tab-gate",
+      "tabbable": false,
+      "keyboardActivatable": false,
+      "focusIndicator": true
+    },
+    {
+      "path": "/flow/apqp",
+      "id": "tab-calendar",
+      "tabbable": false,
+      "keyboardActivatable": false,
+      "focusIndicator": true
+    },
+    {
+      "path": "/ai/assist",
+      "id": "tab-rules",
+      "tabbable": true,
+      "keyboardActivatable": false,
+      "focusIndicator": true
+    },
+    {
+      "path": "/ai/assist",
+      "id": "tab-chat",
+      "tabbable": false,
+      "keyboardActivatable": false,
+      "focusIndicator": true
+    },
+    {
+      "path": "/basic/product-code",
+      "id": "tab-rule",
+      "tabbable": true,
+      "keyboardActivatable": false,
+      "focusIndicator": true
+    },
+    {
+      "path": "/basic/product-code",
+      "id": "tab-customer",
+      "tabbable": false,
+      "keyboardActivatable": false,
+      "focusIndicator": true
+    },
+    {
+      "path": "/basic/product-code",
+      "id": "tab-vehicle",
+      "tabbable": false,
+      "keyboardActivatable": false,
+      "focusIndicator": true
+    },
+    {
+      "path": "/basic/product-code",
+      "id": "tab-ptype",
+      "tabbable": false,
+      "keyboardActivatable": false,
+      "focusIndicator": true
+    },
+    {
+      "path": "/basic/product-code",
+      "id": "tab-build",
+      "tabbable": false,
+      "keyboardActivatable": false,
+      "focusIndicator": true
+    },
+    {
+      "path": "/basic/product-code",
+      "id": "tab-agg",
+      "tabbable": false,
+      "keyboardActivatable": false,
+      "focusIndicator": true
+    },
+    {
+      "path": "/basic/deliverable-control",
+      "id": "tab-matrix",
+      "tabbable": true,
+      "keyboardActivatable": false,
+      "focusIndicator": true
+    },
+    {
+      "path": "/basic/deliverable-control",
+      "id": "tab-level",
+      "tabbable": false,
+      "keyboardActivatable": false,
+      "focusIndicator": true
+    },
+    {
+      "path": "/basic/deliverable-control",
+      "id": "tab-duty",
+      "tabbable": false,
+      "keyboardActivatable": false,
+      "focusIndicator": true
+    },
+    {
+      "path": "/admin/org",
+      "id": "tab-org",
+      "tabbable": true,
+      "keyboardActivatable": false,
+      "focusIndicator": true
+    },
+    {
+      "path": "/admin/org",
+      "id": "tab-users",
+      "tabbable": false,
+      "keyboardActivatable": false,
+      "focusIndicator": true
+    },
+    {
+      "path": "/system/dict",
+      "id": "tab-dict",
+      "tabbable": true,
+      "keyboardActivatable": false,
+      "focusIndicator": true
+    },
+    {
+      "path": "/system/dict",
+      "id": "tab-udf",
+      "tabbable": false,
+      "keyboardActivatable": false,
+      "focusIndicator": true
+    },
+    {
+      "path": "/system/dict",
+      "id": "tab-step",
+      "tabbable": false,
+      "keyboardActivatable": false,
+      "focusIndicator": true
+    },
+    {
+      "path": "/system/dict",
+      "id": "tab-extension",
+      "tabbable": false,
+      "keyboardActivatable": false,
+      "focusIndicator": true
+    },
+    {
+      "path": "/system/calendar",
+      "id": "span#18",
+      "tabbable": false,
+      "keyboardActivatable": false,
+      "focusIndicator": false
+    },
+    {
+      "path": "/system/calendar",
+      "id": "span#19",
+      "tabbable": false,
+      "keyboardActivatable": false,
+      "focusIndicator": false
+    },
+    {
+      "path": "/system/data",
+      "id": "tab-org",
+      "tabbable": true,
+      "keyboardActivatable": false,
+      "focusIndicator": true
+    },
+    {
+      "path": "/system/data",
+      "id": "tab-users",
+      "tabbable": false,
+      "keyboardActivatable": false,
+      "focusIndicator": true
+    }
+  ],
+  "labelViolations": [
+    {
+      "path": "/workbench/todos",
+      "id": "el-id-2949-56"
+    },
+    {
+      "path": "/presale/flow",
+      "id": "el-id-2949-106"
+    },
+    {
+      "path": "/plan/deviation",
+      "id": "el-id-2949-133"
+    },
+    {
+      "path": "/dev/requirements",
+      "id": "el-id-2949-153"
+    },
+    {
+      "path": "/dev/trace",
+      "id": "el-id-2949-157"
+    },
+    {
+      "path": "/dev/ecr",
+      "id": "el-id-2949-158"
+    },
+    {
+      "path": "/dev/baseline",
+      "id": "el-id-2949-169"
+    },
+    {
+      "path": "/quality/coverage",
+      "id": "el-id-2949-193"
+    },
+    {
+      "path": "/quality/knowledge",
+      "id": "el-id-2949-249"
+    },
+    {
+      "path": "/quality/knowledge",
+      "id": "el-id-2949-250"
+    },
+    {
+      "path": "/quality/knowledge",
+      "id": "el-id-2949-251"
+    },
+    {
+      "path": "/quality/knowledge",
+      "id": "el-id-2949-252"
+    },
+    {
+      "path": "/doc/library",
+      "id": "el-id-2949-279"
+    },
+    {
+      "path": "/doc/mdr",
+      "id": "el-id-2949-284"
+    },
+    {
+      "path": "/doc/signoff",
+      "id": "el-id-2949-284"
+    },
+    {
+      "path": "/flow/start",
+      "id": "el-id-2949-323"
+    },
+    {
+      "path": "/flow/approvals",
+      "id": "el-id-2949-323"
+    },
+    {
+      "path": "/flow/monitor",
+      "id": "el-id-2949-323"
+    },
+    {
+      "path": "/ai/assist",
+      "id": "el-id-2949-370"
+    },
+    {
+      "path": "/basic/naming",
+      "id": "el-id-2949-563"
+    },
+    {
+      "path": "/basic/naming",
+      "id": "el-id-2949-564"
+    },
+    {
+      "path": "/basic/naming",
+      "id": "el-id-2949-565"
+    },
+    {
+      "path": "/basic/naming",
+      "id": "el-id-2949-566"
+    },
+    {
+      "path": "/basic/naming",
+      "id": "el-id-2949-567"
+    },
+    {
+      "path": "/basic/naming",
+      "id": "el-id-2949-568"
+    },
+    {
+      "path": "/basic/naming",
+      "id": "el-id-2949-569"
+    },
+    {
+      "path": "/basic/naming",
+      "id": "el-id-2949-570"
+    },
+    {
+      "path": "/basic/naming",
+      "id": "el-id-2949-571"
+    },
+    {
+      "path": "/basic/naming",
+      "id": "el-id-2949-572"
+    },
+    {
+      "path": "/basic/naming",
+      "id": "el-id-2949-573"
+    },
+    {
+      "path": "/basic/naming",
+      "id": "el-id-2949-574"
+    },
+    {
+      "path": "/basic/naming",
+      "id": "el-id-2949-575"
+    },
+    {
+      "path": "/basic/naming",
+      "id": "el-id-2949-576"
+    },
+    {
+      "path": "/basic/naming",
+      "id": "el-id-2949-577"
+    },
+    {
+      "path": "/basic/deliverable-control",
+      "id": "el-id-2949-591"
+    },
+    {
+      "path": "/basic/deliverable-control",
+      "id": "el-id-2949-592"
+    },
+    {
+      "path": "/admin/pool",
+      "id": "el-id-2949-601"
+    },
+    {
+      "path": "/admin/pool",
+      "id": "el-id-2949-602"
+    },
+    {
+      "path": "/admin/pool",
+      "id": "el-id-2949-603"
+    },
+    {
+      "path": "/system/rejection",
+      "id": "el-id-2949-748"
+    },
+    {
+      "path": "/system/rejection",
+      "id": "el-id-2949-749"
+    },
+    {
+      "path": "/system/rejection",
+      "id": "el-id-2949-750"
+    },
+    {
+      "path": "/system/rejection",
+      "id": "el-id-2949-751"
+    },
+    {
+      "path": "/system/rejection",
+      "id": "el-id-2949-753"
+    },
+    {
+      "path": "/system/rejection",
+      "id": "el-id-2949-754"
+    },
+    {
+      "path": "/system/rejection",
+      "id": "el-id-2949-755"
+    },
+    {
+      "path": "/system/rejection",
+      "id": "el-id-2949-756"
+    },
+    {
+      "path": "/system/rejection",
+      "id": "el-id-2949-758"
+    },
+    {
+      "path": "/system/rejection",
+      "id": "el-id-2949-759"
+    },
+    {
+      "path": "/system/rejection",
+      "id": "el-id-2949-760"
+    },
+    {
+      "path": "/system/rejection",
+      "id": "el-id-2949-761"
+    },
+    {
+      "path": "/system/rejection",
+      "id": "el-id-2949-762"
+    },
+    {
+      "path": "/system/rejection",
+      "id": "el-id-2949-763"
+    },
+    {
+      "path": "/system/rejection",
+      "id": "el-id-2949-764"
+    },
+    {
+      "path": "/system/rejection",
+      "id": "el-id-2949-765"
+    },
+    {
+      "path": "/system/rejection",
+      "id": "el-id-2949-769"
+    },
+    {
+      "path": "/system/rejection",
+      "id": "el-id-2949-771"
+    }
+  ],
+  "pageErrors": []
+}

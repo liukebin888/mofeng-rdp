@@ -87,7 +87,7 @@
 # 前端六门禁 + 覆盖率
 cd app && npm ci && npm run typecheck && npm run coverage && npm run build
 #（另开终端）node server/index.js  +  cd app && npm run preview -- --port 4180
-cd app && npm run smoke && npm run e2e
+cd app && npm run smoke && npm run e2e && npm run a11y:evidence
 # 安全与验收
 cd .. && node server/test-security.cjs && node server/test-isolation.cjs \
   && node server/test-contract.cjs && node server/test-sms.cjs
@@ -104,7 +104,9 @@ mvn test -pl mofeng-application -am   # JDK21 + Maven 在 PATH
 | 性能压测 / 5000 并发 / RTO-RPO 演练 | ⏸ | k6 压测报告 + 备份恢复演练记录 |
 | 等保三级 / 密评 / 国密 SM2 双证书网关 | ⏸ | 有资质机构测评报告 + 协议套件扫描 |
 | 真实 UAT 签署 | ⏸ | 用户方签字记录 |
-| 无障碍真实 DOM 取证 | ⏸ | 真浏览器审计（当前对比度算法已真实，键盘/标签抽查仍部分硬编码） |
+| 无障碍真实 DOM 取证 | ✅ 机制已闭环（CI 产出证据）；🟡 真实缺陷待整改 | `npm run a11y:evidence` → `docs/A11Y-EVIDENCE.json/.md`；57 项标签违规 + 27 项框架控件待人工实测，见报告 §六 |
+
+**NFR-017 取证步骤**（2026-11-24 追加，位于门禁 6/6 之后、停服务之前）：真实 Chromium 遍历 `router/index.ts` 全部静态路由，逐页调用页面自身的 `window.__MOFENG_A11Y__.collect()`（判定与 `domain/accessibility.ts` 同源，脚本不另写一份判定），产出 `docs/A11Y-EVIDENCE.json/.md` 并上传 artifact。脚本披露取样页数 / total>0 页数 / 采样元素数 / 内容变化数 / 违规数，并做「注入已知违规样本 → 必须检出 → 移除后恢复」的变异验证；样本为空或变异验证失败即 `exit 1`。**取证只产出证据、不宣称无障碍达标**，故 CI 不加 `--strict`。
 | 灰度 / 回滚演练 | ⏸ | 演练记录 |
 | AI 真实 Key / 短信网关凭据 | ⏸ | `verify-wma.js` 真实模式 `realModel:true`（脚本已就绪，缺 Key） |
 

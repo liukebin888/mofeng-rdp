@@ -8,6 +8,7 @@ import 'element-plus/dist/index.css'
 import 'element-plus/theme-chalk/dark/css-vars.css'
 import './styles/tokens.css'
 import './styles/element-overrides.css'
+import './styles/accessibility.css'
 import App from './App.vue'
 import router from './router'
 import { createI18n } from './infra/i18nPlugin'
@@ -31,3 +32,11 @@ app.use(ElementPlus, { locale: store.locale === 'en-US' ? en : zhCn, size: 'smal
 
 app.use(router)
 app.mount('#app')
+
+// NFR-017 真实 DOM 取证接口（只读诊断）：与页面 store 同源，供审核脚本调用。
+// 只读取渲染 DOM 与 computed style，不写业务数据、不修改元素属性。
+;(window as unknown as { __MOFENG_A11Y__?: unknown }).__MOFENG_A11Y__ = {
+  collect: () => store.collectAccessibilityEvidence(),
+  audit: () => store.accessibilityAudit,
+  evidence: () => store.accessibilityEvidence
+}

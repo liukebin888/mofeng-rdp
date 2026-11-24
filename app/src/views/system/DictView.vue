@@ -190,7 +190,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, onMounted } from 'vue'
 import PageHeader from '@/components/PageHeader.vue'
 import KpiCard from '@/components/KpiCard.vue'
 import { useAppStore } from '@/store/app'
@@ -199,6 +199,11 @@ import { useI18n } from '@/infra/i18nPlugin'
 const store = useAppStore()
 const { te } = useI18n()
 const tab = ref('dict')
+
+// NFR-017：页面真实渲染后采集 DOM 取证（键盘可达 / 表单标签取真实元素）
+onMounted(() => {
+  store.collectAccessibilityEvidence()
+})
 
 const totalCodeValues = computed(() => store.codeDicts.reduce((s, d) => s + d.values.length, 0))
 
