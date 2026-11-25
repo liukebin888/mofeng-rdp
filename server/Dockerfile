@@ -11,6 +11,7 @@ WORKDIR /app
 
 # 仅复制运行所需文件（零第三方依赖，无需 npm install）
 COPY --chown=mofeng:mofeng index.js ./
+COPY --chown=mofeng:mofeng security.js ./
 COPY --chown=mofeng:mofeng test-isolation.cjs ./
 
 # 数据目录挂载卷，持久化 state/audit

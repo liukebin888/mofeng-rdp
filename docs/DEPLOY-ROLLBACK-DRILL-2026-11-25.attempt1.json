@@ -1,0 +1,95 @@
+{
+  "runId": "DRILL-1795612975183",
+  "startedAt": "2026-11-25T13:22:55.183Z",
+  "finishedAt": "2026-11-25T13:23:01.877Z",
+  "environment": {
+    "docker": "Docker version 29.9.3, build 5457199",
+    "compose": "Docker Compose version v5.7.0",
+    "composeFile": "deploy/docker-compose.drill.yml",
+    "project": "mofeng-drill",
+    "hostPort": 8081,
+    "images": {
+      "mofeng-drill-server:v1": "dd8a8ea86811 3 weeks ago",
+      "mofeng-drill-server:v2": "e541ce9ac27f 7 minutes ago",
+      "mofeng-drill-web:v1": "c8769b7502c6 3 weeks ago",
+      "mofeng-drill-web:v2": "c8769b7502c6 3 weeks ago"
+    },
+    "isolation": "独立 project / 容器名 / 命名卷 / bridge 网络；不触碰 8787/5178/8080 与正式 server/data"
+  },
+  "steps": [
+    {
+      "name": "preflight 资源隔离检查",
+      "startedAt": "2026-11-25T13:22:56.282Z",
+      "ok": true,
+      "durationMs": 180,
+      "detail": {
+        "portFree": true,
+        "residualContainers": [],
+        "cleaned": false
+      }
+    },
+    {
+      "name": "up v2（当前源码重建版本）",
+      "startedAt": "2026-11-25T13:22:56.463Z",
+      "ok": true,
+      "durationMs": 983,
+      "detail": {
+        "composeOut": "",
+        "healthyMs": 12,
+        "health": {
+          "ok": true,
+          "service": "mofeng-rdp-server",
+          "version": "r2.1.0",
+          "multiTenant": true,
+          "uptimeSec": 0,
+          "hasState": false,
+          "stateVersion": null,
+          "now": "2026-11-25T13:22:57.442Z"
+        }
+      }
+    },
+    {
+      "name": "baseline 基线采集",
+      "startedAt": "2026-11-25T13:22:57.446Z",
+      "ok": true,
+      "durationMs": 3,
+      "detail": {
+        "stateStatus": 404,
+        "auditCount": 0,
+        "chainOk": true,
+        "brokenAt": null
+      }
+    },
+    {
+      "name": "写入真实业务数据（state + 3 条审计）",
+      "startedAt": "2026-11-25T13:22:57.449Z",
+      "ok": false,
+      "durationMs": 5,
+      "detail": {
+        "error": "POST /api/audit DRILL_CREATE 失败: {\"status\":201,\"json\":{\"ok\":true,\"tenantId\":\"T-1001\",\"saved\":true,\"seq\":1,\"rowHash\":\"e9aa5969013665e2081934ae7daea5f17a688680bfe0c9594ee9b2017ecc07c6\",\"count\":1,\"at\":\"2026-11-25T13:22:57.453Z\"},\"raw\":\"{\\\"ok\\\":true,\\\"tenantId\\\":\\\"T-1001\\\",\\\"saved\\\":true,\\\"seq\\\":1,\\\"rowHash\\\":\\\"e9aa5969013665e2081934ae7daea5f17a688680bfe0c9594ee9b2017ecc07c6\\\",\\\"count\\\":1,\\\"at\\\":\\\"2026-11-25T13:22:57.453Z\\\"}\"}"
+      }
+    },
+    {
+      "name": "cleanup 清理演练资源",
+      "startedAt": "2026-11-25T13:23:01.877Z",
+      "ok": true,
+      "durationMs": 4423,
+      "detail": {
+        "down": true,
+        "residualContainers": [],
+        "residualVolumes": []
+      }
+    }
+  ],
+  "metrics": {
+    "baselineEmpty": {
+      "stateStatus": 404,
+      "auditCount": 0,
+      "chainOk": true,
+      "brokenAt": null
+    }
+  },
+  "disclosure": {},
+  "verdict": "FAIL",
+  "fatal": "写入真实业务数据（state + 3 条审计）: POST /api/audit DRILL_CREATE 失败: {\"status\":201,\"json\":{\"ok\":true,\"tenantId\":\"T-1001\",\"saved\":true,\"seq\":1,\"rowHash\":\"e9aa5969013665e2081934ae7daea5f17a688680bfe0c9594ee9b2017ecc07c6\",\"count\":1,\"at\":\"2026-11-25T13:22:57.453Z\"},\"raw\":\"{\\\"ok\\\":true,\\\"tenantId\\\":\\\"T-1001\\\",\\\"saved\\\":true,\\\"seq\\\":1,\\\"rowHash\\\":\\\"e9aa5969013665e2081934ae7daea5f17a688680bfe0c9594ee9b2017ecc07c6\\\",\\\"count\\\":1,\\\"at\\\":\\\"2026-11-25T13:22:57.453Z\\\"}\"}"
+}

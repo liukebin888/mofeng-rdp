@@ -239,3 +239,46 @@
 - 发布口径继续「**内测 / 演示版**」，不宣称正式生产发布。剩余外部依赖 5 项（性能压测、等保密评/国密网关、真实 UAT 签署、灰度/回滚演练、AI 真实 Key）未变。
 - 正式 `server/data` 全程零写入：门禁前后 sha256 恒为 `state=85af15a8…b4f` / `audit=3727251b…8c5`；因该目录在 `.gitignore:16` 不受 git 跟踪，**零污染唯一判据是 sha256，`git status` 无效**；已留物理恢复副本 `.qa-tmp/data-p0-baseline/`。
 - 本地跑 smoke / e2e 必须显式设 `MOFENG_DATA_DIR` 指向隔离目录（`e2e-click.cjs` 的 `resetBackendState()` 漏设会清空正式 `server/data`）。
+
+## 12. 部署缺陷修复与编排演练定案清单（2026-11-25）
+
+> 触发：用户「按建议继续下一步」，方向为「5 项外部依赖中可自证的部分」。本轮只做本地可真实自证的部分，验收判定不翻盘。
+
+### 12.1 U7 部署阻断缺陷（实测发现并修复）
+
+- 事实：`server/index.js:58` 已 `require('./security')`，但 `server/Dockerfile` 只 COPY `index.js` + `test-isolation.cjs`；按当前源码构建的后端镜像实测 `Error: Cannot find module './security'`，启动即失败。
+- 定案：**仅新增 1 行** `COPY --chown=mofeng:mofeng security.js ./`，其余既有行零改动。修复后 `/api/health` 实测 `200 ok:true`，镜像内 7 个 security 导出齐全。
+- 性质：P0-1 生产安全硬化落地后的**部署资产漂移**，非业务逻辑缺陷；既有 11-01 旧镜像因当时尚未 require 该文件而未暴露。
+
+### 12.2 演练边界定案（U8，不翻盘）
+
+| 项 | 定案 |
+|---|---|
+| 做 | 隔离单机 Docker Compose 编排下的灰度/回滚/无状态部署演练 + RTO/RPO/中断时长真实记录 |
+| 不做 | k6 性能压测（未安装且报告明确「开发环境不可自证」）、等保密评、真实 UAT、生产集群灰度切流 |
+| 镜像 | `v1` = 11-01 稳定版后端（`dd8a8ea8`）、`v2` = 当前源码重建（`e541ce9a`），**镜像 ID 真实不同**；前端 v1/v2 同一 nginx 层 |
+| 隔离 | 独立 project / 容器名 / 命名卷 / bridge 网络 / 宿主机 8081；不碰 8787、5178、8080、正式 `server/data`、正式 `docker-compose.yml` |
+| 判定 | `AC-22.1 / AC-40 / AC-45 / AC-03 / AC-38` 在验收矩阵中 **维持 ⏸ 外部依赖，一字未改**；本轮只新增可复跑资产与真实记录，发布口径继续「内测 / 演示版」，5 项外部依赖不变 |
+
+### 12.3 三次演练如实披露（不掩盖失败）
+
+| 轮次 | 结论 | 根因与处置 |
+|---|---|---|
+| attempt1 | ❌ FAIL | 脚本把 `POST /api/audit` 的 `201 Created`（`server/index.js:758`）误判为失败；修正断言为接受 200/201 且校验 `ok`。证据 `...attempt1.json` |
+| attempt2 | 🟡 判定无效 | 表面 9/9 PASS，但故障注入 `sampleCount=4 / firstFailAt=null / outageMs=null`，`execSync` 阻塞事件循环导致探针采不到中断样本 → 属零缺陷假阳性，**主动判证据无效**。证据 `...attempt2.json` |
+| attempt3 | ✅ 有效 PASS | 改异步 `exec` + 50ms/600ms 探针 + fail-closed（未观测到完整中断窗口即拒绝输出 `outageMs`）；实测 91 样本 / 5 失败样本 / `outageMs=2749ms`。证据 `...json` |
+
+### 12.4 最终指标与文件清单
+
+- 无状态重建 `5361ms` / **RPO=0**；回滚 `v2→v1` `4812ms`（<10min）；回滚可逆 PASS；节点下线中断 `2749ms`；审计链 6 次快照恒 `count=3 / chainOk=true / brokenAt=null`；清理后残留容器 0 / 卷 0。
+
+| 类型 | 文件 |
+|---|---|
+| 修改 | `server/Dockerfile`（+1 行 `security.js`）、`docs/DEPLOYMENT.md`（新增 §八，既有行零改）、`docs/DECISION-LIST.md`（新增 §12） |
+| 新增 | `deploy/docker-compose.drill.yml`、`deploy/rollback-drill.cjs`、`docs/DEPLOY-ROLLBACK-DRILL-2026-11-25.md` / `.json` / `.attempt1.json` / `.attempt2.json` |
+| 零改动 | `docker-compose.yml`、`deploy/nginx.conf.template`、`app/**`、`server/index.js`、`server/security.js`、`docs/ACCEPTANCE-MATRIX.md`、`server/data/*` |
+
+### 12.5 后续必须动作
+
+1. 用**当前源码重建前端镜像**后复演（本次前端沿用 11-01 nginx 层）。
+2. 生产集群灰度按租户切流、多节点节点下线、k6 压测、RTO≤4h 灾备切换、密评与真实 UAT 仍待外部取证，不得以本轮本地自证替代。

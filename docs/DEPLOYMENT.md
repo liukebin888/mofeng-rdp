@@ -243,3 +243,42 @@ mvn -pl mofeng-application -am test   # SecurityAutoConfigurationTest 5 例
 - **审计链**：`audit-*.json` 由服务端权威重算哈希链（append-only），勿手工编辑。
 - **租户隔离**：多租户按 `x-tenant-id` 请求头分文件隔离，伪造租户返回 403。
 - **密钥不入库**：`.env`、`*.pem`、`*.key` 均已排除。
+
+## 八、灰度 / 回滚 / 无状态部署演练（本地自证，2026-11-25）
+
+> 性质：单机 Docker Compose 编排环境的**本地自证记录**，不替代生产集群灰度 / k6 压测 / 灾备演练。完整证据见 `docs/DEPLOY-ROLLBACK-DRILL-2026-11-25.md` 与同名 `.json`。
+
+### 8.1 后端镜像必须包含 security.js
+
+`server/index.js` 已 `require('./security')`，`server/Dockerfile` 必须同时 COPY 二者，否则镜像启动即 `Cannot find module './security'`：
+
+```dockerfile
+COPY --chown=mofeng:mofeng index.js ./
+COPY --chown=mofeng:mofeng security.js ./
+COPY --chown=mofeng:mofeng test-isolation.cjs ./
+```
+
+构建后验收：`docker run --rm -p 8787:8787 <image>` → `curl /api/health` 应返回 `200 {"ok":true,...}`。
+
+### 8.2 演练编排（与正式环境完全隔离）
+
+```bash
+# 演练专用编排：独立 project / 容器名 / 命名卷 / bridge 网络 / 宿主机 8081
+node deploy/rollback-drill.cjs
+```
+
+隔离边界：不启停 8787 / 5178 / 8080，不读写正式 `server/data`，不改正式 `docker-compose.yml`；脚本 `finally` 自动 `down -v` 清理。演练镜像 `v1` 为上一稳定版、`v2` 为当前源码重建，二者镜像 ID 不同，构成真实版本回退。
+
+### 8.3 实测指标（2026-11-25，attempt3 有效轮次）
+
+| 项 | 实测 | 说明 |
+|---|---|---|
+| 无状态重建恢复 | `5361ms`，**RPO = 0** | `down` 保留命名卷 → `up`，state / audit 链逐项一致 |
+| 回滚 `v2 → v1` | `4812ms` | 镜像 tag 切换 + `--force-recreate`，数据兼容 |
+| 回滚可逆 `v1 → v2` | PASS | 数据仍一致 |
+| 节点下线业务中断 | `2749ms` | 91 探针样本 / 5 失败样本 / fail-closed 校验 |
+| 审计链 | `count=3 / chainOk=true / brokenAt=null` | 6 次快照恒定 |
+
+### 8.4 判定边界（不翻盘）
+
+上述数值满足 `AC-22.1 回滚≤10min`、`AC-40 RPO≤15min`、`AC-45 中断≤5s` 的**数值要求**，但环境为单机 Compose、未做真实灰度切流 / 多节点集群 / k6 压测 / 灾备级 RTO，故 `docs/ACCEPTANCE-MATRIX.md` 中相关 AC **维持 ⏸ 外部依赖**。发布口径继续「内测 / 演示版」。后续须用当前源码重建前端镜像后复演。

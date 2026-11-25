@@ -1,0 +1,222 @@
+{
+  "runId": "DRILL-1795613220376",
+  "startedAt": "2026-11-25T13:27:00.376Z",
+  "finishedAt": "2026-11-25T13:27:30.126Z",
+  "environment": {
+    "docker": "Docker version 29.9.3, build 5457199",
+    "compose": "Docker Compose version v5.7.0",
+    "composeFile": "deploy/docker-compose.drill.yml",
+    "project": "mofeng-drill",
+    "hostPort": 8081,
+    "images": {
+      "mofeng-drill-server:v1": "dd8a8ea86811 3 weeks ago",
+      "mofeng-drill-server:v2": "e541ce9ac27f 11 minutes ago",
+      "mofeng-drill-web:v1": "c8769b7502c6 3 weeks ago",
+      "mofeng-drill-web:v2": "c8769b7502c6 3 weeks ago"
+    },
+    "isolation": "独立 project / 容器名 / 命名卷 / bridge 网络；不触碰 8787/5178/8080 与正式 server/data"
+  },
+  "steps": [
+    {
+      "name": "preflight 资源隔离检查",
+      "startedAt": "2026-11-25T13:27:01.529Z",
+      "ok": true,
+      "durationMs": 188,
+      "detail": {
+        "portFree": true,
+        "residualContainers": [],
+        "cleaned": false
+      }
+    },
+    {
+      "name": "up v2（当前源码重建版本）",
+      "startedAt": "2026-11-25T13:27:01.718Z",
+      "ok": true,
+      "durationMs": 874,
+      "detail": {
+        "composeOut": "",
+        "healthyMs": 10,
+        "health": {
+          "ok": true,
+          "service": "mofeng-rdp-server",
+          "version": "r2.1.0",
+          "multiTenant": true,
+          "uptimeSec": 0,
+          "hasState": false,
+          "stateVersion": null,
+          "now": "2026-11-25T13:27:02.589Z"
+        }
+      }
+    },
+    {
+      "name": "baseline 基线采集",
+      "startedAt": "2026-11-25T13:27:02.592Z",
+      "ok": true,
+      "durationMs": 4,
+      "detail": {
+        "stateStatus": 404,
+        "auditCount": 0,
+        "chainOk": true,
+        "brokenAt": null
+      }
+    },
+    {
+      "name": "写入真实业务数据（state + 3 条审计）",
+      "startedAt": "2026-11-25T13:27:02.596Z",
+      "ok": true,
+      "durationMs": 10,
+      "detail": {
+        "stateStatus": 200,
+        "auditCount": 3,
+        "chainOk": true,
+        "brokenAt": null
+      }
+    },
+    {
+      "name": "无状态部署验证：down（保留卷）→ up → 数据不丢",
+      "startedAt": "2026-11-25T13:27:02.606Z",
+      "ok": true,
+      "durationMs": 5367,
+      "detail": {
+        "recoverMs": 5361,
+        "stateStatus": 200,
+        "auditCount": 3,
+        "chainOk": true,
+        "brokenAt": null,
+        "dataIntact": true,
+        "rpo": 0,
+        "note": "down 保留命名卷；容器重建后 state rev / drillMarker / audit 链与写入后逐项一致"
+      }
+    },
+    {
+      "name": "回滚演练 v2 → v1（真实旧版本镜像）",
+      "startedAt": "2026-11-25T13:27:07.973Z",
+      "ok": true,
+      "durationMs": 4816,
+      "detail": {
+        "from": "v2",
+        "to": "v1",
+        "rollbackMs": 4812,
+        "stateStatus": 200,
+        "auditCount": 3,
+        "chainOk": true,
+        "brokenAt": null,
+        "dataIntact": true,
+        "under10min": true,
+        "note": "镜像 tag 切换 + force-recreate；v1 为 11-01 稳定版后端，v2 为当前源码重建，两者镜像 ID 不同"
+      }
+    },
+    {
+      "name": "回滚可逆性验证 v1 → v2",
+      "startedAt": "2026-11-25T13:27:12.789Z",
+      "ok": true,
+      "durationMs": 4774,
+      "detail": {
+        "stateStatus": 200,
+        "auditCount": 3,
+        "chainOk": true,
+        "brokenAt": null,
+        "dataIntact": true
+      }
+    },
+    {
+      "name": "故障注入：后端节点下线 → 业务中断时长",
+      "startedAt": "2026-11-25T13:27:17.563Z",
+      "ok": true,
+      "durationMs": 8074,
+      "detail": {
+        "outageMs": 2749,
+        "webRestarted": false,
+        "sampleCount": 91,
+        "failSampleCount": 5,
+        "firstFailAt": 1795613240165,
+        "recoveredAt": 1795613242914,
+        "stopAt": 1795613240315,
+        "startAt": 1795613242326,
+        "recovered": true,
+        "note": "单机 docker stop/start 模拟节点下线；异步 exec 保证探针在停机窗口内持续采样；未采到失败样本即判 FAIL（fail-closed）"
+      }
+    },
+    {
+      "name": "cleanup 清理演练资源",
+      "startedAt": "2026-11-25T13:27:30.126Z",
+      "ok": true,
+      "durationMs": 4489,
+      "detail": {
+        "down": true,
+        "residualContainers": [],
+        "residualVolumes": []
+      }
+    }
+  ],
+  "metrics": {
+    "baselineEmpty": {
+      "stateStatus": 404,
+      "auditCount": 0,
+      "chainOk": true,
+      "brokenAt": null
+    },
+    "baseline": {
+      "stateStatus": 200,
+      "auditCount": 3,
+      "chainOk": true,
+      "brokenAt": null
+    },
+    "stateless": {
+      "recoverMs": 5361,
+      "stateStatus": 200,
+      "auditCount": 3,
+      "chainOk": true,
+      "brokenAt": null,
+      "dataIntact": true,
+      "rpo": 0,
+      "note": "down 保留命名卷；容器重建后 state rev / drillMarker / audit 链与写入后逐项一致"
+    },
+    "rollback": {
+      "from": "v2",
+      "to": "v1",
+      "rollbackMs": 4812,
+      "stateStatus": 200,
+      "auditCount": 3,
+      "chainOk": true,
+      "brokenAt": null,
+      "dataIntact": true,
+      "under10min": true,
+      "note": "镜像 tag 切换 + force-recreate；v1 为 11-01 稳定版后端，v2 为当前源码重建，两者镜像 ID 不同"
+    },
+    "rollbackRestore": {
+      "stateStatus": 200,
+      "auditCount": 3,
+      "chainOk": true,
+      "brokenAt": null,
+      "dataIntact": true
+    },
+    "faultInjection": {
+      "outageMs": 2749,
+      "webRestarted": false,
+      "sampleCount": 91,
+      "failSampleCount": 5,
+      "firstFailAt": 1795613240165,
+      "recoveredAt": 1795613242914,
+      "stopAt": 1795613240315,
+      "startAt": 1795613242326,
+      "recovered": true,
+      "note": "单机 docker stop/start 模拟节点下线；异步 exec 保证探针在停机窗口内持续采样；未采到失败样本即判 FAIL（fail-closed）"
+    }
+  },
+  "disclosure": {
+    "environment": "单机 Docker Compose（Windows Docker Desktop），非生产集群 / 非真实灰度路由",
+    "images": "v1 = 2026-11-01 稳定版后端镜像；v2 = 当前源码重建后端镜像（含 security.js Dockerfile 修复）；前端 v1/v2 为同一 nginx 层",
+    "rollbackScope": "编排层镜像 tag 切换 + force-recreate，验证版本回退、命名卷持久化与数据兼容；非蓝绿/金丝雀按租户流量切分",
+    "acStatus": "AC-22.1 / AC-40 / AC-45 在 docs/ACCEPTANCE-MATRIX.md 中维持 ⏸ 外部依赖，本演练不翻盘、不改判定",
+    "notCovered": [
+      "多节点集群节点下线业务中断 ≤5s（AC-45）",
+      "真实灰度按租户切流与回滚 ≤10min 的生产编排环境（AC-22.1）",
+      "k6 / JMeter 性能压测 P95≤800ms / P99≤2s / 5000 并发（AC-03/38）",
+      "RTO≤4h 灾备级故障与 RPO≤15min 跨机房切换（AC-40）",
+      "用当前源码重建前端镜像后复演（本次前端沿用 11-01 nginx 层）"
+    ]
+  },
+  "verdict": "PASS_LOCAL_DRILL_ONLY",
+  "fatal": null
+}

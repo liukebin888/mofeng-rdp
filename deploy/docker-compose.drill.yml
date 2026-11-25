@@ -1,0 +1,60 @@
+# 灰度 / 回滚 / 无状态部署演练专用编排（与正式 docker-compose.yml 完全隔离）
+#
+# 用法（项目根目录）：
+#   DRILL_TAG=v2 docker compose -p mofeng-drill -f deploy/docker-compose.drill.yml up -d
+#   DRILL_TAG=v1 docker compose -p mofeng-drill -f deploy/docker-compose.drill.yml up -d --force-recreate
+#   docker compose -p mofeng-drill -f deploy/docker-compose.drill.yml down -v
+#
+# 隔离边界（必须保持）：
+#   1. 独立 project 名 mofeng-drill  → 独立命名卷 mofeng-drill_drill-data
+#   2. 独立容器名 mofeng-drill-*    → 不与正式 mofeng-rdp-* 冲突
+#   3. 独立 bridge 网络 drill-net   → 不与正式 mofeng-net 互通
+#   4. 宿主机端口 8081（正式为 8080）→ 不占用用户预览 5178 / 8787
+#   5. 后端服务名保持 mofeng-server → 沿用镜像内 nginx 反代 proxy_pass 目标，不改既有配置
+#
+# 镜像 tag 约定（由 deploy/rollback-drill.cjs 构建）：
+#   v1 = 2026-11-01 稳定版后端镜像（dd8a8ea86811）
+#   v2 = 当前源码重建的后端镜像（含 security.js Dockerfile 修复）
+#   前端 v1/v2 为同一 nginx 层（静态网关配置未变），仅后端存在真实版本差异。
+
+services:
+  mofeng-server:
+    image: mofeng-drill-server:${DRILL_TAG:-v2}
+    container_name: mofeng-drill-server
+    environment:
+      - PORT=8787
+      - HOST=0.0.0.0
+      - NODE_ENV=development
+      - MOFENG_PROD=0
+      - MOFENG_API_TOKEN=
+      - PRESIGN_SECRET=
+      - CORS_ORIGIN=
+    volumes:
+      - drill-data:/app/data
+    networks:
+      - drill-net
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('node:http').get('http://127.0.0.1:8787/api/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+      start_period: 2s
+
+  mofeng-web:
+    image: mofeng-drill-web:${DRILL_TAG:-v2}
+    container_name: mofeng-drill-web
+    ports:
+      - "8081:80"
+    environment:
+      - MOFENG_API_TOKEN=
+    depends_on:
+      - mofeng-server
+    networks:
+      - drill-net
+
+volumes:
+  drill-data:
+
+networks:
+  drill-net:
+    driver: bridge
