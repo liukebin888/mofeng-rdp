@@ -1,0 +1,215 @@
+{
+  "verdict": "PASS_LOCAL_DRILL_ONLY",
+  "ok": true,
+  "reason": "PASS: 应用自发 /api 请求全部同源且核心 API 真实 2xx，未发现后端绝对地址直连",
+  "checks": [
+    {
+      "id": "R1",
+      "label": "样本非空：总请求 / API 请求 / 应用自发 API 请求均 > 0（fail-closed）",
+      "blocking": true,
+      "pass": true
+    },
+    {
+      "id": "R2",
+      "label": "页面真实渲染（DOM 实测，不得硬编码通过）",
+      "blocking": true,
+      "pass": true
+    },
+    {
+      "id": "R3",
+      "label": "零后端绝对地址直连（127.0.0.1:8787/8788/8088）",
+      "blocking": true,
+      "pass": true
+    },
+    {
+      "id": "R4",
+      "label": "所有 /api 请求与页面同源",
+      "blocking": true,
+      "pass": true
+    },
+    {
+      "id": "R5",
+      "label": "应用自发核心 API（/api/health 或 /api/state）真实 2xx，证明反代链路可达",
+      "blocking": true,
+      "pass": true
+    }
+  ],
+  "metrics": {
+    "requestCount": 17,
+    "apiRequestCount": 5,
+    "appApiRequestCount": 3,
+    "probeApiRequestCount": 2,
+    "forbiddenHitCount": 0,
+    "crossOriginApiCount": 0,
+    "core2xxCount": 2,
+    "expectedOrigin": "http://127.0.0.1:8081",
+    "renderOk": true,
+    "pageErrorCount": 0
+  },
+  "disclosure": {
+    "blockingPolicy": "R1~R5 为阻断型，全部 fail-closed；任一不过即判定 FAIL，不放宽判定。",
+    "recordingPolicy": "pageErrors 与网关探针结果为记录型，如实披露但不阻断，不得隐藏。",
+    "pageErrors": [],
+    "forbiddenUrls": [],
+    "crossOriginUrls": []
+  },
+  "sameSource": "deploy/sameorigin-verdict.cjs（取证脚本与自证同源）",
+  "evidence": {
+    "base": "http://127.0.0.1:8081",
+    "pageUrl": "http://127.0.0.1:8081/",
+    "renderOk": true,
+    "renderInfo": {
+      "title": "魔程化解",
+      "bodyTextLen": 1747,
+      "rootChildCount": 1,
+      "rootHtmlLen": 125307,
+      "url": "http://127.0.0.1:8081/#/basic/naming"
+    },
+    "requests": [
+      {
+        "url": "http://127.0.0.1:8081/",
+        "method": "GET",
+        "resourceType": "document",
+        "source": "app",
+        "status": 200
+      },
+      {
+        "url": "http://127.0.0.1:8081/assets/index-9vWnONnC.js",
+        "method": "GET",
+        "resourceType": "script",
+        "source": "app",
+        "status": 200
+      },
+      {
+        "url": "http://127.0.0.1:8081/assets/index-B65P0NHv.css",
+        "method": "GET",
+        "resourceType": "stylesheet",
+        "source": "app",
+        "status": 200
+      },
+      {
+        "url": "http://127.0.0.1:8081/assets/TodayView-BdjwYpK_.js",
+        "method": "GET",
+        "resourceType": "script",
+        "source": "app",
+        "status": 200
+      },
+      {
+        "url": "http://127.0.0.1:8081/assets/KpiCard-D2UddldC.js",
+        "method": "GET",
+        "resourceType": "script",
+        "source": "app",
+        "status": 200
+      },
+      {
+        "url": "http://127.0.0.1:8081/assets/KpiCard-IIIk4uVP.css",
+        "method": "GET",
+        "resourceType": "stylesheet",
+        "source": "app",
+        "status": 200
+      },
+      {
+        "url": "http://127.0.0.1:8081/assets/SemanticTabs-DUTjchAJ.js",
+        "method": "GET",
+        "resourceType": "script",
+        "source": "app",
+        "status": 200
+      },
+      {
+        "url": "http://127.0.0.1:8081/assets/SemanticTabs-Ba7Lyhtj.css",
+        "method": "GET",
+        "resourceType": "stylesheet",
+        "source": "app",
+        "status": 200
+      },
+      {
+        "url": "http://127.0.0.1:8081/assets/TodayView-B0l2geLq.css",
+        "method": "GET",
+        "resourceType": "stylesheet",
+        "source": "app",
+        "status": 200
+      },
+      {
+        "url": "http://127.0.0.1:8081/api/health",
+        "method": "GET",
+        "resourceType": "fetch",
+        "source": "app",
+        "status": 200
+      },
+      {
+        "url": "http://127.0.0.1:8081/assets/mocheng-logo-DYzu9dIS.png",
+        "method": "GET",
+        "resourceType": "image",
+        "source": "app",
+        "status": 200
+      },
+      {
+        "url": "http://127.0.0.1:8081/api/state",
+        "method": "GET",
+        "resourceType": "fetch",
+        "source": "app",
+        "status": 404
+      },
+      {
+        "url": "http://127.0.0.1:8081/api/state",
+        "method": "PUT",
+        "resourceType": "fetch",
+        "source": "app",
+        "status": 200
+      },
+      {
+        "url": "http://127.0.0.1:8081/assets/NamingView-DQ05fN6V.js",
+        "method": "GET",
+        "resourceType": "script",
+        "source": "app",
+        "status": 200
+      },
+      {
+        "url": "http://127.0.0.1:8081/assets/NamingView-BpEmfZfF.css",
+        "method": "GET",
+        "resourceType": "stylesheet",
+        "source": "app",
+        "status": 200
+      },
+      {
+        "url": "http://127.0.0.1:8081/api/health?__sameorigin_probe=1",
+        "method": "GET",
+        "resourceType": "fetch",
+        "source": "probe",
+        "status": 200
+      },
+      {
+        "url": "http://127.0.0.1:8081/api/state?__sameorigin_probe=1",
+        "method": "GET",
+        "resourceType": "fetch",
+        "source": "probe",
+        "status": 200
+      }
+    ],
+    "pageErrors": [],
+    "gatewayProbe": [
+      {
+        "path": "/api/health",
+        "status": 200,
+        "ok": true,
+        "bodyPreview": "{\"ok\":true,\"service\":\"mofeng-rdp-server\",\"version\":\"r2.1.0\",\"multiTenant\":true,\"uptimeSec\":7,\"hasState\":false,\"stateVers"
+      },
+      {
+        "path": "/api/state",
+        "status": 200,
+        "ok": true,
+        "bodyPreview": "{\"ok\":true,\"tenantId\":\"T-1001\",\"state\":{\"version\":\"mofeng.rdp.v1.0.42\",\"data\":{\"version\":\"mofeng.rdp.v1.0.42\",\"tenantId\""
+      }
+    ],
+    "routeResults": [
+      {
+        "route": "basic/naming",
+        "normalizedUrl": "http://127.0.0.1:8081/#/basic/naming",
+        "ok": true
+      }
+    ],
+    "gotoError": null,
+    "waitMs": 3500,
+    "collectedAt": "2026-11-25T23:03:19.017Z"
+  }
+}

@@ -1,0 +1,133 @@
+{
+  "verdict": "PASS",
+  "total": 12,
+  "passed": 12,
+  "failed": 0,
+  "judgmentUnchanged": true,
+  "cases": [
+    {
+      "name": "01 活样本：应用自发同源 /api 且核心 API 2xx",
+      "expectOk": true,
+      "actualOk": true,
+      "pass": true,
+      "failedChecks": [],
+      "reason": "PASS: 应用自发 /api 请求全部同源且核心 API 真实 2xx，未发现后端绝对地址直连"
+    },
+    {
+      "name": "02 空样本：requests=[] 必须 FAIL",
+      "expectOk": false,
+      "actualOk": false,
+      "pass": true,
+      "failedChecks": [
+        "R1",
+        "R5"
+      ],
+      "reason": "FAIL: R1 样本非空：总请求 / API 请求 / 应用自发 API 请求均 > 0（fail-closed）; R5 应用自发核心 API（/api/health 或 /api/state）真实 2xx，证明反代链路可达"
+    },
+    {
+      "name": "03 仅静态资源、无任何 /api 请求 必须 FAIL",
+      "expectOk": false,
+      "actualOk": false,
+      "pass": true,
+      "failedChecks": [
+        "R1",
+        "R5"
+      ],
+      "reason": "FAIL: R1 样本非空：总请求 / API 请求 / 应用自发 API 请求均 > 0（fail-closed）; R5 应用自发核心 API（/api/health 或 /api/state）真实 2xx，证明反代链路可达"
+    },
+    {
+      "name": "04 含 127.0.0.1:8787 绝对直连 必须 FAIL",
+      "expectOk": false,
+      "actualOk": false,
+      "pass": true,
+      "failedChecks": [
+        "R3",
+        "R4"
+      ],
+      "reason": "FAIL: R3 零后端绝对地址直连（127.0.0.1:8787/8788/8088）; R4 所有 /api 请求与页面同源"
+    },
+    {
+      "name": "05 含 127.0.0.1:8088 绝对直连 必须 FAIL",
+      "expectOk": false,
+      "actualOk": false,
+      "pass": true,
+      "failedChecks": [
+        "R3",
+        "R4"
+      ],
+      "reason": "FAIL: R3 零后端绝对地址直连（127.0.0.1:8787/8788/8088）; R4 所有 /api 请求与页面同源"
+    },
+    {
+      "name": "06 /api 请求跨源 必须 FAIL",
+      "expectOk": false,
+      "actualOk": false,
+      "pass": true,
+      "failedChecks": [
+        "R4"
+      ],
+      "reason": "FAIL: R4 所有 /api 请求与页面同源"
+    },
+    {
+      "name": "07 核心 API 全部非 2xx 必须 FAIL",
+      "expectOk": false,
+      "actualOk": false,
+      "pass": true,
+      "failedChecks": [
+        "R5"
+      ],
+      "reason": "FAIL: R5 应用自发核心 API（/api/health 或 /api/state）真实 2xx，证明反代链路可达"
+    },
+    {
+      "name": "08 页面未渲染 renderOk=false 必须 FAIL",
+      "expectOk": false,
+      "actualOk": false,
+      "pass": true,
+      "failedChecks": [
+        "R2"
+      ],
+      "reason": "FAIL: R2 页面真实渲染（DOM 实测，不得硬编码通过）"
+    },
+    {
+      "name": "09 仅探针请求、应用自发为空：不得伪造应用链路 必须 FAIL",
+      "expectOk": false,
+      "actualOk": false,
+      "pass": true,
+      "failedChecks": [
+        "R1",
+        "R5"
+      ],
+      "reason": "FAIL: R1 样本非空：总请求 / API 请求 / 应用自发 API 请求均 > 0（fail-closed）; R5 应用自发核心 API（/api/health 或 /api/state）真实 2xx，证明反代链路可达"
+    },
+    {
+      "name": "10 记录型：pageErrors 有值不阻断，但必须如实计数",
+      "expectOk": true,
+      "actualOk": true,
+      "pass": true,
+      "failedChecks": [],
+      "reason": "PASS: 应用自发 /api 请求全部同源且核心 API 真实 2xx，未发现后端绝对地址直连"
+    },
+    {
+      "name": "11 pageUrl 非法（无法建立同源基准）必须 FAIL",
+      "expectOk": false,
+      "actualOk": false,
+      "pass": true,
+      "failedChecks": [
+        "R4"
+      ],
+      "reason": "FAIL: R4 所有 /api 请求与页面同源"
+    },
+    {
+      "name": "12 变异：活样本 /api/state 改指 8787，证明规则非恒 PASS",
+      "expectOk": false,
+      "actualOk": false,
+      "pass": true,
+      "failedChecks": [
+        "R3",
+        "R4"
+      ],
+      "reason": "FAIL: R3 零后端绝对地址直连（127.0.0.1:8787/8788/8088）; R4 所有 /api 请求与页面同源"
+    }
+  ],
+  "sameSource": "deploy/sameorigin-verdict.cjs（取证脚本与自证同源）",
+  "generatedAt": "2026-11-25T22:57:50.917Z"
+}

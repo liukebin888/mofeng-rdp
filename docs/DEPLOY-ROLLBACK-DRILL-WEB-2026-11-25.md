@@ -206,3 +206,13 @@ node deploy/frontend-fingerprint-selftest.cjs
 | 验收判定 | ⏸ **维持外部依赖，不翻盘** |
 | 发布口径 | ⏸ 继续「内测 / 演示版」，5 项外部依赖不变 |
 | 后续 | ⏸ 生产集群灰度、多节点、k6 压测、灾备 RTO、密评、真实 UAT 仍待外部取证；U5 报告口径统一需用户授权 |
+
+---
+
+## 十一、后续补验索引（2026-11-25，浏览器相对 /api 链路）
+
+本报告 §八「仍保留的 notCovered」中「前端 `REST_BASE` 仍硬编码 `http://127.0.0.1:8787`、未验证浏览器相对路径 `/api` 链路」**已于同日后续补验轮完成**；本处仅追加索引，既有 §一~§十 文字、数字与结论零改写。
+
+- 官方 `deploy/Dockerfile.web` 新增 `ARG VITE_API_BASE=` 空字符串注入；纠正上一轮「注入 `/api`」会形成 `/api/api/state` 双前缀的技术错误。
+- 真实浏览器取证 `PASS_LOCAL_DRILL_ONLY`（17 请求 / 0 forbidden / 0 跨源 / 页面真实渲染 / 0 pageerror），判定单一权威 `deploy/sameorigin-verdict.cjs` + 回退自证 **12/12 PASS**。
+- 详见 `docs/DEPLOY-SAMEORIGIN-BROWSER-2026-11-25.md`；**验收判定与发布口径仍维持 ⏸，不翻盘**。

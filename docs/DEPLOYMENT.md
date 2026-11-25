@@ -291,3 +291,12 @@ node deploy/rollback-drill.cjs
 - 完整复演 `11/11 PASS`、新增判定回退自证 `8/8 PASS`；无状态 `5468ms/RPO=0`、回滚 `4886ms`、中断 `2746ms`（91 样本/5 失败）、审计链恒定。
 - 新增可复跑资产：`deploy/frontend-fingerprint.cjs`（单一权威判定）、`deploy/frontend-fingerprint-selftest.cjs`（死/活/空/失败/变异样本）。
 - 详见 `docs/DEPLOY-ROLLBACK-DRILL-WEB-2026-11-25.md`；**验收判定与发布口径仍维持 ⏸，不翻盘**。
+
+### 8.6 同源链路补验索引（2026-11-25，浏览器相对 /api 链路）
+
+上文 §8.5 登记的「未验证浏览器相对路径 `/api` 链路」**已补齐**，本处仅追加索引、不改写既有文字：
+
+- 官方 `deploy/Dockerfile.web` 阶段一新增 `ARG VITE_API_BASE=` / `ENV VITE_API_BASE=${VITE_API_BASE}`：生产镜像默认注入**空字符串**，使 `repo.ts` 的 `` `${REST_BASE}/api/state` `` 折叠为相对 `/api/state`，命中 nginx `location /api/` 反代；本地 dev 不经该 Dockerfile，仍保持 8787 直连。
+- 纠正上一轮建议的技术错误：注入 `/api` 会形成 `/api/api/state` **双前缀**；正确值为空字符串 `''`。
+- 真实浏览器（`chromium-1247`）在隔离编排 8081 取证：**17 请求 / 5 个 `/api` 请求 / 3 个应用自发 / 0 个 8787·8088 直连 / 0 跨源 / 核心 API 2xx / 页面真实渲染 / 0 pageerror**；判定单一权威 `deploy/sameorigin-verdict.cjs` + 回退自证 **12/12 PASS**。
+- 详见 `docs/DEPLOY-SAMEORIGIN-BROWSER-2026-11-25.md`；**验收判定与发布口径仍维持 ⏸，不翻盘**。

@@ -14,7 +14,7 @@
 
 ## 六门禁（全过才闭环）
 1. `npx vue-tsc --noEmit` 0 error
-2. `npx vitest run --no-file-parallelism` 全绿（**1796/1796，114 文件**）；`--coverage` 84.54/84.54/94.74/85.07（阈值 lines/stmt 84、func 84、branch 80，`clean:false`）
+2. `npx vitest run --no-file-parallelism` 全绿（**1862/1862，117 文件**，2026-11-25 实测；旧 1796/114 已过时）；`--coverage` 84.54/84.54/94.74/85.07（阈值 lines/stmt 84、func 84、branch 80，`clean:false`）
 3. `npx vite build` 成功
 4. `npm run smoke` exit 0（104/104 real）
 5. `npm run e2e` 33 PASS / 0 FAIL
@@ -65,5 +65,6 @@
 - **2026-11-25 增量闭环**：样件评审模板（评审→结论→提交审批两段式）、P0 persist 乐观锁竞态修复（QA #4 测出 → #5 修复 → #6 复验）、Q12 菜单独立分组恢复（16→18 组 / 104 URL 零改）、Q13 导航断链补齐、Q14 门户协同裁撤只读复核；9 个团队任务全闭环，QA #9 独立复验 `IS_PASS YES`（六门禁全量 + 真实浏览器 `PASS=159 FAIL=0`）。决策见 `docs/DECISION-LIST.md` §10/§11。
 - **2026-11-25 部署自证（不翻盘）**：修复 `server/Dockerfile` 缺 `security.js` 导致的按当前源码构建镜像启动阻断（P0-1 后部署资产漂移）；新增 `deploy/docker-compose.drill.yml` + `deploy/rollback-drill.cjs` 隔离编排演练（独立 project/容器/命名卷/bridge/8081，v1=11-01 稳定版、v2=当前源码重建且镜像 ID 真实不同）。实测无状态重建 5361ms / RPO=0、回滚 4812ms、节点中断 2749ms（91 探针样本 / 5 失败 / fail-closed）、审计链 6 次快照恒定；attempt1/attempt2 失败或无效证据均保留。证据 `docs/DEPLOY-ROLLBACK-DRILL-2026-11-25.md`，文档 `DEPLOYMENT.md` §八 / `DECISION-LIST.md` §12。**AC-22.1/40/45/03/38 维持 ⏸ 不翻盘**，k6 压测、生产集群灰度仍待外部取证；前端镜像重建复演已于同日补验轮补齐（见下条）。
 - **2026-11-25 前端补验轮（不翻盘）**：官方 `deploy/Dockerfile.web` 多阶段构建当前源码 `web:v2`（产物 `index-BGV6B8Cf.js` 与本地 `app/dist` 逐字一致），v1/v2 前后端四镜像 ID 全不同（web `c8769b75`/`f9ad9d25`）；新增 `reqRaw`/`frontendFingerprint`（fail-closed）与 `deploy/frontend-fingerprint.cjs` **单一权威同源判定** + `deploy/frontend-fingerprint-selftest.cjs` 回退自证 8/8（死/活/空/失败/变异）。完整复演 11/11 PASS（无状态 5468ms/RPO=0、回滚 4886ms、中断 2746ms、审计链恒定、`distinct=true`）。证据 `docs/DEPLOY-ROLLBACK-DRILL-WEB-2026-11-25.md` + `-web.json`/`-web-selftest.json`；上轮报告/§8.4/§12.5 仅 append 索引、历史数字零改写。**新增如实披露**：前端 `REST_BASE` 仍硬编码 `127.0.0.1:8787`（官方 Dockerfile 未注入 `VITE_API_BASE`），本演练仅证静态资源版本代表性。AC 判定与发布口径仍 ⏸ 不翻盘。
+- **2026-11-25 同源链路补验轮（不翻盘）**：纠正上轮 `/api` 双前缀错误 —— `repo.ts` 为 `` `${REST_BASE}/api/state` ``，**正确注入值是空字符串 `''`**（`??` 不回退空串，Vite 编译期替换并折叠掉 8787 fallback）；注入 `/api` 会成 `/api/api/state`。`deploy/Dockerfile.web` 阶段一新增 `ARG VITE_API_BASE=` + `ENV`：生产默认相对 `/api` 命中 nginx 反代，本地 dev 不经 Dockerfile 保持 8787 直连，`--build-arg` 可覆盖绝对地址；`app/src` 零改动。⚠ `apiV1.ts` **共用该变量**作 Java `/api/v1` 基址，注入后亦变相对路径，本演练编排下会 404，登记为设计债、不宣称打通。新增 `deploy/sameorigin-verdict.cjs`（R1~R5 阻断型 fail-closed 唯一权威）/`-selftest.cjs`（12/12）/`browser-sameorigin.cjs`（真实 Chromium，app/probe 分离，`--routes` 勿带前导 `/` 防 MSYS 路径转换）。`DRILL_TAG=v3` 隔离编排取证 `PASS_LOCAL_DRILL_ONLY`：17 请求 / 5 `/api` / 3 应用自发 / 0 forbidden / 0 跨源 / core2xx=2 / 0 pageerror；冷启动 `GET /api/state 404`（`server/index.js:613` 空卷未播种设计行为）→ `PUT 200` 自动播种（隔离卷）。门禁 1/2/3/6 通过（4/5 未重跑，因 `app/src` 零改动）；正式数据 sha256 零污染；attempt1 失败证据保留。证据 `docs/DEPLOY-SAMEORIGIN-BROWSER-2026-11-25.md`/`.json`/`.attempt1.json`/`-SELFTEST-2026-11-25.json`；`DEPLOYMENT.md §8.6`、`DECISION-LIST.md §12.7`、上轮 web 报告 §十一 仅 append 零改写。AC 与发布口径仍 ⏸ 不翻盘。
 - **剩余外部依赖 5 项**：性能压测、等保密评/国密网关、真实 UAT 签署、灰度/回滚演练、AI 真实 Key（⏸ 待用户提供）。
 - **发布口径只能是「内测/演示版」，不得宣称正式生产发布**。

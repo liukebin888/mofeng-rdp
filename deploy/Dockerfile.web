@@ -7,6 +7,14 @@ WORKDIR /build
 COPY app/package.json app/package-lock.json* ./
 RUN npm install --frozen-lockfile || npm install
 COPY app/ ./
+# 生产镜像默认注入空字符串：repo.ts 中 fetch(`${REST_BASE}/api/state`) 折叠为相对 '/api/state'，
+# 命中阶段二 nginx 的 location /api/ 反代到内网 mofeng-server:8787。
+# 切勿注入 '/api'（会形成 /api/api/state 双前缀）；本地 dev 不经本 Dockerfile，保持 8787 直连。
+# 可用 --build-arg VITE_API_BASE=http://<host>:8787 覆盖为绝对地址。
+# 连带影响：apiV1.ts 共用此变量作 Java /api/v1 基址，注入 '' 后亦变相对路径；
+# 按项目口径 Java 属内部联调通道，本镜像对外链路不验证、不宣称其打通。
+ARG VITE_API_BASE=
+ENV VITE_API_BASE=${VITE_API_BASE}
 RUN npm run build
 
 # —— 阶段二：nginx 托管 ——

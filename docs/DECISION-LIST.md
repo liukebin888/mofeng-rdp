@@ -300,3 +300,22 @@
 | 文档纪律 | 上轮报告 / §8.4 / §12.5 的历史数字与叙述**全部 append 索引、零改写**；上轮 3 份 JSON 原始证据完整保留 |
 
 新增证据：`docs/DEPLOY-ROLLBACK-DRILL-2026-11-25-web.json`、`docs/DEPLOY-ROLLBACK-DRILL-2026-11-25-web-selftest.json`、`docs/DEPLOY-ROLLBACK-DRILL-WEB-2026-11-25.md`。
+
+### 12.7 同源链路补验定案（2026-11-25：浏览器相对 /api 链路）
+
+> §12.6 登记的「前端 `REST_BASE` 仍硬编码 `http://127.0.0.1:8787`、未验证浏览器相对 `/api` 链路」**已于同日补验轮完成**；本处仅追加定案，既有 §12.1~§12.6 文字零改写。
+
+| 项 | 定案 |
+|---|---|
+| 方向 | 用户「按建议下一步」→ 取上轮建议中的「前端 `VITE_API_BASE` 生产注入 / 浏览器相对 `/api` 链路验证」；U5 报告改数、k6 压测、密评、UAT、生产集群灰度均不碰 |
+| 上轮建议纠错 | 上轮写「注入 `VITE_API_BASE=/api`」经只读核查判为**错误**：`repo.ts` 拼接为 `` `${REST_BASE}/api/state` ``，`/api` 会成 `/api/api/state` 双前缀；改为注入**空字符串** `''` |
+| 改动 | `deploy/Dockerfile.web` 阶段一新增 `ARG VITE_API_BASE=` + `ENV`（生产默认空注入，`--build-arg` 可覆盖为绝对地址）；前端源码 `app/src` **零改动** |
+| 编译期证据 | 基线 `Xl=(...VITE_API_BASE)??"http://127.0.0.1:8787"`；注入版 `Xl=""` / `yh=Xl` / `m9=""`，产物 8787·8088 计数归零；ARG 覆盖活样本 `Xl="http://arg-probe.invalid:9999"` |
+| 判定单一权威 | `deploy/sameorigin-verdict.cjs`（R1~R5 阻断型全 fail-closed + 记录型分层）；`deploy/sameorigin-verdict-selftest.cjs` **12/12 PASS**，含空样本、8787/8088 直连、跨源、页面未渲染、探针伪造应用链路、变异活样本 |
+| 真实浏览器取证 | 隔离编排 `DRILL_TAG=v3`（8081 / 独立卷 / 独立网络），`chromium-1247` 真实加载；**17 请求 / 5 个 `/api` / 3 个应用自发 / 0 forbidden / 0 跨源 / core2xx=2 / renderOk / 0 pageerror**；`verdict=PASS_LOCAL_DRILL_ONLY` |
+| 失败留痕 | attempt1 的 `--routes '/#/basic/naming'` 被 Git Bash(MSYS) 路径转换致 invalid URL，原始 JSON 保留为 `.attempt1.json`，脚本规范化后重跑生效 |
+| 新增如实披露 | `apiV1.ts` 共用 `VITE_API_BASE` 作 Java `/api/v1` 基址，注入 `''` 后亦变相对路径；本次零 `/api/v1` 运行时请求，**未验证、不宣称 Java 通道打通**，登记为设计债。未做未注入版真实浏览器反向对照（会直连正式 8787 污染演示数据），以静态折叠 + selftest 死样本替代 |
+| 判定 | `AC-22.1 / AC-40 / AC-45 / AC-03 / AC-38` 在验收矩阵中**维持 ⏸ 一字未改**；发布口径继续「内测 / 演示版」，5 项外部依赖不变 |
+| 零污染 | 正式 `server/data` sha256 前后一致（`85af15a8…b4f` / `3727251b…8c5`）；应用在**隔离卷**自动播种，不触正式数据 |
+
+新增证据：`docs/DEPLOY-SAMEORIGIN-BROWSER-2026-11-25.md`、`.json`、`.attempt1.json`、`docs/DEPLOY-SAMEORIGIN-SELFTEST-2026-11-25.json`。
