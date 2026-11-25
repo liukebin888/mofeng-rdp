@@ -9,7 +9,7 @@
 ## 路径与环境
 - `app/` 前端、`server/`（Node 8787）、`backend/`（Java Spring Boot 多模块）、`spec/`、`docs/`。dev 5178 / preview+e2e 4180（隔离取证用 4181）/ 后端 8787（占用改 8788）。
 - Java：JDK21 `C:\jdk\jdk-21.0.2`、Maven `C:\maven\apache-maven-3.9.9`（未进 PATH）。`export JAVA_HOME="C:/jdk/jdk-21.0.2" && export PATH="$JAVA_HOME/bin:/c/Windows/System32:/c/maven/apache-maven-3.9.9/bin:$PATH"`（**PATH 必含 System32**，否则 vcruntime140_1.dll 缺失）后 `mvn test -pl mofeng-application -am`（474/474）。
-- Git：main / origin=https://github.com/liukebin888/mofeng-rdp.git / 留总 <liuzong@mofeng.com> / `http.sslBackend openssl`。网络不通先本地提交待推、恢复后补推；保持提交历史完整，不走 API 合并。注入代理端口会变（`127.0.0.1:13775`/`12173` 曾有效），push 失败先 `curl https://api.github.com` 探通再决定代理或直连。沙箱 `reg.exe` 被黑名单，探测走 `tasklist`。
+- Git：main / origin=https://github.com/liukebin888/mofeng-rdp.git / 留总 <liuzong@mofeng.com> / `http.sslBackend openssl`。网络不通先本地提交待推、恢复后补推；保持提交历史完整，不走 API 合并。注入代理端口会变（`127.0.0.1:13775`/`12173` 曾有效），push 失败先 `curl https://api.github.com` 探通再决定代理或直连。代理报 `unexpected eof while reading` / `CONNECT tunnel failed 502`（端口仍 LISTEN、探通 000）时加 `-c http.version=HTTP/1.1` 可规避 HTTP/2 隧道抖动（2026-11-25 实测 `30e8bc2..211c963` 靠此一次闭环）。沙箱 `reg.exe` 被黑名单，探测走 `tasklist`。
 - 部署：`server/Dockerfile` + `deploy/Dockerfile.web` + `docker-compose.yml`（前端 8080 + 后端内网 + 卷 mofeng-data），context=./server，手册 `docs/DEPLOYMENT.md`。
 
 ## 六门禁（全过才闭环）
