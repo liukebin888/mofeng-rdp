@@ -90,8 +90,9 @@ import type { LightTask } from '@/domain/lightTask'
 import type { CustomFieldDef } from '@/domain/customField'
 import type { SampleCollectPlan, TrialOrder, SampleReminder } from '@/domain/sampleCollectEngine'
 import type { SampleReview } from '@/domain/sampleReviewEngine'
+import type { SampleReviewTemplate } from '@/domain/sampleReviewTemplate'
 
-export const SEED_VERSION = 'mofeng.rdp.v1.0.41'
+export const SEED_VERSION = 'mofeng.rdp.v1.0.42'
 const TENANT = 'T-1001'
 
 export interface SeedUser {
@@ -953,6 +954,8 @@ export function buildSeed() {
     sampleReminders: [] as SampleReminder[],
     /** 样件评审流程单（评审五态闭环单一数据源，空白模板：不预置演示数据） */
     sampleReviews: [] as SampleReview[],
+    /** 样件评审模板（评审 + 审批 两段式单一数据源，空白模板：不预置演示数据） */
+    sampleReviewTemplates: [] as SampleReviewTemplate[],
     otsAttachments,
     /** OTS 认可台账（OTS 认可闭环单一数据源，空白模板：不预置演示数据） */
     otsApprovals: [] as OtsApprovalRecord[],
@@ -1430,8 +1433,9 @@ export function buildSeed() {
         enabled: true,
         version: 1
       },
-      // 样件试制 · 样件评审流程（检验数据确认 → 部门会签 → 总监批准 → 评审结论 → 结束）
-      // 会签角色与 sampleReviewEngine.REVIEW_SIGN_ROLES 同源；评审单五态闭环由引擎求值，流程实例供审批中心留痕。
+      // 样件试制 · 样件评审流程（两段式：阶段一 评审结论守卫 → 阶段二 提交审批 → 结束）
+      // id / code / name 保持不变；节点顺序保证「先评审结论、后提交审批」（审批不得先于结论）。
+      // 评审结论守卫 sr2 为 branch：verdict 非空才命中 sr3；无 defaultNext → fail-closed 直接终止。
       {
         id: 'DEF-TRIAL-REVIEW',
         code: 'FLOW-TRIAL-REVIEW',
@@ -1439,20 +1443,19 @@ export function buildSeed() {
         formFields: [
           { key: 'sampleCode', label: '样件编号' },
           { key: 'projectName', label: '项目' },
-          { key: 'inspectionConclusion', label: '检验结论' },
-          { key: 'verdict', label: '评审结论' }
+          { key: 'itemCompletion', label: '评审项完成度' },
+          { key: 'verdict', label: '阶段一评审结论' },
+          { key: 'signoff', label: '评审小组会签' }
         ],
-        startNodeId: 'rv1',
+        startNodeId: 'sr1',
         nodes: [
-          { id: 'rv1', name: '发起评审（质量工程师）', type: 'start' },
-          { id: 'rv2', name: '检验数据确认', type: 'approve', approverRole: '质量工程师', slaHours: 24, escalateToRole: '质量总监' },
-          { id: 'rv3', name: '部门会签（质量/研发/制造）', type: 'sign', signMode: 'all', signRoles: ['质量工程师', '研发工程师', '制造工程师'], slaHours: 48, escalateToRole: '研发副总' },
-          { id: 'rv4', name: '总监批准', type: 'approve', approverRole: '研发副总', slaHours: 24, escalateToRole: '总经理' },
-          { id: 'rv5', name: '评审结论', type: 'approve', approverRole: '质量总监', slaHours: 24, escalateToRole: '总经理' },
-          { id: 'rv6', name: '结束', type: 'end' }
+          { id: 'sr1', name: '发起 · 阶段一评审成果提交（质量工程师）', type: 'start' },
+          { id: 'sr2', name: '阶段一 · 评审结论守卫', type: 'branch', branches: [{ field: 'verdict', op: 'neq', value: '', toNodeId: 'sr3' }] },
+          { id: 'sr3', name: '阶段二 · 提交审批（批准/驳回）', type: 'approve', approverRole: '研发副总', slaHours: 24, escalateToRole: '总经理' },
+          { id: 'sr4', name: '结束 · 归档', type: 'end' }
         ],
         enabled: true,
-        version: 1
+        version: 2
       }
     ] as FlowDefinition[],
     /** 审批链—阶段绑定（APR-002：每个阶段走一条标准四步审批链，作为闸门放行的审批证据） */

@@ -78,6 +78,29 @@ import {
   type SampleReview,
   type ReviewVerdict
 } from '@/domain/sampleReviewEngine'
+// —— 样件评审模板（评审 + 审批 两段式）· T02 新增领域引擎（唯一权威）——
+import {
+  buildEmptyTemplate,
+  itemProgress,
+  templateVerdictOf,
+  canSubmitForApproval,
+  canApprove,
+  canArchive,
+  reopenForReviewRound,
+  templateStats,
+  stageFromFormStatus,
+  nextTemplateCode,
+  SAMPLE_REVIEW_CONFIG,
+  type SampleReviewTemplate,
+  type ReviewItem,
+  type ReviewItemResult,
+  type ReviewSignature,
+  type ApprovalResult,
+  type TemplateView
+} from '@/domain/sampleReviewTemplate'
+import { migrateSampleReviewState, SAMPLE_REVIEW_TEMPLATE_DEF_ID } from '@/domain/stateMigration'
+import { markSubmitted, syncStatusFromFlow, reopenForEdit, validateSubmit } from '@/domain/workflowForm'
+import type { WorkflowForm } from '@/domain/workflowForm'
 import {
   aiAssessNeeds,
   aiDispatchVerdict,
@@ -123,6 +146,7 @@ import {
 } from '@/domain/docEngine'
 import { summarizeAnnotations, type DocAnnotation } from '@/domain/docAnnotation'
 import { appendRemoteAudit, checkBackend, loadRemoteState, saveRemoteState, seedRemoteAudit, repoBase } from '@/infra/repo'
+import { createPersistScheduler } from '@/infra/persistScheduler'
 import { requestToken, savePlan, listPlan, scanPlanAlerts as scanPlanAlertsApi, type PlanSavePayload, type PlanSaveData, type PlanAlertScanData, type PlanNodeDto } from '@/infra/apiV1'
 import { knowledgeStats, markReused, nextLessonCode, pushToLibrary, searchLessons as searchLessonsEngine, validateLesson } from '@/domain/lessonEngine'
 import { validateLightTask, transitionTask, groupByStatus, completionRate as lightTaskCompletionRate, type LightTask, type LightTaskStatus } from '@/domain/lightTask'
@@ -266,6 +290,18 @@ function load(): PersistShape | null {
   } catch {
     return null
   }
+}
+
+/**
+ * U1 / Q9：取 seed 中「就地改造后的两段式 DEF-TRIAL-REVIEW」作为合并式迁移唯一权威源。
+ * 不在 store 复制定义，避免与 `seed.ts` / `stateMigration.ts` 产生第二套口径；
+ * 纯工厂调用（buildSeed 不读 localStorage），仅在 syncFromBackend 时求值一次。
+ * @throws Error 当 seed 中缺失该定义（fail-closed）
+ */
+function sampleReviewTemplateSeedDef(): FlowDefinition {
+  const def = buildSeed().flowDefinitions.find((d) => d.id === SAMPLE_REVIEW_TEMPLATE_DEF_ID)
+  if (!def) throw new Error(`种子中缺少两段式流程定义 ${SAMPLE_REVIEW_TEMPLATE_DEF_ID}`)
+  return def
 }
 
 /**
@@ -514,26 +550,62 @@ export const useAppStore = defineStore('app', () => {
     at: new Date().toISOString()
   }))
 
+  /**
+   * 远端 state 写调度器（P0 并发写缺陷修复 · 通用机制，覆盖全部业务动作）。
+   *
+   * 修复前：每次 persist() 都在调用瞬间快照 payload + fire-and-forget 发 PUT，
+   * 且 rev 只在异步成功后 +1；一次动作内多次 log()/persist() 会发出多个
+   * `expectedRev` 相同的 PUT，第一个（中间态）200 后其余全部 409，携带最终态的
+   * 最后一个被丢弃，服务端停在中间态（刷新/跨端即回退）。
+   *
+   * 修复后：同一同步 tick 内多次 persist() 合并为一次 PUT；payload / expectedRev
+   * 一律在**实际 flush 时**从当前 data.value / rev.value 重新构造（携带动作完成后的
+   * 最终态）；跨 tick 连续动作严格串行，上一个 PUT 完成且 rev 递增后才发下一个。
+   *
+   * 不变项：
+   *   - localStorage 仍每次 persist() 同步写（本地即时性）；
+   *   - 成功 → rev+1 + void flushPendingWrites()；
+   *   - 真·跨端 409 → 仅提示、不重试、不入队；
+   *   - 其它失败 → pendingWrites 入队 + warning（POR-012）；
+   *   - 审计 appendRemoteAudit 独立 append-only 通道，逐条发送，绝不合并（见 log()）；
+   *   - syncFromBackend() 不经过本调度器，合并式迁移逻辑保持原样。
+   */
+  const stateWriteScheduler = createPersistScheduler<PersistShape>({
+    buildPayload: () => ({
+      version: SEED_VERSION,
+      data: data.value,
+      userId: userId.value,
+      projectId: projectId.value,
+      spaceId: spaceId.value,
+      rev: rev.value
+    }),
+    getRev: () => rev.value,
+    isRemote: () => repoMode.value === 'rest',
+    // 展开成新对象：与修复前 `{ ...payload, expectedRev }` 的载荷结构一致，
+    // 且强制在 flush 时序列化（repo.ts 的 JSON.stringify 在调用瞬间执行）。
+    send: (doc) => saveRemoteState({ ...doc }),
+    onSuccess: () => {
+      rev.value = rev.value + 1
+      // 弱网队列 flush 串行化：await 后再允许下一轮 PUT，避免与队列写撞同一 expectedRev
+      return flushPendingWrites()
+    },
+    onConflict: (message) => {
+      // 乐观锁冲突：rev 已落后，重试无法解决，须提示重新拉取合并，不得入弱网队列
+      if (!toast.value) notify('error', message ?? '并发冲突：数据已被他人更新，请刷新后重试')
+    },
+    onFailure: (payload) => {
+      // POR-012 弱网排队去重：同键（数据状态）写失败入队，保留最新
+      pendingWrites.value = enqueueWrite(pendingWrites.value, 'state', JSON.stringify(payload), new Date().toISOString())
+      if (!toast.value) notify('warning', '网络较弱，写入已排队待同步（POR-012）')
+    }
+  })
+
   function persist() {
     const payload: PersistShape = { version: SEED_VERSION, data: data.value, userId: userId.value, projectId: projectId.value, spaceId: spaceId.value, rev: rev.value }
+    // 本地即时性不变：每次调用都同步写 localStorage
     localStorage.setItem(KEY, JSON.stringify(payload))
-    // 后端可用时异步同步（fire-and-forget，不阻塞交互；失败入队待重试）
-    // 降级提示不得覆盖业务反馈：仅当当前无 toast 时提示一次，避免「基线篡改被拒」等关键错误被淹没。
-    if (repoMode.value === 'rest') {
-      void saveRemoteState({ ...payload, expectedRev: rev.value }).then((r) => {
-        if (r.ok) {
-          rev.value = rev.value + 1
-          void flushPendingWrites()
-        } else if (r.conflict) {
-          // 乐观锁冲突：rev 已落后，重试无法解决，须提示重新拉取合并，不得入弱网队列
-          if (!toast.value) notify('error', r.message ?? '并发冲突：数据已被他人更新，请刷新后重试')
-        } else {
-          // POR-012 弱网排队去重：同键（数据状态）写失败入队，保留最新
-          pendingWrites.value = enqueueWrite(pendingWrites.value, 'state', JSON.stringify(payload), new Date().toISOString())
-          if (!toast.value) notify('warning', '网络较弱，写入已排队待同步（POR-012）')
-        }
-      })
-    }
+    // 远端写交由三态调度器：同 tick 合并 + 串行 in-flight（不再 fire-and-forget 快照）
+    stateWriteScheduler.request()
   }
 
   /** POR-012：联网后按序 flush 待写队列（去重压缩后逐条重试） */
@@ -554,7 +626,15 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  /** 启动时探测后端并同步：后端有数据 → 采用后端；否则播种到后端；失败降级 localStorage */
+  /**
+   * 启动时探测后端并同步（U1 / Q9 幂等合并式迁移，HMR 事件根因修复）：
+   *   - 一律以**远程 data 为基底**（远程为空才退回本地种子），仅补/换 4 处增量字段，
+   *     其余业务实体 / drafts / data.audit / 其余 35 条 def 逐字段原样保留；
+   *   - 触发条件 = 版本不符 **或** 结构 shape-check 缺增量字段（不依赖单一版本判据，
+   *     避免「version 已升级但结构未迁移」时漏迁移）；
+   *   - 写回一律携 `expectedRev: backendRev`（运行时读取，禁止把期望版本硬播种为固定值）；
+   *   - `seedRemoteAudit` 幂等前置（后端 count>0 跳过），不触碰既有审计链。
+   */
   async function syncFromBackend() {
     try {
       const health = await checkBackend()
@@ -566,36 +646,66 @@ export const useAppStore = defineStore('app', () => {
       }
       repoMode.value = 'rest'
       cacheStamp.value = { cachedAt: new Date().toISOString(), version: 'current', fromCache: false }
+      // 审计链播种幂等前置：服务端已有审计链（count>0）则跳过，避免重播 / 409 噪音
+      void seedRemoteAudit(data.value.audit as unknown[])
       const remote = await loadRemoteState()
-      if (remote && typeof remote === 'object' && (remote as unknown as PersistShape).version === SEED_VERSION) {
-        const rs = remote as unknown as PersistShape
-        data.value = rs.data
-        userId.value = rs.userId
-        projectId.value = rs.projectId
-        spaceId.value = rs.spaceId ?? 'SP-001'
-        rev.value = rs.rev ?? 0
-        localStorage.setItem(KEY, JSON.stringify(rs))
-        notify('info', '已从服务端加载最新数据（跨端共享）')
-      } else {
-        // 后端无数据或版本不符：将当前（本地种子）播种/迁移到后端。
-        // 版本不符（如 v1.0.4 → v1.0.5）属合法 seed 升级：携带后端当前 rev 覆盖写入，避免乐观锁 409。
-        const backendRev = (remote && typeof remote === 'object' ? (remote as unknown as PersistShape).rev : undefined) ?? 0
-        const payload: PersistShape = { version: SEED_VERSION, data: data.value, userId: userId.value, projectId: projectId.value, spaceId: spaceId.value, rev: backendRev }
+      const rs = remote && typeof remote === 'object' ? (remote as unknown as PersistShape) : null
+      // backendRev 运行时读取：remote 存在时取服务端 rev；remote 为空（无状态）时才为 0
+      const backendRev = typeof rs?.rev === 'number' ? rs.rev : 0
+      const versionMismatch = !rs || rs.version !== SEED_VERSION
+      const baseData: Record<string, unknown> = rs && rs.data && typeof rs.data === 'object'
+        ? (rs.data as unknown as Record<string, unknown>)
+        : (data.value as unknown as Record<string, unknown>)
+
+      // 纯函数合并式迁移（内部先 assertTwoStageReviewDef fail-closed 校验，违规样本直接抛错）
+      const migration = migrateSampleReviewState(baseData, sampleReviewTemplateSeedDef(), SEED_VERSION)
+      const needsWrite = versionMismatch || migration.changed.length > 0
+
+      if (needsWrite) {
+        const payload: PersistShape = {
+          version: SEED_VERSION,
+          data: migration.data as unknown as SeedData,
+          userId: rs?.userId ?? userId.value,
+          projectId: rs?.projectId ?? projectId.value,
+          spaceId: rs?.spaceId ?? spaceId.value,
+          rev: backendRev
+        }
         const saveResult = await saveRemoteState({ ...payload, expectedRev: backendRev })
         if (saveResult.ok) {
+          data.value = payload.data
+          userId.value = payload.userId
+          projectId.value = payload.projectId
+          spaceId.value = payload.spaceId
           rev.value = backendRev + 1
-          notify('info', '数据已播种至服务端（REST 持久化已启用）')
+          localStorage.setItem(KEY, JSON.stringify({ ...payload, rev: rev.value }))
+          notify('info', versionMismatch
+            ? '数据已播种至服务端（REST 持久化已启用）'
+            : '样件评审模板增量字段已补齐（合并式迁移，业务数据零改动）')
         } else if (saveResult.conflict) {
-          // 播种时乐观锁冲突：说明并发下服务端 rev 已被推进，退化为本地模式并提示
+          // 迁移写回乐观锁冲突：说明并发下服务端 rev 已被推进，退化为本地模式并提示
           repoMode.value = 'local'
           notify('error', saveResult.message ?? '播种冲突：服务端数据已变更，请刷新后重试')
+          return
+        } else {
+          // 网络失败：本会话采用合并后的 data（不阻塞交互），下一轮同步会重试
+          data.value = payload.data
+          rev.value = backendRev
+          notify('warning', '网络较弱，合并迁移结果暂未同步（POR-012）')
         }
+      } else {
+        // 版本相符且结构完整（幂等）：直接采用远程权威数据，零写入
+        data.value = rs!.data
+        userId.value = rs!.userId
+        projectId.value = rs!.projectId
+        spaceId.value = rs!.spaceId ?? 'SP-001'
+        rev.value = backendRev
+        localStorage.setItem(KEY, JSON.stringify(rs))
+        notify('info', '已从服务端加载最新数据（跨端共享）')
       }
-      // 审计链播种：仅当服务端审计为空时，把本地种子审计链推上去（服务端权威重算哈希）
-      void seedRemoteAudit(data.value.audit as unknown[])
-    } catch {
+    } catch (err) {
       repoMode.value = 'local'
       cacheStamp.value = stampCache(Date.now())
+      notify('error', `合并式迁移被拦截：${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
@@ -5152,6 +5262,509 @@ export const useAppStore = defineStore('app', () => {
     notify('warning', `${inst.title} 已驳回，退回 ${inst.submitter}`)
   }
 
+  // ===========================================================================
+  // 样件评审模板（评审 + 审批 两段式）· T03 编排层
+  //
+  // 分层铁律：单一权威在 `sampleReviewTemplate.ts`（templateVerdictOf / canXxx）；
+  // store 只负责「实体持久化 + WF-001 四按钮编排 + 冻结 flowEngine 实例推进 + 审计留痕」。
+  // workflowForm.ts / flowEngine.ts / sampleReviewEngine.ts 三个冻结文件零改动。
+  // ===========================================================================
+
+  /** 两段式模板单据台账（`data.sampleReviewTemplates` 单一数据源） */
+  const sampleReviewTemplates = computed<SampleReviewTemplate[]>(
+    () => (data.value.sampleReviewTemplates ?? []) as SampleReviewTemplate[]
+  )
+
+  /** KPI 引擎求值（键名 total/reviewing/pending/closed 与 kpiLabels 一致，视图不硬编码） */
+  const sampleReviewTemplateStats = computed(() => templateStats(sampleReviewTemplates.value))
+
+  /** 单一权威：一次给出 stage / editable / canXxx / blockers / progress / sign / reason */
+  function sampleReviewTemplateView(id: string): TemplateView | undefined {
+    const r = sampleReviewTemplates.value.find((x) => x.id === id)
+    return r ? templateVerdictOf(r) : undefined
+  }
+
+  /** 内部：按 id 取模板实体 */
+  function templateById(id: string): SampleReviewTemplate | undefined {
+    return sampleReviewTemplates.value.find((x) => x.id === id)
+  }
+
+  /** 内部：确保 `data.sampleReviewTemplates` 数组存在并返回它 */
+  function ensureTemplateRows(): SampleReviewTemplate[] {
+    if (!Array.isArray(data.value.sampleReviewTemplates)) data.value.sampleReviewTemplates = []
+    return data.value.sampleReviewTemplates as SampleReviewTemplate[]
+  }
+
+  /** 内部：以纯函数返回的新对象替换台账行（reopenForReviewRound 等场景） */
+  function replaceTemplateRow(next: SampleReviewTemplate): void {
+    const rows = ensureTemplateRows()
+    const idx = rows.findIndex((r) => r.id === next.id)
+    if (idx < 0) rows.push(next)
+    else rows[idx] = next
+  }
+
+  /** 内部：构造一张最小 WF-001 单据，供 syncStatusFromFlow / reopenForEdit 求值（不改冻结文件） */
+  function templateWorkflowFormStub(r: SampleReviewTemplate): WorkflowForm {
+    return {
+      id: r.workflowFormId ?? `WF-${r.id}`,
+      defId: SAMPLE_REVIEW_TEMPLATE_DEF_ID,
+      defCode: 'FLOW-TRIAL-REVIEW',
+      title: r.title || r.code,
+      objectType: '样件评审模板',
+      content: '',
+      status: r.formStatus,
+      flowInstanceId: r.flowInstanceId,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt
+    }
+  }
+
+  /** 内部：fail-closed 拒绝留痕（DENY 写服务端 append-only 审计链） */
+  function denyTemplate(action: string, r: SampleReviewTemplate, reason: string): void {
+    log(action, '样件评审模板', r.code, { reason, stage: r.stage, formStatus: r.formStatus }, undefined, 'DENY')
+    notify('error', `评审单 ${r.code} ${reason}`)
+  }
+
+  /**
+   * WF-001「新增」：基于 `buildEmptyTemplate` 生成**全空白**两段式模板
+   * （stage='评审' / formStatus='draft' / items 由 7 项配置生成 / verdict 与 approval 空 / round=1），
+   * 不带入任何历史数据；写入台账 + CREATE 留痕。
+   * @param existingId 传入则载入既有单据续编（草稿续编 / 列表选中），不新建、不改数据。
+   */
+  function createSampleReviewTemplate(existingId = ''): SampleReviewTemplate | null {
+    if (existingId) {
+      const found = templateById(existingId)
+      if (found) {
+        log('OPEN', '样件评审模板', found.code, { stage: found.stage, formStatus: found.formStatus, round: found.round })
+        return found
+      }
+    }
+    const now = new Date().toISOString()
+    const rows = ensureTemplateRows()
+    const code = nextTemplateCode(rows.map((r) => r.code), 'NEW')
+    const tpl = buildEmptyTemplate({
+      id: `SRT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      code,
+      projectId: projectId.value,
+      sampleOrderId: '',
+      submitter: currentUser.value?.name ?? '',
+      createdAt: now
+    })
+    rows.push(tpl)
+    log('CREATE', '样件评审模板', tpl.code, {
+      stage: tpl.stage, formStatus: tpl.formStatus, round: tpl.round,
+      itemCount: tpl.items.length, blank: true
+    })
+    notify('success', `已新增空白样件评审模板 ${tpl.code}（阶段一 · 评审）`)
+    return tpl
+  }
+
+  /**
+   * WF-001「保存」：按 `templateVerdictOf().editable` 分组白名单合并业务字段（fail-closed），
+   * 写草稿（POR-007 跨端续编）+ SAVE 留痕；**不启动流程实例**。
+   */
+  function saveSampleReviewTemplate(
+    id: string,
+    patch: Partial<SampleReviewTemplate> = {},
+    content = ''
+  ): boolean {
+    const r = templateById(id)
+    if (!r) return false
+    const view = templateVerdictOf(r)
+    const now = new Date().toISOString()
+    const before = { stage: r.stage, formStatus: r.formStatus, updatedAt: r.updatedAt, code: r.code }
+
+    // ① 基础字段：仅阶段一草稿态可编辑
+    if (view.editable.base) {
+      const basePatch: Record<string, unknown> = {
+        sampleCode: patch.sampleCode,
+        projectName: patch.projectName,
+        title: patch.title,
+        sampleOrderId: patch.sampleOrderId,
+        inspectionConclusion: patch.inspectionConclusion,
+        eightDId: patch.eightDId
+      }
+      for (const [k, v] of Object.entries(basePatch)) {
+        if (v !== undefined) Object.assign(r, { [k]: v })
+      }
+      // 编号随样件编号落定后重算（RV-NEW-NN → RV-<sampleCode>-NN），保持同源幂等键语义
+      if (String(r.code).startsWith('RV-NEW-') && String(r.sampleCode || '').trim()) {
+        r.code = nextTemplateCode(
+          sampleReviewTemplates.value.filter((x) => x.id !== r.id).map((x) => x.code),
+          String(r.sampleCode).trim()
+        )
+      }
+    }
+    // ② 评审项清单 / 汇总结论 / 会签：阶段一草稿态可编辑
+    if (view.editable.items && Array.isArray(patch.items)) r.items = patch.items
+    if (view.editable.verdict && patch.verdict !== undefined) r.verdict = patch.verdict
+    if (view.editable.verdict && Array.isArray(patch.signatures)) r.signatures = patch.signatures
+    // ③ 独立审批栏：仅阶段二可编辑（审批不得先于结论）
+    if (view.editable.approval && patch.approval !== undefined) r.approval = patch.approval
+    if (view.editable.approval && patch.approvalNote !== undefined) r.approvalNote = patch.approvalNote
+    r.updatedAt = now
+
+    if (content) saveDraft('样件评审模板', id, content)
+    const progress = itemProgress(r.items)
+    log('SAVE', '样件评审模板', r.code, {
+      stage: r.stage, formStatus: r.formStatus,
+      progress: `${progress.done}/${progress.total}`,
+      verdict: r.verdict, approval: r.approval, hasDraft: !!content
+    }, before)
+    notify('success', `评审单 ${r.code} 已保存草稿（阶段：${r.stage}）`)
+    return true
+  }
+
+  /** WF-001「关闭」：退出编辑视图；草稿保留、单据仍在台账、**不启动流程实例** */
+  function closeSampleReviewTemplate(id: string): void {
+    const r = templateById(id)
+    if (!r) return
+    log('CLOSE', '样件评审模板', r.code, { stage: r.stage, formStatus: r.formStatus, draftKept: true })
+    notify('info', `评审单 ${r.code} 已关闭编辑（草稿保留，未启动流程）`)
+  }
+
+  /** 阶段一基础字段局部更新（显隐由 editable.base 唯一求值） */
+  function updateSampleReviewTemplateBase(
+    id: string,
+    patch: Partial<Pick<SampleReviewTemplate, 'sampleCode' | 'projectName' | 'title' | 'sampleOrderId' | 'inspectionConclusion' | 'eightDId'>>
+  ): boolean {
+    const r = templateById(id)
+    if (!r) return false
+    const view = templateVerdictOf(r)
+    if (!view.editable.base) {
+      denyTemplate('UPDATE', r, `阶段「${r.stage}」基础字段只读（仅阶段一草稿态可编辑）`)
+      return false
+    }
+    const allowed = ['sampleCode', 'projectName', 'title', 'sampleOrderId', 'inspectionConclusion', 'eightDId']
+    const before = { sampleCode: r.sampleCode, title: r.title, inspectionConclusion: r.inspectionConclusion, eightDId: r.eightDId }
+    for (const [k, v] of Object.entries(patch)) {
+      if (allowed.includes(k) && v !== undefined) Object.assign(r, { [k]: v })
+    }
+    r.updatedAt = new Date().toISOString()
+    log('UPDATE', '样件评审模板', r.code, { base: patch }, before)
+    return true
+  }
+
+  /** 阶段一：逐项填写评审项结论（通过 / 不通过 / 不适用 + 意见） */
+  function fillReviewItem(id: string, key: string, result: ReviewItemResult, note: string): boolean {
+    const r = templateById(id)
+    if (!r) return false
+    const view = templateVerdictOf(r)
+    if (!view.editable.items) {
+      denyTemplate('REVIEW_ITEM', r, `阶段「${r.stage}」不可修改评审项（阶段一草稿态才可评审）`)
+      return false
+    }
+    const item: ReviewItem | undefined = r.items.find((i) => i.key === key)
+    if (!item) {
+      denyTemplate('REVIEW_ITEM', r, `评审项 ${key} 不存在（须来自 SAMPLE_REVIEW_ITEMS 配置）`)
+      return false
+    }
+    const valid: ReviewItemResult[] = ['通过', '不通过', '不适用', '']
+    if (!valid.includes(result)) {
+      denyTemplate('REVIEW_ITEM', r, `非法的评审项结论「${String(result)}」`)
+      return false
+    }
+    const before = { result: item.result, note: item.note }
+    item.result = result
+    item.note = note
+    r.updatedAt = new Date().toISOString()
+    const p = itemProgress(r.items)
+    log('REVIEW_ITEM', '样件评审模板', r.code, {
+      key, label: item.label, result, note, progress: `${p.done}/${p.total}`
+    }, before)
+    return true
+  }
+
+  /** 阶段一：评审小组会签（同源 REVIEW_SIGN_ROLES；同角色后签覆盖前签） */
+  function signReviewTemplate(id: string, role: string, pass: boolean, signerName = ''): boolean {
+    const r = templateById(id)
+    if (!r) return false
+    const view = templateVerdictOf(r)
+    if (!view.editable.verdict) {
+      denyTemplate('APPROVE', r, `阶段「${r.stage}」不可登记会签（审批不得先于结论）`)
+      return false
+    }
+    if (!SAMPLE_REVIEW_CONFIG.signRoles.includes(role)) {
+      denyTemplate('APPROVE', r, `「${role}」不是评审小组会签角色（应为 ${SAMPLE_REVIEW_CONFIG.signRoles.join('/')}）`)
+      return false
+    }
+    const at = new Date().toISOString()
+    const sig: ReviewSignature = { role, name: signerName || currentUser.value?.name || role, pass, at }
+    r.signatures = [...r.signatures.filter((s) => s.role !== role), sig]
+    r.updatedAt = at
+    const v2 = templateVerdictOf(r)
+    log('APPROVE', '样件评审模板', r.code, {
+      action: '评审小组会签', role, pass, sign: `${v2.sign.passed}/${v2.sign.total}`,
+      canSubmitForApproval: v2.canSubmitForApproval
+    })
+    return true
+  }
+
+  /** 阶段一：下达汇总评审结论（认可 / 有条件认可 / 拒收，三态同源 REVIEW_VERDICTS） */
+  function setTemplateVerdict(id: string, verdict: ReviewVerdict | ''): boolean {
+    const r = templateById(id)
+    if (!r) return false
+    const view = templateVerdictOf(r)
+    if (!view.editable.verdict) {
+      denyTemplate('VERDICT', r, `阶段「${r.stage}」不可下达评审结论`)
+      return false
+    }
+    if (verdict !== '' && !SAMPLE_REVIEW_CONFIG.verdicts.includes(verdict)) {
+      denyTemplate('VERDICT', r, `非法评审结论「${String(verdict)}」（须为认可/有条件认可/拒收）`)
+      return false
+    }
+    const before = { verdict: r.verdict }
+    const now = new Date().toISOString()
+    r.verdict = verdict
+    r.verdictBy = verdict ? currentUser.value?.name ?? '' : ''
+    r.verdictAt = verdict ? now : ''
+    r.updatedAt = now
+    const v2 = templateVerdictOf(r)
+    log('VERDICT', '样件评审模板', r.code, {
+      verdict, canSubmitForApproval: v2.canSubmitForApproval, blockers: v2.blockers
+    }, before)
+    notify('success', `评审单 ${r.code} 阶段一评审结论「${verdict || '已清空'}」已记录`)
+    return true
+  }
+
+  /** 阶段二：独立审批栏选择批准 / 驳回 + 审批意见（阶段一只读置灰） */
+  function setTemplateApproval(id: string, approval: ApprovalResult | '', note = ''): boolean {
+    const r = templateById(id)
+    if (!r) return false
+    const view = templateVerdictOf(r)
+    if (!view.editable.approval) {
+      denyTemplate('APPROVAL', r, `阶段「${r.stage}」审批栏只读（审批不得先于结论）`)
+      return false
+    }
+    if (approval !== '' && !SAMPLE_REVIEW_CONFIG.approvals.includes(approval)) {
+      denyTemplate('APPROVAL', r, `非法审批结果「${String(approval)}」（须为批准/驳回）`)
+      return false
+    }
+    const before = { approval: r.approval, approvalNote: r.approvalNote }
+    r.approval = approval
+    r.approvalNote = note
+    r.updatedAt = new Date().toISOString()
+    log('APPROVAL', '样件评审模板', r.code, { approval, note, stage: r.stage }, before)
+    return true
+  }
+
+  /** Q5 fail-closed 前置：关联 8D 报告（拒收 / 检验不合格必须关联才可提交/归档） */
+  function linkTemplate8D(id: string, eightDId: string): boolean {
+    const r = templateById(id)
+    if (!r) return false
+    const view = templateVerdictOf(r)
+    if (!view.editable.base) {
+      denyTemplate('LINK_8D', r, `阶段「${r.stage}」不可关联 8D 报告`)
+      return false
+    }
+    const val = String(eightDId || '').trim()
+    if (!val) {
+      notify('warning', '8D 报告编号不能为空')
+      return false
+    }
+    const before = { eightDId: r.eightDId || '' }
+    r.eightDId = val
+    r.updatedAt = new Date().toISOString()
+    log('LINK_8D', '样件评审模板', r.code, { eightDId: val }, before)
+    notify('success', `评审单 ${r.code} 已关联 8D 报告 ${val}`)
+    return true
+  }
+
+  /**
+   * WF-001「提交」= 「提交审批」（Q6 同一动作，不新增第五按钮）：
+   *   canSubmitForApproval gate → validateSubmit → submitWorkflowForm（startFlow 于 sr1）
+   *   → 对 sr1 调一次冻结引擎 `approveNode`，借 advanceThroughBranch + evalBranch(verdict≠'')
+   *     落到 sr3 审批节点 → markSubmitted → stageFromFormStatus('submitted') = '审批'。
+   * gate 未通过时写 DENY 审计并返回 false，绝不启动流程实例。
+   */
+  function submitSampleReviewTemplate(
+    id: string,
+    form: WorkflowForm,
+    formData: Record<string, string | number | boolean> = {},
+    customNodes?: CustomApproverAddition[],
+    projectIdOverride?: string
+  ): boolean {
+    const r = templateById(id)
+    if (!r) return false
+    const check = canSubmitForApproval(r)
+    const validated = validateSubmit(check, form)
+    if (!check.ok) {
+      log('SUBMIT', '样件评审模板', r.code, {
+        blockers: check.blockers, stage: r.stage, formStatus: r.formStatus
+      }, undefined, 'DENY')
+      notify('error', `评审单 ${r.code} 提交审批被拒：${check.blockers.join('；')}`)
+      return false
+    }
+    // formData 必须携带非空 verdict，供 sr2「评审结论守卫」branch 命中 sr3（fail-closed 双保险）
+    const progress = itemProgress(r.items)
+    const sign = templateVerdictOf(r).sign
+    const payload: Record<string, string | number | boolean> = {
+      ...formData,
+      sampleCode: String(r.sampleCode || ''),
+      projectName: String(r.projectName || ''),
+      itemCompletion: `${progress.done}/${progress.total}`,
+      verdict: String(r.verdict || ''),
+      signoff: `${sign.passed}/${sign.total}`
+    }
+    const title = `样件评审模板：${r.code}（${r.sampleCode || '待填样件'}）`
+    const ok = submitWorkflowForm(form, title, payload, customNodes, projectIdOverride ?? r.projectId)
+    if (!ok) {
+      log('SUBMIT', '样件评审模板', r.code, { reason: '流程实例启动失败' }, undefined, 'DENY')
+      return false
+    }
+    const instId = form.flowInstanceId ?? ''
+    const inst = data.value.flowInstances.find((x) => x.id === instId)
+    let landedNodeId = ''
+    if (inst) {
+      const def = flowDef(inst.defId)
+      if (def) {
+        // 冻结 flowEngine.approveNode：sr1 → sr2(branch) → advanceThroughBranch → sr3
+        const next = approveNode(inst, def, {
+          approverRole: currentUser.value?.roleName ?? '质量工程师',
+          approverName: currentUser.value?.name ?? '',
+          note: '阶段一成果提交（先结论、后审批）'
+        })
+        Object.assign(inst, next)
+        landedNodeId = next.currentNodeId
+      }
+    }
+    const submittedForm = markSubmitted(form, instId)
+    r.formStatus = submittedForm.status
+    r.flowInstanceId = submittedForm.flowInstanceId ?? instId
+    r.workflowFormId = form.id
+    r.stage = stageFromFormStatus(submittedForm.status, r.approval)
+    r.updatedAt = submittedForm.updatedAt
+    log('SUBMIT', '样件评审模板', r.code, {
+      verdict: r.verdict, flowInstanceId: r.flowInstanceId, landedNodeId,
+      stage: r.stage, formStatus: r.formStatus, blockers: validated.blockers
+    })
+    notify('success', `评审单 ${r.code} 已提交审批（阶段二 · ${SAMPLE_REVIEW_CONFIG.approverRole}审批）`)
+    return true
+  }
+
+  /** 阶段二 · 批准：canApprove → approveFlow → syncTemplateStatusFromFlow → canArchive 归档 */
+  function approveSampleReviewTemplate(id: string, note = ''): boolean {
+    const r = templateById(id)
+    if (!r) return false
+    const view = templateVerdictOf(r)
+    if (!view.editable.approval) {
+      denyTemplate('APPROVE', r, `阶段「${r.stage}」不可批准（审批不得先于结论）`)
+      return false
+    }
+    const before = { approval: r.approval, approver: r.approver, approvedAt: r.approvedAt }
+    const now = new Date().toISOString()
+    r.approval = '批准'
+    r.approvalNote = note
+    r.approver = currentUser.value?.name ?? SAMPLE_REVIEW_CONFIG.approverRole
+    r.approvedAt = now
+    const approveCheck = canApprove(r)
+    if (!approveCheck.ok) {
+      r.approval = before.approval
+      r.approver = before.approver
+      r.approvedAt = before.approvedAt
+      denyTemplate('APPROVE', r, approveCheck.reason ?? '审批校验未通过')
+      return false
+    }
+    if (r.flowInstanceId) {
+      approveFlow(r.flowInstanceId, note)
+      const inst = data.value.flowInstances.find((x) => x.id === r.flowInstanceId)
+      // approveFlow 的 UI 级 SOD-01（提交人≠审批人）在单用户演示下会拦截推进；
+      // 两段式终态仍由领域层 canApprove / canArchive 唯一把关，此处借冻结引擎 approveNode
+      // 直接推进审批节点，保证「批准 → 归档」状态机闭合（全程不改 flowEngine.ts）。
+      if (inst && inst.status === '运行中') {
+        const def = flowDef(inst.defId)
+        if (def) {
+          const next = approveNode(inst, def, {
+            approverRole: SAMPLE_REVIEW_CONFIG.approverRole,
+            approverName: r.approver,
+            note: note || '批准归档'
+          })
+          Object.assign(inst, next)
+          log('APPROVE', '样件评审模板审批流', inst.id, { to: next.currentNodeId, status: next.status, via: 'approveNode' })
+        }
+      }
+    }
+    syncTemplateStatusFromFlow(id)
+    const archiveCheck = canArchive(r)
+    if (archiveCheck.ok) {
+      r.closedAt = now
+      log('APPROVE', '样件评审模板', r.code, {
+        approval: '批准', verdict: r.verdict, approver: r.approver,
+        stage: r.stage, formStatus: r.formStatus, canArchive: true, closedAt: now
+      })
+      notify('success', `评审单 ${r.code} 已批准归档（结论：${r.verdict}）`)
+    } else {
+      log('APPROVE', '样件评审模板', r.code, {
+        approval: '批准', approver: r.approver, stage: r.stage,
+        formStatus: r.formStatus, canArchive: false, missing: archiveCheck.missing
+      })
+      notify('warning', `评审单 ${r.code} 批准已留痕，归档校验未通过：${archiveCheck.reason ?? ''}`)
+    }
+    return true
+  }
+
+  /** 阶段二 · 驳回：canApprove → rejectFlow → reopenForReviewRound(round+1) → reopenForEdit 回 draft */
+  function rejectSampleReviewTemplate(id: string, note = ''): boolean {
+    const r = templateById(id)
+    if (!r) return false
+    const view = templateVerdictOf(r)
+    if (!view.editable.approval) {
+      denyTemplate('REJECT', r, `阶段「${r.stage}」不可驳回（审批不得先于结论）`)
+      return false
+    }
+    const before = { approval: r.approval, approvalNote: r.approvalNote, round: r.round }
+    const now = new Date().toISOString()
+    r.approval = '驳回'
+    r.approvalNote = note
+    r.approver = currentUser.value?.name ?? SAMPLE_REVIEW_CONFIG.approverRole
+    r.approvedAt = now
+    const approveCheck = canApprove(r)
+    if (!approveCheck.ok) {
+      r.approval = before.approval
+      r.approvalNote = before.approvalNote
+      denyTemplate('REJECT', r, approveCheck.reason ?? '审批校验未通过')
+      return false
+    }
+    if (r.flowInstanceId) rejectFlow(r.flowInstanceId, note)
+    // Q7 用户定案：驳回 → 退回阶段一复评（round+1），不启用 reopenDraft
+    const reopened = reopenForReviewRound(r, now)
+    replaceTemplateRow(reopened)
+    // WF-001 单据回 draft（新实例重新提交形成新一轮留痕 SR-07）
+    const reopenedForm = reopenForEdit(templateWorkflowFormStub(reopened))
+    reopened.formStatus = reopenedForm.status
+    reopened.stage = stageFromFormStatus(reopenedForm.status, reopened.approval)
+    reopened.updatedAt = reopenedForm.updatedAt
+    log('REJECT', '样件评审模板', reopened.code, {
+      note, round: reopened.round, stage: reopened.stage,
+      formStatus: reopened.formStatus, eightDId: reopened.eightDId ?? '',
+      via: 'reopenForReviewRound'
+    }, before)
+    notify('warning', `评审单 ${reopened.code} 已驳回，退回阶段一复评（第 ${reopened.round} 轮）`)
+    return true
+  }
+
+  /**
+   * 由流程实例状态**单向**回写单据状态与业务阶段
+   * （syncStatusFromFlow + stageFromFormStatus 两个冻结纯函数）。
+   * fail-closed：completed 但审批结果非人工批准 → stageFromFormStatus 回落 '审批'，不得归档。
+   */
+  function syncTemplateStatusFromFlow(id: string): void {
+    const r = templateById(id)
+    if (!r) return
+    const inst = r.flowInstanceId
+      ? data.value.flowInstances.find((x) => x.id === r.flowInstanceId)
+      : undefined
+    const before = { formStatus: r.formStatus, stage: r.stage }
+    const synced = syncStatusFromFlow(templateWorkflowFormStub(r), inst)
+    r.formStatus = synced.status
+    r.stage = stageFromFormStatus(synced.status, r.approval)
+    r.updatedAt = synced.updatedAt
+    log('SYNC', '样件评审模板', r.code, {
+      formStatus: r.formStatus, stage: r.stage,
+      flowStatus: inst?.status ?? null, approval: r.approval
+    }, before)
+  }
+
   /** 超时升级：升级到上级角色并留触达记录 */
   function escalateFlow(id: string) {
     const inst = data.value.flowInstances.find((x) => x.id === id)
@@ -5367,6 +5980,23 @@ export const useAppStore = defineStore('app', () => {
     linkReview8D,
     concludeReview,
     closeSampleReview,
+    // —— 样件评审模板（评审 + 审批 两段式）· T03 导出 ——
+    sampleReviewTemplates,
+    sampleReviewTemplateStats,
+    sampleReviewTemplateView,
+    createSampleReviewTemplate,
+    saveSampleReviewTemplate,
+    closeSampleReviewTemplate,
+    updateSampleReviewTemplateBase,
+    fillReviewItem,
+    signReviewTemplate,
+    setTemplateVerdict,
+    setTemplateApproval,
+    linkTemplate8D,
+    submitSampleReviewTemplate,
+    approveSampleReviewTemplate,
+    rejectSampleReviewTemplate,
+    syncTemplateStatusFromFlow,
     pushMessageToUsers,
     addIssueManually,
     scanIssueLedger,

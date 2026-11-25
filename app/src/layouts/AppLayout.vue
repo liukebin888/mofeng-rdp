@@ -176,9 +176,12 @@ onUnmounted(() => {
   window.removeEventListener('resize', onResize)
 })
 
-const isGroupActive = (key: string) => route.path.startsWith(`/${key}`)
+const isGroupActive = (key: string) => {
+  const g = String(route.meta.group ?? '')
+  return g ? g === key : route.path.startsWith(`/${key}`)
+}
 watch(() => route.path, () => {
-  const g = MENUS.find((m) => route.path.startsWith(`/${m.key}`))
+  const g = MENUS.find((m) => m.key === String(route.meta.group ?? ''))
   if (g && !open.value.includes(g.key)) open.value = [...open.value, g.key]
   // 移动端导航后自动收起抽屉
   if (bp.value === 'mobile') drawerOpen.value = false

@@ -82,7 +82,7 @@ import { capacityCheck } from '@/domain/portfolio'
 const store = useAppStore()
 const { te } = useI18n()
 
-/** 本组件被 2 个菜单复用：评分与排序 / 优选与容量（已并入「成本管理」域） */
+/** 本组件被 2 个菜单复用：评分与排序 / 优选与容量（现归属「组合与投资」组；path 保留 /cost/* 不变） */
 const tabs = [
   { path: '/cost/score', label: '评分与排序' },
   { path: '/cost/capacity', label: '优选与容量' }

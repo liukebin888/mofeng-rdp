@@ -132,7 +132,12 @@ export const MENUS: MenuGroup[] = [
       { path: '/cost/budget', title: '成本归集表', desc: '8 列归集表 + 四类单据', icon: 'Money', comp: v('cost/CostSheetView') },
       { path: '/cost/deviation', title: '成本偏差', desc: 'CPI 0.95/0.90 判读', icon: 'TrendCharts', comp: v('resource/EvmView') },
       { path: '/cost/hours', title: '工时归集', desc: '工时→成本归集', icon: 'Timer', comp: v('resource/EvmView') },
-      { path: '/cost/evm', title: '四值与挣值报表', desc: 'SPI/CPI/EAC/TCPI/VAC', icon: 'DataAnalysis', comp: v('resource/EvmView') },
+      { path: '/cost/evm', title: '四值与挣值报表', desc: 'SPI/CPI/EAC/TCPI/VAC', icon: 'DataAnalysis', comp: v('resource/EvmView') }
+    ]
+  },
+  {
+    key: 'portfolio', title: '组合与投资', icon: 'PieChart', stage: 'P1–P7', role: 'PMO / 研发副总', cp: 'PFM-011~019',
+    items: [
       { path: '/cost/score', title: '评分与排序', desc: '40/35/25 三维加权 ×20', icon: 'Rank', comp: v('portfolio/ScoreView') },
       { path: '/cost/capacity', title: '优选与容量', desc: '容量缺口三建议（PFM-019）', icon: 'Odometer', comp: v('portfolio/ScoreView') },
       { path: '/cost/analysis', title: '组合分析', desc: 'ROI/决策留痕/What-if', icon: 'TrendCharts', comp: v('portfolio/AnalysisView') },
@@ -166,7 +171,12 @@ export const MENUS: MenuGroup[] = [
       { path: '/supply/portal', title: '门户与代录', desc: '代录标记来源（SUP-014）', icon: 'Monitor', comp: v('supply/PortalView') },
       { path: '/supply/purchase-plan', title: '采购计划', desc: '采购计划编制与跟踪（长周期零件）', icon: 'Tickets', comp: v('supply/PurchasePlanView') },
       { path: '/supply/tender', title: '招投标', desc: '招标立项/投标评审/开标定标留痕', icon: 'Document', comp: v('supply/TenderView') },
-      { path: '/supply/sample-purchase', title: '样件采购管理', desc: '试制样件采购需求/下单/到货/验收', icon: 'Box', comp: v('supply/SamplePurchaseView') },
+      { path: '/supply/sample-purchase', title: '样件采购管理', desc: '试制样件采购需求/下单/到货/验收', icon: 'Box', comp: v('supply/SamplePurchaseView') }
+    ]
+  },
+  {
+    key: 'delivery', title: '交付管理', icon: 'Van', stage: 'P5–P7', role: '项目经理 / 交付', cp: 'C-19 HW-016',
+    items: [
       { path: '/supply/deliverables', title: '交付物清单', desc: '缺件率 0 方可提交（C-19）', icon: 'List', comp: v('delivery/DeliverableView') },
       { path: '/supply/ship', title: '样件发运与签收', desc: '签收后转已交付（HW-016）', icon: 'Van', comp: v('delivery/DeliverableView') },
       { path: '/supply/soft', title: '软件交付台账', desc: '版本与刷写记录', icon: 'Monitor', comp: v('delivery/SoftDeliverView') }

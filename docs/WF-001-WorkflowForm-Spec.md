@@ -118,11 +118,27 @@ function wfSubmit() {
 | 项目/产品报价 | DEF-PRE-2 | ✅ 已接入（`views/presale/QuoteApplyView.vue`） |
 | 技术方案（TR） | DEF-PRE-5 | ✅ 已接入（`views/presale/SchemeView.vue`） |
 | 立项评审 | DEF-PRE-4 | ✅ 已接入（自动触发，`views/presale/ProjectReviewView.vue`） |
+| 样件评审模板（评审 + 审批 两段式） | DEF-TRIAL-REVIEW | ✅ 已接入（`views/trial/InspectView.vue`，2026-11-24 增量） |
 | ECR 审批 | DEF-ECR | ⏸ 待接入 |
 | Gate 放行 | DEF-GATE | ⏸ 待接入 |
 | 豁免申请 | DEF-EXEMPT | ⏸ 待接入 |
 | 工时审核 | DEF-HOUR | ⏸ 待接入 |
 | 阶段审批 S1~S6 | DEF-STAGE-S* | ⏸ 待接入 |
+
+### 5.1 样件评审模板接入口径（Q6：提交 = 提交审批，同一动作）
+
+> 增量代号 `mofeng_rdp_sample_review_template_increment`，详见 `docs/DESIGN-SAMPLE-REVIEW-TEMPLATE-2026-11-24.md` v0.3。
+
+| 项 | 约定 |
+|---|---|
+| 模板 | 就地改造 `DEF-TRIAL-REVIEW`（`id` / `code` / `name` 保持原值，仅改 `nodes` / `formFields` / `version=2`）：`start(sr1) → branch(sr2「阶段一 · 评审结论守卫」，无 defaultNext) → approve(sr3「阶段二 · 提交审批」，研发副总) → end(sr4)` |
+| 草稿类型 | `DraftObjectType` 已登记 `'样件评审模板'`（WF-001 §3.4） |
+| 四按钮 | 「新增」`createSampleReviewTemplate` → 「保存」`saveSampleReviewTemplate` → 「关闭」`closeSampleReviewTemplate` → 「提交」`submitSampleReviewTemplate`。**「提交」即「提交审批」**（Q6 同一动作）；表单内**不新增第五按钮 / 不引入第二个提交语义**，仅在「提交」按钮旁用新增说明文字写明「提交后进入审批阶段」 |
+| 提交 gate | `canSubmitForApproval(r)`：评审项清单全完成 + 汇总结论非空 + 必填字段 + 会签全通过 + 8D 前置（拒收 / 检验不合格，fail-closed）。未通过则 blockers 可见且不启动流程实例 |
+| 提交编排 | `validateSubmit` → `submitWorkflowForm`（`startFlow` 于 sr1）→ 对 sr1 调一次冻结引擎 `approveNode`，借 `advanceThroughBranch` + `evalBranch(verdict≠'')` 落到 sr3 → `markSubmitted` → `stageFromFormStatus('submitted') = '审批'` |
+| 阶段二 | `approveSampleReviewTemplate` / `rejectSampleReviewTemplate` → `syncTemplateStatusFromFlow` 单向回写；批准经 `canArchive` fail-closed 归档，驳回经 `reopenForReviewRound` 退回阶段一复评（`round+1`） |
+| 单一权威 | 页面只消费 `store.sampleReviewTemplateView(id)` → `templateVerdictOf(r)` 的 `stage / editable / canXxx / blockers / progress / sign`，视图不自行拼装状态口径 |
+| 冻结边界 | `workflowForm.ts` / `flowEngine.ts` / `sampleReviewEngine.ts` / `repo.ts` 及其单测、`WorkflowFormShell.vue` 均零改动 |
 
 ## 6. 测试与验证
 

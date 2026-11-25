@@ -6,6 +6,7 @@
         <el-button size="small" @click="doAssess">AI 汇总</el-button>
         <el-button size="small" type="primary" :disabled="!assess?.recommend" @click="doDispatch">AI 自动下达</el-button>
         <el-button size="small" @click="doTrack">AI 跟踪巡检</el-button>
+        <el-button size="small" @click="$router.push('/trial/workorder')">试制工单与工装</el-button>
       </template>
     </PageHeader>
 

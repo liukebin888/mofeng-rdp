@@ -120,3 +120,122 @@
 | 事项 | 性质 | 说明 |
 |---|---|---|
 | 等保/密评测评执行 | 交付后验证 | 实现方做完系统 → 提交有资质机构测评 → 给出「符合/不符合」结论；机构选定为采购执行，非前置卡点 |
+
+---
+
+## 10. 样件评审模板（评审 + 审批 两段式）增量定案清单（2026-11-24）
+
+> 增量代号 `mofeng_rdp_sample_review_template_increment`。上游：`docs/PRD-SAMPLE-REVIEW-TEMPLATE-2026-11-24.md`、`docs/DESIGN-SAMPLE-REVIEW-TEMPLATE-2026-11-24.md` v0.3、`docs/class-diagram.mermaid`、`docs/sequence-diagram.mermaid`。
+> **优先级**：设计稿与主理人裁决冲突时，一律以主理人裁决 / 用户定案为准（§0.4）。
+
+### 10.1 核心语义
+
+用户需求逐字：「创建一个样件评审的模板，审是一个评审+审批流程」；澄清「首先进行样件评审，评审小组给出评审结论，然后再提交审批」。即 **「先结论、后审批」**：阶段一评审小组逐项评审并形成汇总结论 → 阶段二把**已形成的结论**提交审批（批准 / 驳回）→ 批准归档 / 驳回复评（`round+1`）。旧 `DEF-TRIAL-REVIEW` 与 `sampleReviewEngine.ts` 五态「先批准后结论」顺序相反，本次以**新增两段式模板引擎**承载，旧五态引擎冻结不改。
+
+### 10.2 Q1~Q11 定案总表
+
+| 编号 | 定案方 | 结论 | 落点 |
+|---|---|---|---|
+| Q1 | 架构师 | **就地改造** `DEF-TRIAL-REVIEW`，不新增流程定义；`id` / `code` / `name`（仍「样件评审流程」）保持原值，仅改 `nodes` / `formFields` / `version=2` | `seed.ts` + `stateMigration.ts` |
+| Q2 | **用户** | 评审项 **7 项**（外观 / 尺寸 / 关键性能 / 检验记录符合性 / 资料齐套性 / 风险与整改建议 / 8D 闭环状态）且**配置化**（数据定义 + 引擎求值，视图 `v-for` 不硬编码） | `SAMPLE_REVIEW_ITEMS` |
+| Q3 | **用户** | 阶段二审批角色 **研发副总**（单人） | `SAMPLE_REVIEW_CONFIG.approverRole` / `sr3.approverRole` |
+| Q4 | **用户** | 汇总结论三态 `认可 / 有条件认可 / 拒收`（同源复用 `REVIEW_VERDICTS`）；审批结果两态 `批准 / 驳回` | `SAMPLE_REVIEW_CONFIG.verdicts` / `.approvals` |
+| Q5 | 架构师 + **主理人裁决** | 8D 独立流程分支 / SLA 加签转办 / 导出打印 / AI 辅助水印为 **P2 本期不实现，仅留配置位**；但「拒收或检验不合格须关联 8D 才允许提交（fail-closed）」、驳回复评 `round+1`、`reviewDedupKey` import 复用 **仍为 P0 必做** | `canSubmitForApproval` / `canArchive` / `reopenForReviewRound` / `SAMPLE_REVIEW_CONFIG.p2` |
+| Q6 | 架构师 | 「提交」与「提交审批」为 **同一动作**，统一落在 WF-001 四按钮「提交」，**不新增第五按钮 / 不引入第二提交语义**；按钮旁用新增说明文字写明「提交后进入审批阶段」 | `submitSampleReviewTemplate` / `InspectView.vue` |
+| Q7 | **用户** | 驳回 **退回阶段一重新评审、复评轮次 +1**（不是退回草稿重开）；`'reopenDraft'` 仅保留为配置层备选、本次不启用 | `SAMPLE_REVIEW_CONFIG.rejectBehavior='reReviewRound'` / `reopenForReviewRound` |
+| Q8 | **用户** | **唯一授权文案改动**：仅允许改 `InspectView.vue` 第 3 行 `PageHeader desc` 为两段式语义；`title`「样件评审」、侧栏菜单、品牌名「魔程化解」及其余所有既有字符串 **一字不动**（早期「desc 一字不动」表述作废） | `InspectView.vue` 第 3 行 |
+| Q9 | 架构师 + **主理人裁决 U1** | **幂等合并式迁移**：以远程 `data` 为基底，只写 `version='mofeng.rdp.v1.0.42'`、补 `sampleReviewTemplates`、按 `id` 就地替换 `DEF-TRIAL-REVIEW`，其余字段原样保留；写回携运行时读取的 `expectedRev: backendRev`（禁止 `expectedRev:0` 硬播种）；`seedRemoteAudit` 幂等前置；**禁止手工编辑** `server/data/*.json` | `stateMigration.ts` / `store.syncFromBackend()` |
+| Q10 | 架构师 | 会签角色与 `REVIEW_SIGN_ROLES` **同源**，不新增「评审小组」角色集；`signComplete` / `signProgress` / `reviewDedupKey` / `nextReviewCode` 一律 import 复用冻结引擎，不复制不改写 | `sampleReviewTemplate.ts` |
+| Q11 | 架构师 + **主理人收紧** | **KPI 4 个 label 保持原值**（评审单 / 进行中 / 已闭环 / 待总监批准），仅统计数据源切到 `templateStats`；键名统一 `total / reviewing / pending / closed`（v0.3，**不沿用 `open` 键**）；列表保留既有 6 列及其顺序（`评审单号 / 样件 / 阶段 / 轮次 / 结论 / 会签`），**只允许新增列**（本次新增「审批结果」）；设计稿 Q11「待总监批准→待审批」**作废** | `templateStats` / `InspectView.vue` H、F 区 |
+
+### 10.3 工程性事项（主理人定案）
+
+| 编号 | 结论 |
+|---|---|
+| U1 | 采纳幂等合并式迁移（见 Q9）；`syncFromBackend()` 版本不符分支由「本地 `buildSeed()` 全量覆盖」改为「远程 data 为基底的增量合并」；另补 **shape-check**（version 相符但结构缺增量字段时同样迁移），不依赖单一版本判据 |
+| U3 | 不新增表单内「提交审批」按钮（见 Q6） |
+| U5 | P2 项本期不实现，仅留接口/配置位；Q5 三项 P0 保留（见 Q5） |
+| U6 | 新增单测使用例总数 > 1796，口径为「既有 1796 全绿 + 新增用例全绿」，**不得删改既有断言凑数** |
+| 文案边界 | 除 `desc` 外任何既有字符串一律不动；两段式语义一律通过新增 DOM / 新组件 / 新增列 / 新增说明文字承载 |
+| 冻结边界 | `sampleReviewEngine.ts`、`workflowForm.ts`、`flowEngine.ts`、`repo.ts` 及其单测零改动；`WorkflowFormShell.vue` 原则不改（复核四按钮 / 状态徽章 / blockers / slot 后确认无需适配）；`PpapView.vue` 仅作 WF-001 接入范式参考 |
+
+### 10.4 偏离设计稿的点（以主理人裁决为准）
+
+1. **§3.3 `name` 改名作废**：设计稿早期示例把 `DEF-TRIAL-REVIEW.name` 改为「样件评审流程（评审 + 审批 两段式）」；按 Q1 保持原值「样件评审流程」。
+2. **Q8 反转**：架构师首条红线曾写「`desc` 一字不动」，后续紧急更正为「唯一授权文案改动」；实现按更正后裁决执行。
+3. **Q11「待总监批准→待审批」作废**：4 个 KPI label 保持既有原值；设计稿 v0.3 已把 `kpiLabels` 键名修正为 `total / reviewing / pending / closed`。
+4. **`templateStats` 口径**：按 v0.3 §5 Q11，`reviewing`（进行中）= `stage !== '归档'` = `total - closed`，`pending`（待总监批准）= `stage === '审批'`，`closed`（已闭环）= `stage === '归档'`；不再暴露 `open` 键。
+5. **Store 动作签名**：类图为简写（无 `id` 参数）；实现为显式 `id` + `WorkflowForm` 参数（对齐既有 `submitWorkflowForm(form, title, data, ...)` 约定），避免隐藏全局「当前单据」状态，便于 vitest 直调与跨单据操作。**方法名、职责、调用链与类图/时序图一致**。
+6. **SOD-01 兼容**：`approveFlow` 的 UI 级「提交人≠审批人」在单用户演示下会拦截推进；`approveSampleReviewTemplate` 在检测到实例仍「运行中」时借冻结引擎 `approveNode` 直接推进，保证「批准 → 归档」状态机闭合（终态仍由 `canApprove` / `canArchive` 唯一把关），全程不改 `flowEngine.ts`。
+
+### 10.5 HMR 事件与恢复后基线（如实记录）
+
+- **事件**：本机曾运行 Vite 预览（127.0.0.1:5178，有活动浏览器连接）与后端（8787）。修改 `seed.ts` 的 `SEED_VERSION` 至 `v1.0.42` 后触发 HMR 重载；当时 `syncFromBackend()` 仍是旧逻辑，版本不符分支用本地 `buildSeed()` 空种子全量覆盖远程 state，导致默认演示目录业务实体被重置（只读实测：`rev 5` / `projects 0` / `samples 0` / `sampleTrialOrders 0` / `samplePurchases 0` / `audit 0`；而 `audit-T-1001.json` 18 条链未被触碰）。
+- **处置**：掐断污染源（Vite 预览 5178 已停止、无监听；后端 8787 保留）；**通过应用侧 API 通道**恢复：`GET /api/state` → 补齐业务实体 → `PUT /api/state` 携 `expectedRev` 写回，`audit.count !== 0` 时跳过 seed，结果 `state saved rev 6` / `audit already 18`。临时恢复脚本已删除。**未手工编辑** `server/data/*.json`。
+- **恢复后基线（本次交付报告口径）**：`rev=6`、`version='mofeng.rdp.v1.0.42'`；`projects=1 (PRJ-DEMO-AI)` / `samples=1` / `trialOrders=1` / `purchases=3` / `drafts=1` / `flowDefinitions=36` 全部在位；`audit-T-1001.json` **18 条**、`chainOk=true`、`brokenAt=null`、`checked=18`。
+- **根因修复**：U1 幂等合并式迁移 `migrateSampleReviewState`（`stateMigration.ts`）+ `syncFromBackend()` shape-check 接入；新增 `stateMigration.spec.ts` 覆盖「远程 data 为基底 / 其余字段逐字段保留 / 二次调用幂等 / 已知违规样本断言拦截」。
+- **交付纪律**：最终交付前不再启动前端预览、不连接浏览器到 5178 / 8787、不触发页面刷新、不跑 smoke / e2e、不 `git commit`；QA 回归使用 `MOFENG_DATA_DIR` 隔离演示数据。
+
+### 10.6 本次增量文件清单
+
+| 类型 | 文件 |
+|---|---|
+| 新增 | `app/src/domain/sampleReviewTemplate.ts`、`app/src/domain/stateMigration.ts`、`app/src/components/SampleReviewTemplateForm.vue`、`app/src/components/SampleReviewStageChain.vue`、`app/tests/sampleReviewTemplate.spec.ts`、`app/tests/stateMigration.spec.ts` |
+| 修改 | `app/src/domain/types.ts`、`app/src/data/seed.ts`、`app/src/store/app.ts`、`app/src/views/trial/InspectView.vue`、`docs/WF-001-WorkflowForm-Spec.md`、`docs/DECISION-LIST.md` |
+| 零改动（冻结 / 复核） | `app/src/domain/sampleReviewEngine.ts`、`app/src/domain/workflowForm.ts`、`app/src/domain/flowEngine.ts`、`app/src/infra/repo.ts`、`app/src/components/WorkflowFormShell.vue`、`app/src/views/project/PpapView.vue`、`app/src/components/PageHeader.vue`、`app/src/components/KpiCard.vue`、`server/data/*` |
+
+## 11. 测试评估问题整改定案清单（2026-11-25）
+
+> 触发：用户「针对测试评估出来的问题进行完善」，AskUserQuestion 勾选 4 项范围全选。依据 `docs/BUSINESS-CLOSURE-REVIEW-2026-11-25.md`（业务闭环与菜单关联复查报告 第 2 轮）与 QA #4/#6/#9 报告。
+
+### 11.1 P0 通用缺陷：persist 乐观锁竞态（QA #4 测出，#5 修复，#6 复验）
+
+- **现象**：一次提交触发 5 次 `PUT /api/state` 全用同一 `expectedRev`；首个（中间态）200 推高服务端 rev，其余 409，**携带最终态的最后一次写被丢弃且 409 分支只提示不重试不入队** → 提交/驳回后服务端业务状态未持久化，UI 成功但刷新/跨端回退。
+- **根因**：`app/src/store/app.ts` 旧 `persist()` 调用瞬间快照 payload + fire-and-forget，`rev` 仅异步成功后自增；`log()` 又无条件再调 `persist()` ⇒ 同一 tick 多个同 `expectedRev` 并发 PUT。影响面为**全系统通用机制**（221 处 `log()` / 60 处 `persist()` / 33 处双写），非样件评审专属。
+- **修复（方案：同 tick 合并 + 串行 in-flight）**：新增 `app/src/infra/persistScheduler.ts`（纯 TS 三态调度器）；`persist()` 每次仍同步写 localStorage，远端写交调度器，`payload` / `expectedRev` 一律在 **flush 时**从当前 `data.value` / `rev.value` 重构造；跨 tick 严格串行。新增 `app/tests/persistCoalescing.spec.ts`（21 例，含「已知违规样本回退验证」）。
+- **不变项**：成功 `rev+1` + `flushPendingWrites`；真·跨端 409 仅提示不重试不入队；弱网入 `pendingWrites`（POR-012）；审计 `appendRemoteAudit` 独立 append-only 逐条发送**不合并**；`syncFromBackend()` 不经调度器，U1 合并式迁移 / shape-check 保持原样。
+- **复验（QA #6 / #9）**：真实网络层提交/驳回各 **1 次 PUT、0 次 409、payload 为最终态**；跨工作流补测 `advanceSamplePurchase` 同样收敛，证明通用修复。六门禁 117 文件 / 1862 用例全绿。
+- **残留（如实）**：真 409 / 弱网仅 mock 单测覆盖；其余工作流未逐一网络层实测；启动期极窄理论窗口未评估；a11y 真实取证三项按口径未跑。
+
+### 11.2 Q12 菜单独立分组恢复（推翻既有裁决，用户本次明确授权）
+
+- **旧裁决**（见「菜单结构」历史记录）：「组合投资 → 成本（/cost/*）」「交付 → 采购（/supply/*）」，一级菜单 16 组。
+- **新裁决（用户 AskUserQuestion 勾选「恢复菜单独立分组（P0）」）**：恢复独立「组合与投资」组（5 项 PMO 治理功能）与「交付管理」组（3 项项目交付功能），一级菜单 **16 → 18 组**。**此项推翻旧裁决，以本节为准。**
+- **实现定案（方案 1，主理人裁决 U1）**：**保留全部 104 条 URL 一字不改**，仅把 8 个菜单项整行搬到新组；`AppLayout.vue` 的 `isGroupActive` 与 watch 内 `MENUS.find` 改用每条路由**已写入**的 `route.meta.group` 判定，并保留 `route.path.startsWith('/'+key)` 作为 meta 缺失时的 fallback。
+  - 否决方案 2（改 key + 改 path 为 `/portfolio/*`）：牵动 6+ 文件 30+ 行、locale 16 行键名、`PageHeader` / `SemanticTabs` 用 `route.path` 拼 i18n key 会**静默降级到中文硬编码**、`probe-consistency.cjs` 硬编码 `/cost/score` 失效、历史深链失效、A11Y / 探针证据路径失配。
+- **配套**：`locale.ts` 新增 zh/en 各 2 行组名词条（`app.brand` 一字不动）；「不改 domain 引擎」口径明确为业务规则引擎，i18n 词典不属于该约束（U2）。
+- **复验（QA #9）**：18 组 active / 自动展开真实浏览器回归 `PASS=159 FAIL=0`（23 条深链 + 8 段导航 + 真实鼠标点击）；104 path 集合与 HEAD 全等、深链 `#/cost/score` 有效；中英切换无裸 key；footer `menuCount` 自动变 18。
+
+### 11.3 Q13 导航断链补齐（不新增/不改路由）
+
+| 视图 | 新增按钮 | 目标 | 定案 |
+|---|---|---|---|
+| `SampleRequestView.vue` | 「试制工单与工装」 | `/trial/workorder` | AI 下达的试制任务单可直达 |
+| `LightTaskBoardView.vue` | 「前往项目主计划」 | `/project/plan` | U3 裁决用**如实文案**，不用「转为正式计划」——本轮只补跳转入口、不做数据转换，避免虚假闭环；真正的「轻量任务 → WBS」转换超出授权范围，单独立项 |
+
+- U6：目标路由定 `/project/plan`；U4：允许顺手修 2 行域归属注释（纯文本、逐字披露）；EvmView 4 处复用收敛属 P2，本轮**不实施**。
+- 实现偏差（主理人核验判定正确）：按钮须落在 `#actions` 具名插槽最后一个子元素；若按原清单放在 `</template>` 之后会被静默丢弃。
+
+### 11.4 Q14 门户与协同裁撤去向（只读说明，不恢复）
+
+- 用户此前明确要求「彻底删除门户与协同全链路」。只读核查确认：`key:'collab'` 及 4 子菜单、`PortalView` / `SuperviseView`、`collabEngine`、`resolutionToTask` 均已删除；全量 13 处 `router.push` 目标均可达，**删除未留死链**；`myWorkEngine` 已收敛 WBS / 审批两类。
+- 残留仅为静态文案口径不一致（`TodayView` / `InboxView` desc、`types.ts` / `enumDict.ts` / `messageCenter.ts` / `org.ts` 注释），属文案债，本轮**不清理**。
+- ⚠️ `router/index.ts` 中 `/supply/portal`「门户与代录」是**供应链代录 SUP-014**，不是被裁撤的「项目门户 / 门户与协同」，不得混淆或删改。
+
+### 11.5 U5 报告数字差异（如实披露，不擅自改数）
+
+`docs/BUSINESS-CLOSURE-REVIEW-2026-11-25.md:32/158` 写「16 组一级菜单 / 107 二级菜单」，源码实测改动前 **16 组 / 104 菜单路由**、改动后 **18 组 / 104**（另有 1 条非菜单路由 `project/master-plan-editor`、1 条 redirect、1 条 catch-all 不计入）。差异系报告口径含非菜单页，与 104 菜单 path 不同源。按裁决**以源码为准、不替报告改数**，是否统一由后续轮次裁定。
+
+### 11.6 本轮增量文件清单（#5 + #8）
+
+| 类型 | 文件 |
+|---|---|
+| 新增 | `app/src/infra/persistScheduler.ts`、`app/tests/persistCoalescing.spec.ts`、`docs/BUSINESS-CLOSURE-REVIEW-2026-11-25.md` |
+| 修改 | `app/src/store/app.ts`（仅 `persist()` 调度器接入）、`app/src/router/index.ts`（新增 2 组，path 零改）、`app/src/layouts/AppLayout.vue`（2 行 active 判定）、`app/src/domain/locale.ts`（4 行组名词条）、`app/src/views/project/SampleRequestView.vue`、`app/src/views/wb/LightTaskBoardView.vue`、`app/src/views/portfolio/ScoreView.vue`（注释）、`app/src/views/delivery/DeliverableView.vue`（注释）、`docs/DECISION-LIST.md` |
+| 零改动（冻结 / 复核） | `app/index.html`、`app.brand`、`SEED_VERSION='mofeng.rdp.v1.0.42'`、`server/**`、全部 17 个 `*Engine.ts`、`PageHeader.vue`、`SemanticTabs.vue`、`probe-consistency.cjs`、`app/src/components/WorkflowFormShell.vue`、`server/data/*` |
+
+### 11.7 发布口径与隔离纪律
+
+- 发布口径继续「**内测 / 演示版**」，不宣称正式生产发布。剩余外部依赖 5 项（性能压测、等保密评/国密网关、真实 UAT 签署、灰度/回滚演练、AI 真实 Key）未变。
+- 正式 `server/data` 全程零写入：门禁前后 sha256 恒为 `state=85af15a8…b4f` / `audit=3727251b…8c5`；因该目录在 `.gitignore:16` 不受 git 跟踪，**零污染唯一判据是 sha256，`git status` 无效**；已留物理恢复副本 `.qa-tmp/data-p0-baseline/`。
+- 本地跑 smoke / e2e 必须显式设 `MOFENG_DATA_DIR` 指向隔离目录（`e2e-click.cjs` 的 `resetBackendState()` 漏设会清空正式 `server/data`）。

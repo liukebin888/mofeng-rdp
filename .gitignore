@@ -54,6 +54,17 @@ app/shots/probe-consistency-result.json
 # 探针截图产物（由 probe 脚本确定性重算）
 app/shots/*.png
 
+# QA 临时取证产物（2026-11-25 收口：保留在磁盘供追溯，不入库；含隔离端口/路径硬编码）
+# 注：已跟踪的 app/scripts/qa-compute.mts、qa-ui-check.cjs 不受影响（gitignore 只作用于未跟踪文件）
+.qa-tmp/
+app/scripts/qa-diag-404.cjs
+app/scripts/qa-diag-final.cjs
+app/scripts/qa-p0-audit-chain.cjs
+app/scripts/qa-p0-verify.cjs
+app/scripts/qa-runtime-round2.cjs
+app/scripts/qa-runtime-verify.cjs
+app/scripts/qa-verify-engine.mts
+
 # 发布产物与打包（不入库，避免大二进制污染）
 _site_publish/
 *.zip

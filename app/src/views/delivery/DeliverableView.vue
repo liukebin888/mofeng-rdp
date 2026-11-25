@@ -76,7 +76,7 @@ import { useI18n } from '@/infra/i18nPlugin'
 const store = useAppStore()
 const { te } = useI18n()
 
-/** 本组件被 2 个菜单复用：交付物清单 / 样件发运与签收（同一「采购管理」域） */
+/** 本组件被 2 个菜单复用：交付物清单 / 样件发运与签收（现归属「交付管理」组；path 保留 /supply/* 不变） */
 const tabs = [
   { path: '/supply/deliverables', label: '交付物清单' },
   { path: '/supply/ship', label: '样件发运与签收' }

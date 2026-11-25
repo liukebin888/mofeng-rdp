@@ -31,6 +31,7 @@
 - 资源：resourceConflict / projectClone / shareLink / quota / resourceCapacity / supplyDemand / overallocation / leveling / bottleneck / resourcePool / resourcePlan。风险：riskQuant+simulation+contingency / riskLifecycle；采购：supplierPerformance / otsClosure；报表：reportLibrary+interop+dataQuality / extensionPoint+accessibility。
 - 样件：`sample.ts`（HW-001~016）；提报单 `nextSampleCode`/`buildSampleOrder`（字段齐全率校验，未立项 projectId='' 时拒绝），嵌入 `/trial/samples` KittingView 弹窗；BOM+齐套(K9) 由下达 `canReleaseTrial` 把关。
 - 闭环引擎（均为 domain 单一权威纯函数，AI 只做不越权辅助）：`sampleReviewEngine`（五态+会签角色集+8D 关联+关闭四要素 fail-closed，SEED_VERSION v1.0.41，`/trial/inspect`）、`sampleRequestEngine`（AI 汇总/幂等键 `requestDispatchKey`/自动下达/跟踪，`/project/sample-request`）、`issueAiEngine`（架在 `issueEngine` 五态之上，6 类建议/采纳/跟踪，`/issue-risk/issue`）、`purchaseAiEngine`（六态 PURCHASE_NEXT 与 store 同源，风险预警/跟踪/闭环率，`/supply/sample-purchase`）。
+- **2026-11-25 新增（样件评审两段式 + P0 竞态）**：`domain/sampleReviewTemplate.ts`（页面唯一权威 `templateVerdictOf()` 一次求值给 stage/editable/blockers/canSubmitForApproval/canApprove/canArchive；7 项评审项配置化 + 结论三态 + 8D fail-closed + 驳回复评轮次+1；旧 `sampleReviewEngine` 五态**冻结仅被 import 复用**，不重写其 40+ 断言基线）、`domain/stateMigration.ts`（合并式迁移，运行时读 `backendRev` 禁止硬编码 rev/审计条数）、`infra/persistScheduler.ts`（persist 乐观锁竞态 coalescing）、`views/trial/InspectView.vue`（WF-001 四按钮改造；用户唯一授权改 `PageHeader desc` 一处）。
 - `server/index.js`：/api/state 乐观锁 + /api/audit append-only + /api/ai/chat SSE + /api/ai/workbuddy/status + /api/ai/sms/send|verify；`infra/repo.ts` RestRepo↔LocalRepo 双通道 2~4s 静默降级 + `seedRemoteAudit` 幂等前置（后端非空链跳过）。seed.ts：14 中心 / ~486 用户 / 219 节点。
 - WorkBuddy AI：`agent/`(ADK) + `POST /api/ai/chat`（越权前置过滤+SSE+AI_CALL 审计）+ `AiChatPanel.vue`；WMA 契约 `api.workbuddy.dev/v1/agent/chat/completions` + Bearer Key + agent_id；server 零依赖读 `.env`（CODEBUDDY_API_KEY/AI_ENDPOINT/AI_AGENT_ID/AI_MODEL）；`server/scripts/verify-wma.js`；`docs/AI-INTEGRATION.md`；一键唤起 `workbuddy://ch@t/?prompt=`。**三决策（2026-11-18 用户拍板）**：①每人自带 Key（仅 sessionStorage+内存，随请求体，不落库/不入审计/不入 git）②手机号短信验证码核验（`aiAccountEngine`，手机号加密落库+脱敏，**审计零 Key 泄露**）③Key 到位前占位降级不虚假接通；优先级 `body.apiKey → 服务端 CODEBUDDY_API_KEY → 占位降级`，`realModel` 仅真实调用成功后 true。
 
@@ -42,13 +43,13 @@
 - 验收资产：`docs/ACCEPTANCE-MATRIX.md`（85 条 AC，`app/scripts/_gen-ac-matrix.cjs` 生成且自检证据）、`docs/EXPERT-REVIEW-RECHECK-2026-11-23.md`（8 维复验，总裁决「有条件放行内测版，未达生产发布」）。
 
 ## 菜单结构（均经用户确认）
-报价费用明细→项目成本 tab；交付→采购（/supply/*）；组合投资→成本（/cost/*）；项目执行→项目管理、项目计划与进度→计划与进度；新建行政管理（/admin/org|roles|overload|pool）；报表并入顶部工作中心（/workbench/*）；**门户与协同全链路删除**（key:collab 及 4 子菜单、PortalView/SuperviseView、collabEngine、类型、seed 字段、store computed/KPI/动作、阈值、myWorkEngine 四类→两类）。一级菜单 16，路由 104。渲染：`AppLayout.vue` workbenchItems 顶部横向 / sideMenus 侧栏，`isGroupActive` 用 `route.path.startsWith('/'+key)`，路径前缀须与 group key 一致；迁移「改路径+改 locale+探针/视图 tabs 同步，不挪物理组件文件」。
+报价费用明细→项目成本 tab；交付→采购（/supply/*）；组合投资→成本（/cost/*）；项目执行→项目管理、项目计划与进度→计划与进度；新建行政管理（/admin/org|roles|overload|pool）；报表并入顶部工作中心（/workbench/*）；**门户与协同全链路删除**（key:collab 及 4 子菜单、PortalView/SuperviseView、collabEngine、类型、seed 字段、store computed/KPI/动作、阈值、myWorkEngine 四类→两类）。**⚠ 2026-11-25 用户裁决推翻上述旧归并**：恢复独立「组合与投资」(portfolio，5 项) 与「交付管理」(delivery，3 项) 两组，一级菜单 **16 → 18 组**；定案方案 1 = **104 条 URL 一字不改**，仅把 8 个菜单项整行搬到新组；`isGroupActive`/watch 改 `route.meta.group` 优先 + `startsWith` fallback；locale 新增 zh/en 各 2 行组名词条（`app.brand` 不动）。菜单路由仍 104。渲染：`AppLayout.vue` workbenchItems 顶部横向 / sideMenus 侧栏，`isGroupActive` 用 `route.path.startsWith('/'+key)`，路径前缀须与 group key 一致；迁移「改路径+改 locale+探针/视图 tabs 同步，不挪物理组件文件」。
 
 ## 需求方裁决
 - REQ-CONF-2026-1101-01：48 点分布 29/10/7/2；QM+CAL3~4+无自研软件判 L2 增行；冻结基线全量传播+打标。
 
 ## 演示数据（用户 2026-11-23 明确要求保留，勿当脏数据清除）
-- `server/data/state-T-1001.json` + `audit-T-1001.json`：1 项目(PRJ-DEMO-AI) / 1 样件 / 1 试制单 / 3 采购单 / **审计 16 条 chainOk true**（rev=2）。
+- `server/data/state-T-1001.json` + `audit-T-1001.json`：1 项目(PRJ-DEMO-AI) / 1 样件 / 1 试制单 / 3 采购单 / **审计 18 条 chainOk true**（rev=4；2026-11-24 前端正常播种 append-only 追加 2 条 UPDATE「附件A归档」，**非误删**；旧快照「16 条/rev=2」已废，架构师实测修正）。
 - **恢复方法**：从会话 JSONL line 44239 的 `providerData.toolResult.renderer.value` 取回 `server/scripts/_restore-demo.cjs`，复制隔离空态 state 作基线后执行，随后删临时脚本。
 - **e2e 隔离坑**：`app/scripts/e2e-click.cjs` `resetBackendState()` 曾硬编码清仓库 `server/data`（已修为优先读 `MOFENG_DATA_DIR`），会误删正式演示数据。smoke/e2e 会清空 state+audit，跑完必须复核正式数据。
 
@@ -60,6 +61,7 @@
 - **剩余能力边界（非缺陷，不判无障碍 100% 达标）**：屏幕阅读器、复合键、`.el-drawer`/分步弹窗未采到；对比度仅 6 组令牌色值；overlay 内 12 标签 + 6 键盘真实违规与 50 个 SKIP 待后续整改，不得翻盘为达标。
 
 ## 当前状态
-- P0-1~P0-6 / P1 / P2-1 / P2-2 / P2-3 全部闭环；P0-3 因外部测评/网关部署按用户裁决跳过。`origin/main...main = 0 0`，工作区干净，正式演示数据零改动。
+- P0-1~P0-6 / P1 / P2-1 / P2-2 / P2-3 全部闭环；P0-3 因外部测评/网关部署按用户裁决跳过。正式演示数据零改动（本目录在 `.gitignore`，零污染唯一判据是 sha256，`git status` 无效）。
+- **2026-11-25 增量闭环**：样件评审模板（评审→结论→提交审批两段式）、P0 persist 乐观锁竞态修复（QA #4 测出 → #5 修复 → #6 复验）、Q12 菜单独立分组恢复（16→18 组 / 104 URL 零改）、Q13 导航断链补齐、Q14 门户协同裁撤只读复核；9 个团队任务全闭环，QA #9 独立复验 `IS_PASS YES`（六门禁全量 + 真实浏览器 `PASS=159 FAIL=0`）。决策见 `docs/DECISION-LIST.md` §10/§11。
 - **剩余外部依赖 5 项**：性能压测、等保密评/国密网关、真实 UAT 签署、灰度/回滚演练、AI 真实 Key（⏸ 待用户提供）。
 - **发布口径只能是「内测/演示版」，不得宣称正式生产发布**。

@@ -710,6 +710,8 @@ export type DraftObjectType =
   | '零件号申请'
   | '外购外协件认可'
   | '软件发布'
+  // —— 样件评审模板（评审 + 审批 两段式，WF-001 §3.4 登记）——
+  | '样件评审模板'
 
 export interface FormDraft {
   id: string

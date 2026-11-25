@@ -8,6 +8,7 @@
           <el-radio-button value="gantt">甘特</el-radio-button>
         </el-radio-group>
         <el-button size="small" type="primary" @click="addDialog = true">+ 新建任务</el-button>
+        <el-button size="small" @click="$router.push('/project/plan')">前往项目主计划</el-button>
       </template>
     </PageHeader>
 

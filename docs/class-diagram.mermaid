@@ -1,0 +1,206 @@
+classDiagram
+    direction TB
+
+    class SampleReviewTemplate {
+        +string id
+        +string code
+        +string projectId
+        +string sampleOrderId
+        +string sampleCode
+        +string projectName
+        +string title
+        +string submitter
+        +ReviewTemplateStage stage
+        +WorkflowFormStatus formStatus
+        +string workflowFormId
+        +string flowInstanceId
+        +ReviewItem[] items
+        +ReviewVerdict verdict
+        +string verdictBy
+        +string verdictAt
+        +ReviewSignature[] signatures
+        +ApprovalResult approval
+        +string approvalNote
+        +string approver
+        +string approvedAt
+        +string eightDId
+        +string inspectionConclusion
+        +number round
+        +string createdAt
+        +string updatedAt
+        +string closedAt
+    }
+
+    class ReviewItem {
+        +string key
+        +string label
+        +ReviewItemResult result
+        +string note
+    }
+    class ReviewItemDef {
+        +string key
+        +string label
+        +boolean required
+    }
+    class ReviewSignature {
+        +string role
+        +string name
+        +boolean pass
+        +string at
+    }
+    class TemplateView {
+        +ReviewTemplateStage stage
+        +ReviewTemplateStage next
+        +EditableFlags editable
+        +boolean canSubmitForApproval
+        +boolean canApprove
+        +boolean canArchive
+        +string[] blockers
+        +ItemProgress progress
+        +SignProgress sign
+        +string reason
+    }
+
+    class SampleReviewTemplateEngine {
+        <<pure functions / domain>>
+        +SAMPLE_REVIEW_ITEMS ReviewItemDef[]
+        +SAMPLE_REVIEW_STAGES StageDef[]
+        +STAGE_TRANSITIONS Record
+        +SAMPLE_REVIEW_CONFIG Config
+        +buildEmptyTemplate(input) SampleReviewTemplate
+        +itemProgress(items) ItemProgress
+        +templateVerdictOf(r) TemplateView
+        +canSubmitForApproval(r) SubmitCheck
+        +canApprove(r) Check
+        +canArchive(r) Check
+        +reopenForReviewRound(r, now) SampleReviewTemplate
+        +templateStats(rows) Stats
+        +stageFromFormStatus(status, approval) ReviewTemplateStage
+    }
+
+    class SampleReviewStateMigration {
+        <<pure functions / domain>>
+        +migrateSampleReviewState(prev, newDef, toVersion) MigrationResult
+    }
+
+    class WorkflowForm {
+        <<workflowForm.ts / reuse>>
+        +string id
+        +string defId
+        +string defCode
+        +string content
+        +WorkflowFormStatus status
+        +string[] blockers
+        +string flowInstanceId
+    }
+    %% DEF-TRIAL-REVIEW（主理人裁决）：id / code / name 保持原样（name 仍为「样件评审流程」），仅改 nodes / formFields / version；除 desc 外既有字符串一律不动（KPI 4 个 label 与列表既有 6 列及其顺序保留，仅切统计数据源到 templateStats + 只允许新增列）
+    class FlowDefinition {
+        <<flowEngine.ts / reuse>>
+        +string id
+        +string code
+        +FormField[] formFields
+        +FlowNode[] nodes
+        +string startNodeId
+        +number version
+    }
+    class FlowInstance {
+        <<flowEngine.ts / reuse>>
+        +string id
+        +string currentNodeId
+        +string status
+        +Record form
+        +string[] passedNodeIds
+        +ApprovalRecord[] history
+    }
+    class SampleReviewEngineLegacy {
+        <<sampleReviewEngine.ts / FROZEN>>
+        +REVIEW_SIGN_ROLES string[]
+        +REVIEW_VERDICTS ReviewVerdict[]
+        +signComplete(sigs) boolean
+        +signProgress(sigs) SignProgress
+        +reviewDedupKey(projectId, code) string
+        +nextReviewCode(codes, code) string
+    }
+
+    class AppStore {
+        <<pinia / orchestration>>
+        +sampleReviewTemplates Computed
+        +sampleReviewTemplateView(id) TemplateView
+        +createSampleReviewTemplate() void
+        +saveSampleReviewTemplate(content) void
+        +closeSampleReviewTemplate() void
+        +fillReviewItem(key, result, note) void
+        +signReviewTemplate(role, pass) void
+        +setTemplateVerdict(verdict) void
+        +submitSampleReviewTemplate(customNodes) boolean
+        +approveSampleReviewTemplate(note) void
+        +rejectSampleReviewTemplate(note) void
+        +syncTemplateStatusFromFlow(id) void
+        +submitWorkflowForm(form, title, data) boolean
+        +approveFlow(id, note) void
+        +rejectFlow(id, note) void
+        +saveDraft(type, id, content) void
+        +log(action, objType, objId, after, before, result) void
+        +persist() void
+    }
+
+    class InspectView {
+        <<vue / container>>
+        +wfForm WorkflowForm
+        +wfBlockers string[]
+        +dirty boolean
+        +wfNew() void
+        +wfSave() void
+        +wfClose() void
+        +wfSubmit(customNodes) void
+    }
+    class WorkflowFormShell {
+        <<vue / WF-001 reuse>>
+        +form WorkflowForm
+        +blockers string[]
+        +dirty boolean
+        +canNew/canSave/canClose/canSubmit boolean
+        +emit new/save/close/submit
+    }
+    class SampleReviewTemplateForm {
+        <<vue / new>>
+        +view TemplateView
+        +renderItems() void
+        +renderVerdict() void
+        +renderApproval() void
+    }
+    class SampleReviewStageChain {
+        <<vue / new>>
+        +stages StageDef[]
+        +current ReviewTemplateStage
+    }
+    class Repo {
+        <<infra / reuse>>
+        +saveRemoteState(doc) SaveRemoteResult
+        +appendRemoteAudit(entry) AuditAppendResult
+        +seedRemoteAudit(rows) boolean
+    }
+
+    SampleReviewTemplate "1" *-- "many" ReviewItem : contains
+    SampleReviewTemplate "1" *-- "many" ReviewSignature : signs
+    ReviewItem ..> ReviewItemDef : instantiated from
+    SampleReviewTemplateEngine ..> SampleReviewTemplate : builds / evaluates
+    SampleReviewTemplateEngine ..> TemplateView : returns
+    SampleReviewTemplateEngine ..> SampleReviewEngineLegacy : reuses (roles/verdicts/dedup)
+    SampleReviewTemplateEngine ..> SAMPLE_REVIEW_STAGES : renders via
+    SampleReviewStateMigration ..> FlowDefinition : replaces DEF-TRIAL-REVIEW
+    AppStore ..> SampleReviewTemplateEngine : calls (single authority)
+    AppStore ..> SampleReviewStateMigration : calls on version mismatch
+    AppStore "1" o-- "many" SampleReviewTemplate : persists in data
+    AppStore ..> WorkflowForm : new/save/sync
+    AppStore ..> FlowDefinition : startFlow(def)
+    AppStore ..> FlowInstance : approveNode/rejectNode
+    AppStore ..> Repo : persist + audit
+    InspectView *-- WorkflowFormShell : #actions slot
+    InspectView *-- SampleReviewTemplateForm : region D
+    InspectView *-- SampleReviewStageChain : region E
+    InspectView ..> AppStore : dispatches
+    SampleReviewTemplateForm ..> TemplateView : consumes editable/blockers
+    SampleReviewStageChain ..> TemplateView : consumes stage
+    WorkflowForm ..> FlowInstance : binds flowInstanceId
+    FlowDefinition ..> FlowInstance : startFlow

@@ -1,0 +1,125 @@
+sequenceDiagram
+    autonumber
+    actor U as 用户(发起人/评审小组/审批人)
+    participant V as InspectView.vue
+    participant S as WorkflowFormShell.vue
+    participant F as SampleReviewTemplateForm.vue
+    participant C as SampleReviewStageChain.vue
+    participant ST as AppStore (pinia)
+    participant EN as sampleReviewTemplate.ts (domain)
+    participant WF as workflowForm.ts (domain)
+    participant FE as flowEngine.ts (domain)
+    participant RP as repo.ts (infra)
+    participant SV as 服务端 REST (/api/state, /api/audit)
+
+    rect rgb(18, 34, 58)
+    Note over U,S: ① 新增空白模板（WF-001「新增」）
+    U->>S: 点击「新增」
+    S->>V: emit('new')
+    V->>ST: flowDefinitions.find('DEF-TRIAL-REVIEW')
+    ST-->>V: def(两段式, version 2)
+    V->>WF: newWorkflowForm({def, objectType:'样件评审模板', objectId})
+    WF-->>V: WorkflowForm{status:'draft', content:'{}'}
+    V->>EN: buildEmptyTemplate({id, code, ...})
+    EN-->>V: SampleReviewTemplate(全空白: items 由 SAMPLE_REVIEW_ITEMS 生成, verdict='', approval='', stage='评审', round=1)
+    V->>F: 渲染(消费 templateVerdictOf)
+    V->>C: 渲染 SAMPLE_REVIEW_STAGES, 高亮「阶段一」
+    Note over V: 不带入任何已有数据（SR-02① / SR-03②）
+    end
+
+    rect rgb(24, 42, 30)
+    Note over U,SV: ② 保存草稿 / 关闭续编（WF-001「保存」「关闭」）
+    U->>F: 填写基础字段
+    U->>S: 点击「保存」
+    S->>V: emit('save')
+    V->>WF: saveWorkflowForm(form, serializeContent())
+    WF-->>V: form{status:'draft', updatedAt}
+    V->>ST: saveDraft('样件评审模板', id, content)
+    ST->>RP: persist() → saveRemoteState({expectedRev})
+    RP->>SV: PUT /api/state
+    SV-->>RP: {ok:true} → rev+1
+    ST->>RP: log('SAVE','样件评审模板',code) → appendRemoteAudit
+    RP->>SV: POST /api/audit (append-only + 哈希链)
+    U->>S: 点击「关闭」
+    S->>V: emit('close') → wfForm=null (草稿保留, 不删除)
+    U->>S: 再次「新增」→ 载入草稿 hydrateContent 续编
+    end
+
+    rect rgb(42, 32, 18)
+    Note over U,SV: ③ 阶段一 · 评审小组逐项评审 + 下达评审结论（结论先于审批）
+    U->>F: 逐项填写 items[]（通过/不通过/不适用 + 意见）
+    V->>EN: itemProgress(items)
+    EN-->>V: {done, total, missing} → 顶部 x/y
+    V->>ST: fillReviewItem(key, result, note) / signReviewTemplate(role, pass)
+    ST->>EN: signComplete / signProgress (同源 REVIEW_SIGN_ROLES)
+    ST->>RP: log('REVIEW_ITEM' / 'APPROVE', ...) → 服务端审计留痕
+    U->>F: 下达汇总评审结论（认可/有条件认可/拒收）
+    V->>ST: setTemplateVerdict(verdict)
+    ST->>EN: templateVerdictOf(r)  %% 单一权威求值
+    EN-->>ST: TemplateView{stage:'评审', editable.approval:false, canSubmitForApproval:false, blockers:['评审项未完成']}
+    F->>F: 审批栏整块置灰只读（SR-02④ / SR-06）
+    Note over EN: 结论为「拒收」→ blockers 追加「须关联 8D」(Q5 fail-closed)
+    end
+
+    rect rgb(18, 34, 58)
+    Note over U,SV: ④ 提交（= 提交审批，Q6 同一动作）→ gate → 启动流程 → 落到审批节点
+    U->>S: 点击四按钮「提交」（即「提交审批」；不新增第五按钮，按钮旁新增说明文字「提交后进入审批阶段」）
+    S->>V: emit('submit', customApprovers)
+    V->>EN: canSubmitForApproval(r) / templateVerdictOf(r)
+    alt gate 未通过（清单未完成 / verdict 为空 / 必填缺失 / 8D 未关联）
+        EN-->>V: {ok:false, blockers:[...]}
+        V->>S: wfBlockers = blockers（可见，SR-03⑥ / SR-08）
+        V->>U: notify('error', blockers.join('；'))，不启动流程
+    else gate 通过（结论已形成）
+        EN-->>V: {ok:true, blockers:[]}
+        V->>WF: saveWorkflowForm(form, serializeContent())
+        V->>ST: submitWorkflowForm(form, title, formData{verdict,itemCompletion,signoff,sampleCode,projectName})
+        ST->>FE: startFlow({def:'DEF-TRIAL-REVIEW', form}) 
+        FE-->>ST: FlowInstance{currentNodeId:'sr1', status:'运行中'}
+        ST->>FE: approveNode(inst, def, {approverRole, note:'阶段一成果提交'})
+        FE->>FE: staticNext → sr2(branch) → advanceThroughBranch → evalBranch(verdict≠'') → sr3
+        FE-->>ST: FlowInstance{currentNodeId:'sr3', passedNodeIds:[sr1,sr2], status:'运行中'}
+        ST->>WF: markSubmitted(form, instId) → status='submitted'
+        ST->>ST: clearDraft('样件评审模板', id)  %% POR-007
+        ST->>EN: stageFromFormStatus('submitted') → stage='审批'
+        ST->>RP: log('SUBMIT','样件评审模板',code,{verdict,flowInstanceId})
+        RP->>SV: POST /api/audit（提交动作留痕）
+        V->>F: editable → 阶段一全部只读回显 + 审批栏开放（SR-06）
+        V->>C: 高亮「阶段二 · 提交审批」
+        Note over ST,FE: 审批节点可回读 form.verdict（SR-01④）；审批不得先于结论（SR-01③）
+    end
+    end
+
+    rect rgb(24, 42, 30)
+    Note over U,SV: ⑤ 阶段二 · 批准 / 驳回
+    U->>F: 查看只读的阶段一清单与评审结论，在审批栏选择 批准/驳回 + 审批意见
+    V->>EN: canApprove(r)  %% 驳回时 approvalNote 必填
+    alt 批准
+        U->>ST: approveSampleReviewTemplate(note) → approveFlow(instId, note)
+        ST->>FE: approveNode(inst, def, {approverRole:'研发副总', note})
+        FE-->>ST: FlowInstance{status:'已完成', currentNodeId:'sr4'}
+        ST->>ST: syncTemplateStatusFromFlow → formStatus='completed', stage='归档', approval='批准', approver/approvedAt 留痕
+        ST->>EN: canArchive(r)  %% fail-closed 终态校验
+        ST->>RP: log('APPROVE','样件评审模板',code,{approval:'批准',verdict})
+        RP->>SV: POST /api/audit（批准留痕）
+        V->>F: 全字段只读 + 归档（SR-06 终态）
+        V->>C: 「结束 · 归档」done
+    else 驳回（须填意见）
+        U->>ST: rejectSampleReviewTemplate(note) → rejectFlow(instId, note)
+        ST->>FE: rejectNode(inst, def, {note})
+        FE-->>ST: FlowInstance{status:'已驳回'}
+        ST->>RP: log('REJECT','样件评审模板',code,{note,round}) → 服务端留痕
+        ST->>EN: reopenForReviewRound(r)  %% Q7 用户定案：退回阶段一复评, round+1（不启用 reopenDraft）
+        EN-->>ST: SampleReviewTemplate{stage:'评审', round:2, verdict:'', approval:'', items 结论清空, 保留 8D 与历史}
+        ST->>WF: reopenForEdit(form) → status='draft'（新实例重新提交）
+        V->>C: 高亮回到「阶段一」R2，形成新一轮留痕（SR-07）
+    end
+    end
+
+    rect rgb(30, 20, 20)
+    Note over U,SV: ⑥ 归档终态与审计链（贯穿全流程）
+    ST->>RP: persist() → saveRemoteState({...payload, expectedRev: rev})
+    RP->>SV: PUT /api/state（乐观锁，409 则提示重新拉取）
+    SV-->>RP: {ok:true} → rev = rev+1
+    Note over RP,SV: seedRemoteAudit 幂等前置：/api/audit count>0 → 跳过播种<br/>audit-T-1001.json 18 条链零改动、chainOk true（Q9）
+    end
