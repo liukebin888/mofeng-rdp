@@ -12,10 +12,12 @@
 #   4. 宿主机端口 8081（正式为 8080）→ 不占用用户预览 5178 / 8787
 #   5. 后端服务名保持 mofeng-server → 沿用镜像内 nginx 反代 proxy_pass 目标，不改既有配置
 #
-# 镜像 tag 约定（由 deploy/rollback-drill.cjs 构建）：
-#   v1 = 2026-11-01 稳定版后端镜像（dd8a8ea86811）
-#   v2 = 当前源码重建的后端镜像（含 security.js Dockerfile 修复）
-#   前端 v1/v2 为同一 nginx 层（静态网关配置未变），仅后端存在真实版本差异。
+# 镜像 tag 约定（由 deploy/rollback-drill.cjs 复演前准备）：
+#   v1 = 2026-11-01 稳定版前后端镜像（web c8769b7502c6 / server dd8a8ea86811）
+#   v2 = 当前 11-25 源码官方重建的前后端镜像：
+#        前端走 deploy/Dockerfile.web 多阶段构建（node:20-alpine 编译 + nginx:1.25-alpine 托管）；
+#        后端走 server/Dockerfile（含 security.js COPY 修复）。
+#   v1/v2 前后端四个镜像 ID 均不同，回滚为完整版本差异（非同 ID 双 tag 假回滚）。
 
 services:
   mofeng-server:

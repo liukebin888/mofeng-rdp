@@ -1,0 +1,76 @@
+{
+  "selfTest": "frontend-fingerprint",
+  "at": "2026-11-25T14:02:42.526Z",
+  "evidence": "DEPLOY-ROLLBACK-DRILL-2026-11-25-web.json",
+  "sameSource": "deploy/frontend-fingerprint.cjs（演练与自证同源）",
+  "cases": [
+    {
+      "name": "活样本：真实 v1/v2 指纹应 valid + distinct=true",
+      "pass": true,
+      "got": {
+        "valid": true,
+        "indexDiff": true,
+        "assetPathDiff": true,
+        "assetShaDiff": true,
+        "distinct": true
+      }
+    },
+    {
+      "name": "死样本：同指纹应 distinct=false（不得翻盘为通过）",
+      "pass": true,
+      "got": {
+        "valid": true,
+        "indexDiff": false,
+        "assetPathDiff": false,
+        "assetShaDiff": false,
+        "distinct": false
+      }
+    },
+    {
+      "name": "fail-closed：assertDistinct 对同指纹必须抛错",
+      "pass": true,
+      "threw": true,
+      "message": "v2/v1 前端静态资源指纹完全相同，前端未真实参与版本回滚（拒绝零差异假阳性）"
+    },
+    {
+      "name": "空样本：缺失 v1 指纹必须抛错",
+      "pass": true,
+      "threw": true
+    },
+    {
+      "name": "采集失败样本：ok=false 必须抛错",
+      "pass": true,
+      "threw": true
+    },
+    {
+      "name": "活样本：assertDistinct 应正常通过",
+      "pass": true
+    },
+    {
+      "name": "变异：仅 assetSha256 不同也应 distinct=true",
+      "pass": true,
+      "got": {
+        "valid": true,
+        "indexDiff": false,
+        "assetPathDiff": false,
+        "assetShaDiff": true,
+        "distinct": true
+      }
+    },
+    {
+      "name": "变异：仅 indexSha256 不同也应 distinct=true",
+      "pass": true,
+      "got": {
+        "valid": true,
+        "indexDiff": true,
+        "assetPathDiff": false,
+        "assetShaDiff": false,
+        "distinct": true
+      }
+    }
+  ],
+  "passed": 8,
+  "total": 8,
+  "allPass": true,
+  "verdict": "PASS"
+}

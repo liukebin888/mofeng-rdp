@@ -282,3 +282,21 @@
 
 1. 用**当前源码重建前端镜像**后复演（本次前端沿用 11-01 nginx 层）。
 2. 生产集群灰度按租户切流、多节点节点下线、k6 压测、RTO≤4h 灾备切换、密评与真实 UAT 仍待外部取证，不得以本轮本地自证替代。
+
+### 12.6 补验轮定案（2026-11-25：当前源码前端镜像复演）
+
+> §12.5 第 1 条「用当前源码重建前端镜像后复演」**已于同日补验轮完成**；本处仅追加定案，既有 §12.1~§12.5 文字零改写。
+
+| 项 | 定案 |
+|---|---|
+| 方向 | 用户「按建议继续」→ 取上轮三条建议中**唯一无需授权、可真实自证**的第 1 条；U5 报告口径统一需授权、k6 压测需目标环境，两者不碰、不翻盘 |
+| 前端构建 | 走官方 `deploy/Dockerfile.web` 多阶段构建（源码零改动）；根目录 `.dockerignore` 已排除 `node_modules`/`dist`，容器内真编译；产物与本地 `app/dist` 逐字一致 |
+| 镜像 | v1/v2 前后端**四个镜像 ID 全不同**（server `dd8a8ea8`/`67146bb9`，web `c8769b75`/`f9ad9d25`），前端不再沿用 11-01 层 |
+| 新增探针 | `reqRaw` + `frontendFingerprint`（fail-closed，3 次重试）+ v1/v2 双采集 + 差异断言；`deploy/frontend-fingerprint.cjs` 为判定**单一权威**，演练与 selftest 同源 |
+| 回退验证 | `deploy/frontend-fingerprint-selftest.cjs` **8/8 PASS**：活/死/空/采集失败/两种变异样本；`sameSource` 明确 |
+| 演练结论 | ✅ `PASS_LOCAL_DRILL_ONLY`，**11/11 步骤**一次通过；无状态 `5468ms/RPO=0`、回滚 `4886ms`、中断 `2746ms`（91 样本/5 失败）、审计链恒定、`distinct=true` |
+| 新增如实披露 | 前端 `REST_BASE` 仍硬编码 `http://127.0.0.1:8787`（官方 Dockerfile 未注入 `VITE_API_BASE`）；本演练仅验证静态资源版本代表性，未验证浏览器相对路径 `/api` 链路 |
+| 判定 | `AC-22.1 / AC-40 / AC-45 / AC-03 / AC-38` 在验收矩阵中**维持 ⏸ 一字未改**；发布口径继续「内测 / 演示版」，5 项外部依赖不变 |
+| 文档纪律 | 上轮报告 / §8.4 / §12.5 的历史数字与叙述**全部 append 索引、零改写**；上轮 3 份 JSON 原始证据完整保留 |
+
+新增证据：`docs/DEPLOY-ROLLBACK-DRILL-2026-11-25-web.json`、`docs/DEPLOY-ROLLBACK-DRILL-2026-11-25-web-selftest.json`、`docs/DEPLOY-ROLLBACK-DRILL-WEB-2026-11-25.md`。

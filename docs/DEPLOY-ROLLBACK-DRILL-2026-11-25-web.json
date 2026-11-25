@@ -1,0 +1,315 @@
+{
+  "runId": "DRILL-1795615331967",
+  "startedAt": "2026-11-25T14:02:11.967Z",
+  "finishedAt": "2026-11-25T14:02:42.330Z",
+  "environment": {
+    "docker": "Docker version 29.9.3, build 5457199",
+    "compose": "Docker Compose version v5.7.0",
+    "composeFile": "deploy/docker-compose.drill.yml",
+    "project": "mofeng-drill",
+    "hostPort": 8081,
+    "images": {
+      "mofeng-drill-server:v1": "dd8a8ea86811 3 weeks ago",
+      "mofeng-drill-server:v2": "67146bb9fe6b 47 minutes ago",
+      "mofeng-drill-web:v1": "c8769b7502c6 3 weeks ago",
+      "mofeng-drill-web:v2": "f9ad9d25a243 9 minutes ago"
+    },
+    "isolation": "独立 project / 容器名 / 命名卷 / bridge 网络；不触碰 8787/5178/8080 与正式 server/data"
+  },
+  "steps": [
+    {
+      "name": "preflight 资源隔离检查",
+      "startedAt": "2026-11-25T14:02:13.238Z",
+      "ok": true,
+      "durationMs": 198,
+      "detail": {
+        "portFree": true,
+        "residualContainers": [],
+        "cleaned": false
+      }
+    },
+    {
+      "name": "up v2（当前源码重建版本）",
+      "startedAt": "2026-11-25T14:02:13.437Z",
+      "ok": true,
+      "durationMs": 941,
+      "detail": {
+        "composeOut": "",
+        "healthyMs": 10,
+        "health": {
+          "ok": true,
+          "service": "mofeng-rdp-server",
+          "version": "r2.1.0",
+          "multiTenant": true,
+          "uptimeSec": 0,
+          "hasState": false,
+          "stateVersion": null,
+          "now": "2026-11-25T14:02:14.374Z"
+        }
+      }
+    },
+    {
+      "name": "前端静态资源指纹采集（v2 当前源码构建）",
+      "startedAt": "2026-11-25T14:02:14.378Z",
+      "ok": true,
+      "durationMs": 12,
+      "detail": {
+        "indexSha256": "d7320a61de81ff03688d8c46fede2b483775ea26aca1fb74df76be34bc4f48ce",
+        "assetPath": "/assets/index-BGV6B8Cf.js",
+        "assetSha256": "e0ad4cebab06b5282aa1791377e29b4f34a8ec10473abe3873114ad8b39343e9",
+        "assetBytes": 1796584,
+        "attempts": 1
+      }
+    },
+    {
+      "name": "baseline 基线采集",
+      "startedAt": "2026-11-25T14:02:14.390Z",
+      "ok": true,
+      "durationMs": 3,
+      "detail": {
+        "stateStatus": 404,
+        "auditCount": 0,
+        "chainOk": true,
+        "brokenAt": null
+      }
+    },
+    {
+      "name": "写入真实业务数据（state + 3 条审计）",
+      "startedAt": "2026-11-25T14:02:14.393Z",
+      "ok": true,
+      "durationMs": 11,
+      "detail": {
+        "stateStatus": 200,
+        "auditCount": 3,
+        "chainOk": true,
+        "brokenAt": null
+      }
+    },
+    {
+      "name": "无状态部署验证：down（保留卷）→ up → 数据不丢",
+      "startedAt": "2026-11-25T14:02:14.404Z",
+      "ok": true,
+      "durationMs": 5472,
+      "detail": {
+        "recoverMs": 5468,
+        "stateStatus": 200,
+        "auditCount": 3,
+        "chainOk": true,
+        "brokenAt": null,
+        "dataIntact": true,
+        "rpo": 0,
+        "note": "down 保留命名卷；容器重建后 state rev / drillMarker / audit 链与写入后逐项一致"
+      }
+    },
+    {
+      "name": "回滚演练 v2 → v1（真实旧版本镜像）",
+      "startedAt": "2026-11-25T14:02:19.876Z",
+      "ok": true,
+      "durationMs": 4894,
+      "detail": {
+        "from": "v2",
+        "to": "v1",
+        "rollbackMs": 4886,
+        "stateStatus": 200,
+        "auditCount": 3,
+        "chainOk": true,
+        "brokenAt": null,
+        "dataIntact": true,
+        "under10min": true,
+        "note": "镜像 tag 切换 + force-recreate；v1 为 11-01 稳定版后端，v2 为当前源码重建，两者镜像 ID 不同"
+      }
+    },
+    {
+      "name": "回滚可逆性验证 v1 → v2",
+      "startedAt": "2026-11-25T14:02:24.770Z",
+      "ok": true,
+      "durationMs": 4989,
+      "detail": {
+        "stateStatus": 200,
+        "auditCount": 3,
+        "chainOk": true,
+        "brokenAt": null,
+        "dataIntact": true
+      }
+    },
+    {
+      "name": "故障注入：后端节点下线 → 业务中断时长",
+      "startedAt": "2026-11-25T14:02:29.759Z",
+      "ok": true,
+      "durationMs": 8080,
+      "detail": {
+        "outageMs": 2746,
+        "webRestarted": false,
+        "sampleCount": 91,
+        "failSampleCount": 5,
+        "firstFailAt": 1795615352367,
+        "recoveredAt": 1795615355113,
+        "stopAt": 1795615352535,
+        "startAt": 1795615354543,
+        "recovered": true,
+        "note": "单机 docker stop/start 模拟节点下线；异步 exec 保证探针在停机窗口内持续采样；未采到失败样本即判 FAIL（fail-closed）"
+      }
+    },
+    {
+      "name": "前端版本差异断言：v2 与 v1 静态资源指纹真实不同（同源判定）",
+      "startedAt": "2026-11-25T14:02:37.839Z",
+      "ok": true,
+      "durationMs": 0,
+      "detail": {
+        "v2": {
+          "indexSha256": "d7320a61de81ff03688d8c46fede2b483775ea26aca1fb74df76be34bc4f48ce",
+          "assetPath": "/assets/index-BGV6B8Cf.js",
+          "assetSha256": "e0ad4cebab06b5282aa1791377e29b4f34a8ec10473abe3873114ad8b39343e9",
+          "assetBytes": 1796584
+        },
+        "v1": {
+          "indexSha256": "70e5d6f4226ef67536beebd1bda646f808c3d728eb6ee47bc5efc6905693e748",
+          "assetPath": "/assets/index-CYnVq22Z.js",
+          "assetSha256": "2ad3626aeed86f3b7d82ba26cf8671f578973058e7ce1073d92ef4e14a026e6a",
+          "assetBytes": 1285492
+        },
+        "valid": true,
+        "indexDiff": true,
+        "assetPathDiff": true,
+        "assetShaDiff": true,
+        "distinct": true,
+        "note": "v2 = 当前 11-25 源码官方 Dockerfile.web 构建；v1 = 11-01 稳定版；index.html 与 JS 指纹不同即证明前端参与真实版本回滚；判定由 deploy/frontend-fingerprint.cjs 单一权威提供"
+      }
+    },
+    {
+      "name": "cleanup 清理演练资源",
+      "startedAt": "2026-11-25T14:02:42.330Z",
+      "ok": true,
+      "durationMs": 4490,
+      "detail": {
+        "down": true,
+        "residualContainers": [],
+        "residualVolumes": []
+      }
+    }
+  ],
+  "metrics": {
+    "frontendV2": {
+      "ok": true,
+      "attempts": 1,
+      "indexStatus": 200,
+      "indexSha256": "d7320a61de81ff03688d8c46fede2b483775ea26aca1fb74df76be34bc4f48ce",
+      "indexBytes": 943,
+      "assetRefs": [
+        "./assets/index-BGV6B8Cf.js",
+        "./assets/index-B65P0NHv.css"
+      ],
+      "assetPath": "/assets/index-BGV6B8Cf.js",
+      "assetStatus": 200,
+      "assetSha256": "e0ad4cebab06b5282aa1791377e29b4f34a8ec10473abe3873114ad8b39343e9",
+      "assetBytes": 1796584
+    },
+    "baselineEmpty": {
+      "stateStatus": 404,
+      "auditCount": 0,
+      "chainOk": true,
+      "brokenAt": null
+    },
+    "baseline": {
+      "stateStatus": 200,
+      "auditCount": 3,
+      "chainOk": true,
+      "brokenAt": null
+    },
+    "stateless": {
+      "recoverMs": 5468,
+      "stateStatus": 200,
+      "auditCount": 3,
+      "chainOk": true,
+      "brokenAt": null,
+      "dataIntact": true,
+      "rpo": 0,
+      "note": "down 保留命名卷；容器重建后 state rev / drillMarker / audit 链与写入后逐项一致"
+    },
+    "frontendV1": {
+      "ok": true,
+      "attempts": 1,
+      "indexStatus": 200,
+      "indexSha256": "70e5d6f4226ef67536beebd1bda646f808c3d728eb6ee47bc5efc6905693e748",
+      "indexBytes": 982,
+      "assetRefs": [
+        "./assets/index-CYnVq22Z.js",
+        "./assets/index-DU5Po_eJ.css"
+      ],
+      "assetPath": "/assets/index-CYnVq22Z.js",
+      "assetStatus": 200,
+      "assetSha256": "2ad3626aeed86f3b7d82ba26cf8671f578973058e7ce1073d92ef4e14a026e6a",
+      "assetBytes": 1285492
+    },
+    "rollback": {
+      "from": "v2",
+      "to": "v1",
+      "rollbackMs": 4886,
+      "stateStatus": 200,
+      "auditCount": 3,
+      "chainOk": true,
+      "brokenAt": null,
+      "dataIntact": true,
+      "under10min": true,
+      "note": "镜像 tag 切换 + force-recreate；v1 为 11-01 稳定版后端，v2 为当前源码重建，两者镜像 ID 不同"
+    },
+    "rollbackRestore": {
+      "stateStatus": 200,
+      "auditCount": 3,
+      "chainOk": true,
+      "brokenAt": null,
+      "dataIntact": true
+    },
+    "faultInjection": {
+      "outageMs": 2746,
+      "webRestarted": false,
+      "sampleCount": 91,
+      "failSampleCount": 5,
+      "firstFailAt": 1795615352367,
+      "recoveredAt": 1795615355113,
+      "stopAt": 1795615352535,
+      "startAt": 1795615354543,
+      "recovered": true,
+      "note": "单机 docker stop/start 模拟节点下线；异步 exec 保证探针在停机窗口内持续采样；未采到失败样本即判 FAIL（fail-closed）"
+    },
+    "frontendVersionDelta": {
+      "v2": {
+        "indexSha256": "d7320a61de81ff03688d8c46fede2b483775ea26aca1fb74df76be34bc4f48ce",
+        "assetPath": "/assets/index-BGV6B8Cf.js",
+        "assetSha256": "e0ad4cebab06b5282aa1791377e29b4f34a8ec10473abe3873114ad8b39343e9",
+        "assetBytes": 1796584
+      },
+      "v1": {
+        "indexSha256": "70e5d6f4226ef67536beebd1bda646f808c3d728eb6ee47bc5efc6905693e748",
+        "assetPath": "/assets/index-CYnVq22Z.js",
+        "assetSha256": "2ad3626aeed86f3b7d82ba26cf8671f578973058e7ce1073d92ef4e14a026e6a",
+        "assetBytes": 1285492
+      },
+      "valid": true,
+      "indexDiff": true,
+      "assetPathDiff": true,
+      "assetShaDiff": true,
+      "distinct": true,
+      "note": "v2 = 当前 11-25 源码官方 Dockerfile.web 构建；v1 = 11-01 稳定版；index.html 与 JS 指纹不同即证明前端参与真实版本回滚；判定由 deploy/frontend-fingerprint.cjs 单一权威提供"
+    }
+  },
+  "disclosure": {
+    "environment": "单机 Docker Compose（Windows Docker Desktop），非生产集群 / 非真实灰度路由",
+    "images": "v1 = 2026-11-01 稳定版前后端镜像（web c8769b7502c6 / server dd8a8ea86811）；v2 = 当前 11-25 源码官方重建前后端镜像（前端 deploy/Dockerfile.web 多阶段构建 f9ad9d25a243、后端 server/Dockerfile 含 security.js 修复 67146bb9fe6b）；四个镜像 ID 均不同",
+    "frontendBuild": "web:v2 由 deploy/Dockerfile.web 官方多阶段构建（node:20-alpine 内 npm install + npm run build → nginx:1.25-alpine 托管）；根目录 .dockerignore 已排除 node_modules/dist，构建产物 index-BGV6B8Cf.js 与本地干净 app/dist 逐字一致",
+    "rollbackScope": "编排层镜像 tag 切换 + force-recreate，验证版本回退、命名卷持久化与数据兼容；非蓝绿/金丝雀按租户流量切分",
+    "acStatus": "AC-22.1 / AC-40 / AC-45 在 docs/ACCEPTANCE-MATRIX.md 中维持 ⏸ 外部依赖，本演练不翻盘、不改判定",
+    "resolvedGaps": [
+      "上轮 notCovered「用当前源码重建前端镜像后复演」本轮已补齐：web:v2 从当前源码官方构建，v1/v2 前端静态资源指纹真实不同（见 metrics.frontendVersionDelta）"
+    ],
+    "notCovered": [
+      "多节点集群节点下线业务中断 ≤5s（AC-45）",
+      "真实灰度按租户切流与回滚 ≤10min 的生产编排环境（AC-22.1）",
+      "k6 / JMeter 性能压测 P95≤800ms / P99≤2s / 5000 并发（AC-03/38）",
+      "RTO≤4h 灾备级故障与 RPO≤15min 跨机房切换（AC-40）",
+      "前端 REST_BASE 仍硬编码 http://127.0.0.1:8787（官方 Dockerfile.web 未注入 VITE_API_BASE）；本演练仅验证静态资源版本代表性，未验证生产网关相对路径 /api 的浏览器链路"
+    ]
+  },
+  "verdict": "PASS_LOCAL_DRILL_ONLY",
+  "fatal": null
+}

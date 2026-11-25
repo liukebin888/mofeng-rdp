@@ -20,6 +20,7 @@ const http = require('node:http')
 const net = require('node:net')
 const fs = require('node:fs')
 const path = require('node:path')
+const { assertDistinct } = require('./frontend-fingerprint.cjs')
 
 const ROOT = path.resolve(__dirname, '..')
 const COMPOSE = 'deploy/docker-compose.drill.yml'
@@ -96,6 +97,63 @@ function req(method, pathname, body, timeoutMs = 3000) {
   })
 }
 const sleep = ms => new Promise(r => setTimeout(r, ms))
+
+/** 原样 GET（不截断、不解析 JSON），用于前端静态资源版本指纹 */
+function reqRaw(pathname, timeoutMs = 3000) {
+  return new Promise((resolve) => {
+    const crypto = require('node:crypto')
+    const opts = { host: HOST, port: PORT, path: pathname, method: 'GET', timeout: timeoutMs }
+    const r = http.request(opts, (res) => {
+      const chunks = []
+      res.on('data', c => chunks.push(c))
+      res.on('end', () => {
+        const buf = Buffer.concat(chunks)
+        resolve({
+          status: res.statusCode, body: buf.toString('utf8'), bytes: buf.length,
+          sha256: crypto.createHash('sha256').update(buf).digest('hex')
+        })
+      })
+    })
+    r.on('error', e => resolve({ status: 0, body: '', bytes: 0, sha256: null, raw: e.message }))
+    r.on('timeout', () => { r.destroy(); resolve({ status: 0, body: '', bytes: 0, sha256: null, raw: 'timeout' }) })
+    r.end()
+  })
+}
+/**
+ * 采集当前前端版本指纹：GET / → 提取 /assets/ 引用 → GET 该 JS → sha256。
+ * fail-closed：非 200 / 无 assets 引用 / asset 0 字节一律返回 ok:false，绝不产出「看起来通过」的空证据。
+ */
+async function frontendFingerprint() {
+  let last = null
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const idx = await reqRaw('/')
+    if (idx.status !== 200 || !idx.body) {
+      last = { ok: false, attempts: attempt, reason: `GET / 返回 ${idx.status}`, indexStatus: idx.status }
+      await sleep(400); continue
+    }
+    const assets = [...idx.body.matchAll(/(?:src|href)="([^"]*\/assets\/[^"]+)"/g)].map(m => m[1])
+    const picked = assets.find(a => /\.js(\?|$)/.test(a)) || assets[0]
+    if (!picked) {
+      last = { ok: false, attempts: attempt, reason: 'index.html 未引用 /assets/ 资源',
+        indexStatus: idx.status, indexSha256: idx.sha256, indexBytes: idx.bytes }
+      await sleep(400); continue
+    }
+    const assetPath = picked.startsWith('http')
+      ? new URL(picked).pathname
+      : (picked.startsWith('/') ? picked : '/' + picked.replace(/^\.\//, ''))
+    const a = await reqRaw(assetPath)
+    last = {
+      ok: a.status === 200 && a.bytes > 0, attempts: attempt,
+      indexStatus: idx.status, indexSha256: idx.sha256, indexBytes: idx.bytes,
+      assetRefs: assets, assetPath, assetStatus: a.status,
+      assetSha256: a.sha256, assetBytes: a.bytes
+    }
+    if (last.ok) return last
+    last.reason = `GET ${assetPath} 返回 ${a.status} / ${a.bytes} bytes`
+    await sleep(400)
+  }
+  return last
+}
 
 function portFree(port) {
   return new Promise(resolve => {
@@ -191,6 +249,14 @@ async function main() {
     return { composeOut: r.out.slice(0, 200), healthyMs: h.elapsedMs, health: h.last.json }
   })
 
+  await step('前端静态资源指纹采集（v2 当前源码构建）', async () => {
+    const fe = await frontendFingerprint()
+    run.metrics.frontendV2 = fe
+    if (!fe.ok) throw new Error(`v2 前端指纹采集失败（fail-closed）: ${fe.reason}`)
+    return { indexSha256: fe.indexSha256, assetPath: fe.assetPath,
+      assetSha256: fe.assetSha256, assetBytes: fe.assetBytes, attempts: fe.attempts }
+  })
+
   await step('baseline 基线采集', async () => {
     const s = await snapshot()
     run.metrics.baselineEmpty = s
@@ -252,6 +318,10 @@ async function main() {
     const h = await waitHealthy(30000)
     if (!h.ok) throw new Error(`回滚后健康检查超时: ${JSON.stringify(h.last)}`)
     const rollbackMs = Date.now() - t0
+    // 回滚到 v1 后采集前端静态资源指纹（v1 = 11-01 前端），证明前端也参与真实版本回滚
+    const feV1 = await frontendFingerprint()
+    run.metrics.frontendV1 = feV1
+    if (!feV1.ok) throw new Error(`v1 前端指纹采集失败（fail-closed）: ${feV1.reason}`)
     const s = await snapshot()
     const b = run.metrics.baseline
     const intact = s.stateRev === b.stateRev && s.auditCount === b.auditCount && s.chainOk === true
@@ -328,17 +398,35 @@ async function main() {
     return run.metrics.faultInjection
   })
 
+  await step('前端版本差异断言：v2 与 v1 静态资源指纹真实不同（同源判定）', async () => {
+    const a = run.metrics.frontendV2
+    const b = run.metrics.frontendV1
+    // 单一权威：判定逻辑与 selftest 同源（规格治理铁律 1），fail-closed 由模块统一提供
+    const d = assertDistinct(a, b)
+    run.metrics.frontendVersionDelta = {
+      v2: { indexSha256: a.indexSha256, assetPath: a.assetPath, assetSha256: a.assetSha256, assetBytes: a.assetBytes },
+      v1: { indexSha256: b.indexSha256, assetPath: b.assetPath, assetSha256: b.assetSha256, assetBytes: b.assetBytes },
+      ...d,
+      note: 'v2 = 当前 11-25 源码官方 Dockerfile.web 构建；v1 = 11-01 稳定版；index.html 与 JS 指纹不同即证明前端参与真实版本回滚；判定由 deploy/frontend-fingerprint.cjs 单一权威提供'
+    }
+    return run.metrics.frontendVersionDelta
+  })
+
   run.disclosure = {
     environment: '单机 Docker Compose（Windows Docker Desktop），非生产集群 / 非真实灰度路由',
-    images: 'v1 = 2026-11-01 稳定版后端镜像；v2 = 当前源码重建后端镜像（含 security.js Dockerfile 修复）；前端 v1/v2 为同一 nginx 层',
+    images: 'v1 = 2026-11-01 稳定版前后端镜像（web c8769b7502c6 / server dd8a8ea86811）；v2 = 当前 11-25 源码官方重建前后端镜像（前端 deploy/Dockerfile.web 多阶段构建 f9ad9d25a243、后端 server/Dockerfile 含 security.js 修复 67146bb9fe6b）；四个镜像 ID 均不同',
+    frontendBuild: 'web:v2 由 deploy/Dockerfile.web 官方多阶段构建（node:20-alpine 内 npm install + npm run build → nginx:1.25-alpine 托管）；根目录 .dockerignore 已排除 node_modules/dist，构建产物 index-BGV6B8Cf.js 与本地干净 app/dist 逐字一致',
     rollbackScope: '编排层镜像 tag 切换 + force-recreate，验证版本回退、命名卷持久化与数据兼容；非蓝绿/金丝雀按租户流量切分',
     acStatus: 'AC-22.1 / AC-40 / AC-45 在 docs/ACCEPTANCE-MATRIX.md 中维持 ⏸ 外部依赖，本演练不翻盘、不改判定',
+    resolvedGaps: [
+      '上轮 notCovered「用当前源码重建前端镜像后复演」本轮已补齐：web:v2 从当前源码官方构建，v1/v2 前端静态资源指纹真实不同（见 metrics.frontendVersionDelta）'
+    ],
     notCovered: [
       '多节点集群节点下线业务中断 ≤5s（AC-45）',
       '真实灰度按租户切流与回滚 ≤10min 的生产编排环境（AC-22.1）',
       'k6 / JMeter 性能压测 P95≤800ms / P99≤2s / 5000 并发（AC-03/38）',
       'RTO≤4h 灾备级故障与 RPO≤15min 跨机房切换（AC-40）',
-      '用当前源码重建前端镜像后复演（本次前端沿用 11-01 nginx 层）'
+      '前端 REST_BASE 仍硬编码 http://127.0.0.1:8787（官方 Dockerfile.web 未注入 VITE_API_BASE）；本演练仅验证静态资源版本代表性，未验证生产网关相对路径 /api 的浏览器链路'
     ]
   }
 }

@@ -282,3 +282,12 @@ node deploy/rollback-drill.cjs
 ### 8.4 判定边界（不翻盘）
 
 上述数值满足 `AC-22.1 回滚≤10min`、`AC-40 RPO≤15min`、`AC-45 中断≤5s` 的**数值要求**，但环境为单机 Compose、未做真实灰度切流 / 多节点集群 / k6 压测 / 灾备级 RTO，故 `docs/ACCEPTANCE-MATRIX.md` 中相关 AC **维持 ⏸ 外部依赖**。发布口径继续「内测 / 演示版」。后续须用当前源码重建前端镜像后复演。
+
+### 8.5 补验轮索引（2026-11-25，当前源码前端复演）
+
+上文 §8.4 末句「后续须用当前源码重建前端镜像后复演」**已补齐**，本处仅追加索引、不改写既有文字：
+
+- 前端 `web:v2` 由官方 `deploy/Dockerfile.web` 多阶段构建（`node:20-alpine` 编译 → `nginx:1.25-alpine` 托管），产物 `index-BGV6B8Cf.js` 与本地干净 `app/dist` 逐字一致；v1/v2 前后端四个镜像 ID 全部不同。
+- 完整复演 `11/11 PASS`、新增判定回退自证 `8/8 PASS`；无状态 `5468ms/RPO=0`、回滚 `4886ms`、中断 `2746ms`（91 样本/5 失败）、审计链恒定。
+- 新增可复跑资产：`deploy/frontend-fingerprint.cjs`（单一权威判定）、`deploy/frontend-fingerprint-selftest.cjs`（死/活/空/失败/变异样本）。
+- 详见 `docs/DEPLOY-ROLLBACK-DRILL-WEB-2026-11-25.md`；**验收判定与发布口径仍维持 ⏸，不翻盘**。
