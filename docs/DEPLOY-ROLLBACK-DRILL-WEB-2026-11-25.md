@@ -216,3 +216,11 @@ node deploy/frontend-fingerprint-selftest.cjs
 - 官方 `deploy/Dockerfile.web` 新增 `ARG VITE_API_BASE=` 空字符串注入；纠正上一轮「注入 `/api`」会形成 `/api/api/state` 双前缀的技术错误。
 - 真实浏览器取证 `PASS_LOCAL_DRILL_ONLY`（17 请求 / 0 forbidden / 0 跨源 / 页面真实渲染 / 0 pageerror），判定单一权威 `deploy/sameorigin-verdict.cjs` + 回退自证 **12/12 PASS**。
 - 详见 `docs/DEPLOY-SAMEORIGIN-BROWSER-2026-11-25.md`；**验收判定与发布口径仍维持 ⏸，不翻盘**。
+
+## 十二、后续补验索引（2026-11-26，Node / Java 通道解耦）
+
+本报告 §十一 所指向的同源链路补验中，「`apiV1.ts` 共用 `VITE_API_BASE` 作 Java `/api/v1` 基址」的连带回归**已于次日修复**，本处仅追加索引，既有 §一~§十一 文字、数字与结论零改写。
+
+- `app/src/infra/apiV1.ts` 拆出独立 `VITE_API_V1_BASE`（默认 8088）；`deploy/Dockerfile.web` 仅追加更正注释、`ARG`/`ENV` 零改写。
+- 静态三场景 12/12 规则 + 20/20 自证、全六门禁（含隔离 4/5/6 两次 FAIL 留痕）、v4 官方镜像重建与真实浏览器复演 `PASS_LOCAL_DRILL_ONLY`（17 请求 / 0 forbidden / 0 跨源 / 0 pageerror）。
+- 详见 `docs/DEPLOY-API-BASE-DECOUPLE-2026-11-26.md`；**Java `/api/v1` 未验证打通，验收判定与发布口径仍维持 ⏸，不翻盘**。

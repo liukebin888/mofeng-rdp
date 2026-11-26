@@ -1,0 +1,111 @@
+{
+  "artifact": "isolated gates 4/5/6 recheck",
+  "generatedAt": "2026-11-26T14:09:41.839Z",
+  "verdict": "PASS_ISOLATED_GATES_4_5_6",
+  "fatal": null,
+  "isolation": {
+    "tempRoot": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\mofeng-gate-1795702131089（系统临时目录，非 git 工作区）",
+    "dataDir": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\mofeng-gate-1795702131089\\data",
+    "distDir": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\mofeng-gate-1795702131089\\gate-dist",
+    "backendPort": 8788,
+    "previewPort": 4181,
+    "injectedBase": "http://127.0.0.1:8788",
+    "note": "smoke/e2e 全程只连隔离后端 8788；正式 8787 仅被门禁 6 只读 GET /api/audit"
+  },
+  "frontendInjection": {
+    "injectedBase": "http://127.0.0.1:8788",
+    "assetPath": "assets/index-CaNr_0Pz.js",
+    "bytes": 1796543,
+    "backend8788Count": 1,
+    "node8787Count": 0,
+    "java8088Count": 1,
+    "v1BaseLiteralCount": 1
+  },
+  "warmup": {
+    "purpose": "对齐正式后端「已有 state」基准态，消除空卷冷启动 404（server/index.js:613 设计行为）",
+    "stateStatusBefore": 404,
+    "stateStatusAfter": 200,
+    "notFoundUrls": [
+      "http://127.0.0.1:8788/api/state"
+    ],
+    "note": "预热仅用真实浏览器让应用自行播种；smoke.cjs / e2e-click.cjs 判定逻辑一字未改，104 路由判定条件未放宽"
+  },
+  "gates": {
+    "gate4_smoke": {
+      "name": "smoke（104 路由真实浏览器冒烟）",
+      "exit": 0,
+      "base": "http://127.0.0.1:4181",
+      "total": 104,
+      "ok": 104,
+      "badCount": 0,
+      "errorCount": 0,
+      "errors": [],
+      "stdoutTail": "      \"ok\": true |     } |   ] | }",
+      "stderrTail": ""
+    },
+    "gate5_e2e": {
+      "name": "e2e（交互点击级回归）",
+      "exit": 0,
+      "base": "http://127.0.0.1:4181",
+      "pass": 33,
+      "fail": 0,
+      "pageerrorPresent": false,
+      "stdoutTail": " | [链路9] 交付物审批齐套结构 |   ✓ 存在「交付物审批齐套」面板 |  | ========== 结果 ========== | PASS 33 / FAIL 0",
+      "stderrTail": ""
+    },
+    "gate6_audit": {
+      "name": "正式后端 GET /api/audit（只读）",
+      "httpOk": true,
+      "chainOk": true,
+      "count": 18,
+      "checked": 18,
+      "brokenAt": null,
+      "rowsLen": 18
+    }
+  },
+  "gateChecks": {
+    "okG4": true,
+    "okG5": true,
+    "okG6": true,
+    "demoUnchanged": true,
+    "allPass": true
+  },
+  "demoData": {
+    "before": [
+      {
+        "file": "server/data/state-T-1001.json",
+        "sha256": "85af15a8c8e8a92fd5985303072116a53cf5f66d99c44d160a689af1759a3b4f"
+      },
+      {
+        "file": "server/data/audit-T-1001.json",
+        "sha256": "3727251ba41fa006609f2b9ce6fb3dd5925d84dd0026402dfc39b066b7cb85c5"
+      }
+    ],
+    "after": [
+      {
+        "file": "server/data/state-T-1001.json",
+        "sha256": "85af15a8c8e8a92fd5985303072116a53cf5f66d99c44d160a689af1759a3b4f"
+      },
+      {
+        "file": "server/data/audit-T-1001.json",
+        "sha256": "3727251ba41fa006609f2b9ce6fb3dd5925d84dd0026402dfc39b066b7cb85c5"
+      }
+    ],
+    "unchanged": true
+  },
+  "isolatedDataFiles": [
+    {
+      "file": "state-T-1001.json",
+      "bytes": 235746
+    }
+  ],
+  "disclosure": [
+    "门禁 1/2/3（vue-tsc 0 error / vitest 1862/1862、117 文件 / vite build OK）已在同轮单独复核，本脚本只负责需隔离的 4/5 与只读 6",
+    "attempt1/attempt2 的 smoke exit=1 原始 FAIL 证据完整保留（.attempt1.json / .attempt2.json）：冷启动空卷 GET /api/state 404 被记为 console.error；经 404 URL 定位 + 预热对齐基准态后复跑，不改任何验收判定脚本",
+    "注入版前端仅用于门禁 4/5，产物落在系统临时目录，不改写 app/dist；app/dist 保持未注入基线",
+    "smoke 截图写入 app/shots/*.png，已被 .gitignore:55 忽略，不进提交",
+    "e2e 的 resetBackendState() 经 MOFENG_DATA_DIR 只清隔离临时目录，绝不触碰仓库 server/data",
+    "门禁 6 为只读 GET，不追加审计；正式演示数据以 sha256 前后比对为零污染唯一判据",
+    "AC 判定与发布口径维持「内测/演示版」不翻盘"
+  ]
+}

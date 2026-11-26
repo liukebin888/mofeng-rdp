@@ -300,3 +300,13 @@ node deploy/rollback-drill.cjs
 - 纠正上一轮建议的技术错误：注入 `/api` 会形成 `/api/api/state` **双前缀**；正确值为空字符串 `''`。
 - 真实浏览器（`chromium-1247`）在隔离编排 8081 取证：**17 请求 / 5 个 `/api` 请求 / 3 个应用自发 / 0 个 8787·8088 直连 / 0 跨源 / 核心 API 2xx / 页面真实渲染 / 0 pageerror**；判定单一权威 `deploy/sameorigin-verdict.cjs` + 回退自证 **12/12 PASS**。
 - 详见 `docs/DEPLOY-SAMEORIGIN-BROWSER-2026-11-25.md`；**验收判定与发布口径仍维持 ⏸，不翻盘**。
+
+### 8.7 Node / Java 通道解耦补验索引（2026-11-26）
+
+上文 §8.6 登记的「`apiV1.ts` 共用 `VITE_API_BASE` 作 Java `/api/v1` 基址、注入 `''` 后亦变相对路径」这一连带回归**已修复**，本处仅追加索引、不改写既有文字：
+
+- `app/src/infra/apiV1.ts` 改读独立变量 `VITE_API_V1_BASE`（默认 `http://127.0.0.1:8088`）；`deploy/Dockerfile.web` 仅追加更正注释，`ARG VITE_API_BASE=` / `ENV` 与历史注释零改写。
+- 静态三场景（dev / prod / override）真实构建 12/12 规则 + 20/20 死活空变异自证；prod 场景 `8787=0 / 8088=1`，证明 Node 折叠与 Java 恢复默认互不影响。
+- v4 官方镜像 `ff5d444b709d` 内主 JS sha256 与本地 prod 产物逐字一致；真实浏览器复演 `PASS_LOCAL_DRILL_ONLY`（17 请求 / 0 forbidden / 0 跨源 / 0 pageerror），**Node 同源 `/api` 链路不回退**。
+- 全六门禁复核通过（含隔离门禁 4/5/6，两次 FAIL 原始留痕保留）；正式 `server/data` sha256 零污染。
+- 详见 `docs/DEPLOY-API-BASE-DECOUPLE-2026-11-26.md`；**Java `/api/v1` 仍属内部联调基址、未验证打通；验收判定与发布口径仍维持 ⏸，不翻盘**。

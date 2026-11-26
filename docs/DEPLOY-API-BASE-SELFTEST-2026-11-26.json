@@ -1,0 +1,172 @@
+{
+  "artifact": "api-base-verdict selftest",
+  "generatedAt": "2026-11-26T13:52:45.421Z",
+  "sameSource": "deploy/api-base-verdict.cjs（本自证与 deploy/api-base-probe.cjs 同源复用，未内联复制判定）",
+  "verdictSource": "deploy/api-base-verdict.cjs",
+  "totalCases": 20,
+  "passed": 20,
+  "failed": 0,
+  "verdictAllPass": true,
+  "liveSamples": {
+    "dev": {
+      "scenario": "dev",
+      "ok": true,
+      "assetPath": "assets/index-CC7WV40D.js",
+      "bytes": 1705974,
+      "node8787Count": 1,
+      "java8088Count": 1,
+      "overrideHostCount": 0,
+      "v1BaseLiteralCount": 1,
+      "nodeBaseLiteralCount": 1
+    },
+    "prod": {
+      "scenario": "prod",
+      "ok": true,
+      "assetPath": "assets/index-sx90vn81.js",
+      "bytes": 1705909,
+      "node8787Count": 0,
+      "java8088Count": 1,
+      "overrideHostCount": 0,
+      "v1BaseLiteralCount": 1,
+      "nodeBaseLiteralCount": 0
+    },
+    "override": {
+      "scenario": "override",
+      "ok": true,
+      "assetPath": "assets/index-MVwmWztI.js",
+      "bytes": 1705871,
+      "node8787Count": 0,
+      "java8088Count": 0,
+      "overrideHostCount": 1,
+      "v1BaseLiteralCount": 0,
+      "nodeBaseLiteralCount": 0
+    }
+  },
+  "cases": [
+    {
+      "name": "C01 活·dev 场景通过",
+      "type": "live",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "C02 活·prod 场景通过（回归修复核心）",
+      "type": "live",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "C03 活·override 场景通过",
+      "type": "live",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "C04 活·assertAll 三场景齐全且全绿",
+      "type": "live",
+      "ok": true,
+      "detail": "{\"pass\":true,\"scenarioCount\":3,\"results\":[{\"scenario\":\"dev\",\"pass\":true,\"regression\":false,\"failedRules\":[],\"checks\":[{\"id\":\"D1\",\"label\":\"Node 通道保留 8787 默认基址\",\"pass\":true},{\"id\":\"D2\",\"label\":\"Java 通道保留 8088 默认基址\",\"pass\":"
+    },
+    {
+      "name": "C05 活·合法 prod 不属于旧回归形态",
+      "type": "live",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "C06 死·旧共用变量回归（Node 折叠且 8088 也消失）",
+      "type": "dead",
+      "ok": true,
+      "detail": "pass=false regression=true failed=[P2,P4,P5] reason=prod 场景未通过：P2,P4,P5"
+    },
+    {
+      "name": "C07 死·prod 但 Node 8787 未折叠",
+      "type": "dead",
+      "ok": true,
+      "detail": "pass=false regression=false failed=[P1] reason=prod 场景未通过：P1"
+    },
+    {
+      "name": "C08 死·伪装解耦（Java 保 8088 但独立变量字面量缺失）",
+      "type": "dead",
+      "ok": true,
+      "detail": "pass=false regression=false failed=[P4] reason=prod 场景未通过：P4"
+    },
+    {
+      "name": "C09 死·override 但覆盖基址未出现",
+      "type": "dead",
+      "ok": true,
+      "detail": "pass=false regression=true failed=[O2] reason=override 场景未通过：O2"
+    },
+    {
+      "name": "C10 死·dev 丢失 Node 默认基址",
+      "type": "dead",
+      "ok": true,
+      "detail": "pass=false regression=false failed=[D1] reason=dev 场景未通过：D1"
+    },
+    {
+      "name": "C11 死·旧回归形态识别为真",
+      "type": "dead",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "C12 空·null 样本",
+      "type": "empty",
+      "ok": true,
+      "detail": "正确抛错: 样本缺失或非对象（fail-closed）"
+    },
+    {
+      "name": "C13 空·ok:false 采集失败样本",
+      "type": "empty",
+      "ok": true,
+      "detail": "正确抛错: 样本 ok !== true，采集失败不得参与判定（fail-closed）"
+    },
+    {
+      "name": "C14 空·assetPath 为空",
+      "type": "empty",
+      "ok": true,
+      "detail": "正确抛错: 样本 assetPath 缺失（fail-closed）"
+    },
+    {
+      "name": "C15 伪造·负数字段",
+      "type": "empty",
+      "ok": true,
+      "detail": "正确抛错: 样本 node8787Count 非非负整数（fail-closed）"
+    },
+    {
+      "name": "C16 伪造·非整数字段",
+      "type": "empty",
+      "ok": true,
+      "detail": "正确抛错: 样本 bytes 非法（fail-closed）"
+    },
+    {
+      "name": "C17 未知场景",
+      "type": "empty",
+      "ok": true,
+      "detail": "正确抛错: 未知场景 unknown（fail-closed）"
+    },
+    {
+      "name": "C18 空·assertAll 缺场景",
+      "type": "empty",
+      "ok": true,
+      "detail": "正确抛错: 缺少场景 override（fail-closed）"
+    },
+    {
+      "name": "C19 变异·三场景产物 bytes 全相同（零差异假阳性护栏）",
+      "type": "mutation",
+      "ok": true,
+      "detail": "正确抛错: 三场景产物 bytes 完全相同，疑似复用同一构建产物（拒绝零差异假阳性）"
+    },
+    {
+      "name": "C20 变异·assertAll 场景重复",
+      "type": "mutation",
+      "ok": true,
+      "detail": "正确抛错: 场景 dev 重复（fail-closed）"
+    }
+  ],
+  "disclosure": [
+    "活样本指标取自 2026-11-26 三次真实 vite 构建，非手工编造；真实证据另见 DEPLOY-API-BASE-DECOUPLE-2026-11-26.json",
+    "本自证只验证「判定规则」本身，不替代真实构建与真实浏览器取证",
+    "fail-closed：空样本、失败标记、伪造字段一律抛错，不参与判定"
+  ]
+}

@@ -1,0 +1,261 @@
+{
+  "artifact": "api-base decouple static probe",
+  "generatedAt": "2026-11-26T13:52:49.948Z",
+  "verdict": "PASS_LOCAL_STATIC_ONLY",
+  "fatal": null,
+  "sameSource": "deploy/api-base-verdict.cjs（构建采集与回退自证同源复用）",
+  "buildCommand": "node node_modules/vite/bin/vite.js build --outDir <tmp>/<scenario> --emptyOutDir（cwd=app，env 精确控制，无 shell 拼接）",
+  "tempRoot": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\mofeng-apibase-1795701141548（系统临时目录，非 git 工作区）",
+  "sourceChanges": [
+    "app/src/infra/apiV1.ts：API_V1_BASE 由 VITE_API_BASE 改读独立 VITE_API_V1_BASE（默认 http://127.0.0.1:8088）",
+    "deploy/Dockerfile.web：仅追加 2026-11-26 更正注释，ARG/ENV 与历史注释零改写"
+  ],
+  "scenarios": [
+    {
+      "scenario": "dev",
+      "env": "(未注入任何 VITE_* 变量)",
+      "build": {
+        "exit": 0,
+        "error": null,
+        "stderrTail": "",
+        "stdoutTail": "\u001b[2mC:/Users/ADMINI~1/AppData/Local/Temp/mofeng-apibase-1795701141548/dev/\u001b[22m\u001b[36massets/xlsx-CbTSpprj.js                            \u001b[39m\u001b[1m\u001b[2m  429.52 kB\u001b[22m\u001b[1m\u001b[22m\u001b[2m │ gzip: 143.08 kB\u001b[22m | \u001b[2mC:/Users/ADMINI~1/AppData/Local/Temp/mofeng-apibase-1795701141548/dev/\u001b[22m\u001b[36massets/index-CC7WV40D.js                           \u001b[39m\u001b[1m\u001b[2m1,796.59 kB\u001b[22m\u001b[1m\u001b[22m\u001b[2m │ gzip: 574.79 kB\u001b[22m | \u001b[32m✓ built in 7.99s\u001b[39m"
+      },
+      "sample": {
+        "scenario": "dev",
+        "ok": true,
+        "assetPath": "assets/index-CC7WV40D.js",
+        "bytes": 1796587,
+        "node8787Count": 1,
+        "java8088Count": 1,
+        "overrideHostCount": 0,
+        "v1BaseLiteralCount": 1,
+        "nodeBaseLiteralCount": 1,
+        "build": {
+          "exit": 0,
+          "error": null,
+          "stderrTail": "",
+          "stdoutTail": "\u001b[2mC:/Users/ADMINI~1/AppData/Local/Temp/mofeng-apibase-1795701141548/dev/\u001b[22m\u001b[36massets/xlsx-CbTSpprj.js                            \u001b[39m\u001b[1m\u001b[2m  429.52 kB\u001b[22m\u001b[1m\u001b[22m\u001b[2m │ gzip: 143.08 kB\u001b[22m | \u001b[2mC:/Users/ADMINI~1/AppData/Local/Temp/mofeng-apibase-1795701141548/dev/\u001b[22m\u001b[36massets/index-CC7WV40D.js                           \u001b[39m\u001b[1m\u001b[2m1,796.59 kB\u001b[22m\u001b[1m\u001b[22m\u001b[2m │ gzip: 574.79 kB\u001b[22m | \u001b[32m✓ built in 7.99s\u001b[39m"
+        },
+        "contexts": {
+          "node8787": ":\"#3b82f6\",文字:\"#4ade80\"},gh={},Xl=(gh==null?void 0:gh.VITE_API_BASE)??\"http://127.0.0.1:8787\";async function N6e(){try{const",
+          "java8088": "nt(){return o}}}const wh={},v9=(wh==null?void 0:wh.VITE_API_V1_BASE)??\"http://127.0.0.1:8088\";async function Ch(e,t,n,o=3600",
+          "overrideHost": null
+        }
+      },
+      "contexts": {
+        "node8787": ":\"#3b82f6\",文字:\"#4ade80\"},gh={},Xl=(gh==null?void 0:gh.VITE_API_BASE)??\"http://127.0.0.1:8787\";async function N6e(){try{const",
+        "java8088": "nt(){return o}}}const wh={},v9=(wh==null?void 0:wh.VITE_API_V1_BASE)??\"http://127.0.0.1:8088\";async function Ch(e,t,n,o=3600",
+        "overrideHost": null
+      }
+    },
+    {
+      "scenario": "prod",
+      "env": {
+        "VITE_API_BASE": ""
+      },
+      "build": {
+        "exit": 0,
+        "error": null,
+        "stderrTail": "",
+        "stdoutTail": "\u001b[2mC:/Users/ADMINI~1/AppData/Local/Temp/mofeng-apibase-1795701141548/prod/\u001b[22m\u001b[36massets/xlsx-CbTSpprj.js                            \u001b[39m\u001b[1m\u001b[2m  429.52 kB\u001b[22m\u001b[1m\u001b[22m\u001b[2m │ gzip: 143.08 kB\u001b[22m | \u001b[2mC:/Users/ADMINI~1/AppData/Local/Temp/mofeng-apibase-1795701141548/prod/\u001b[22m\u001b[36massets/index-sx90vn81.js                           \u001b[39m\u001b[1m\u001b[2m1,796.52 kB\u001b[22m\u001b[1m\u001b[22m\u001b[2m │ gzip: 574.74 kB\u001b[22m | \u001b[32m✓ built in 8.38s\u001b[39m"
+      },
+      "sample": {
+        "scenario": "prod",
+        "ok": true,
+        "assetPath": "assets/index-sx90vn81.js",
+        "bytes": 1796522,
+        "node8787Count": 0,
+        "java8088Count": 1,
+        "overrideHostCount": 0,
+        "v1BaseLiteralCount": 1,
+        "nodeBaseLiteralCount": 0,
+        "build": {
+          "exit": 0,
+          "error": null,
+          "stderrTail": "",
+          "stdoutTail": "\u001b[2mC:/Users/ADMINI~1/AppData/Local/Temp/mofeng-apibase-1795701141548/prod/\u001b[22m\u001b[36massets/xlsx-CbTSpprj.js                            \u001b[39m\u001b[1m\u001b[2m  429.52 kB\u001b[22m\u001b[1m\u001b[22m\u001b[2m │ gzip: 143.08 kB\u001b[22m | \u001b[2mC:/Users/ADMINI~1/AppData/Local/Temp/mofeng-apibase-1795701141548/prod/\u001b[22m\u001b[36massets/index-sx90vn81.js                           \u001b[39m\u001b[1m\u001b[2m1,796.52 kB\u001b[22m\u001b[1m\u001b[22m\u001b[2m │ gzip: 574.74 kB\u001b[22m | \u001b[32m✓ built in 8.38s\u001b[39m"
+        },
+        "contexts": {
+          "node8787": null,
+          "java8088": "nt(){return o}}}const bh={},h9=(bh==null?void 0:bh.VITE_API_V1_BASE)??\"http://127.0.0.1:8088\";async function wh(e,t,n,o=3600",
+          "overrideHost": null
+        }
+      },
+      "contexts": {
+        "node8787": null,
+        "java8088": "nt(){return o}}}const bh={},h9=(bh==null?void 0:bh.VITE_API_V1_BASE)??\"http://127.0.0.1:8088\";async function wh(e,t,n,o=3600",
+        "overrideHost": null
+      }
+    },
+    {
+      "scenario": "override",
+      "env": {
+        "VITE_API_BASE": "",
+        "VITE_API_V1_BASE": "http://java-probe.invalid:9999"
+      },
+      "build": {
+        "exit": 0,
+        "error": null,
+        "stderrTail": "",
+        "stdoutTail": "\u001b[2mC:/Users/ADMINI~1/AppData/Local/Temp/mofeng-apibase-1795701141548/override/\u001b[22m\u001b[36massets/xlsx-CbTSpprj.js                            \u001b[39m\u001b[1m\u001b[2m  429.52 kB\u001b[22m\u001b[1m\u001b[22m\u001b[2m │ gzip: 143.08 kB\u001b[22m | \u001b[2mC:/Users/ADMINI~1/AppData/Local/Temp/mofeng-apibase-1795701141548/override/\u001b[22m\u001b[36massets/index-MVwmWztI.js                           \u001b[39m\u001b[1m\u001b[2m1,796.48 kB\u001b[22m\u001b[1m\u001b[22m\u001b[2m │ gzip: 574.74 kB\u001b[22m | \u001b[32m✓ built in 8.25s\u001b[39m"
+      },
+      "sample": {
+        "scenario": "override",
+        "ok": true,
+        "assetPath": "assets/index-MVwmWztI.js",
+        "bytes": 1796484,
+        "node8787Count": 0,
+        "java8088Count": 0,
+        "overrideHostCount": 1,
+        "v1BaseLiteralCount": 0,
+        "nodeBaseLiteralCount": 0,
+        "build": {
+          "exit": 0,
+          "error": null,
+          "stderrTail": "",
+          "stdoutTail": "\u001b[2mC:/Users/ADMINI~1/AppData/Local/Temp/mofeng-apibase-1795701141548/override/\u001b[22m\u001b[36massets/xlsx-CbTSpprj.js                            \u001b[39m\u001b[1m\u001b[2m  429.52 kB\u001b[22m\u001b[1m\u001b[22m\u001b[2m │ gzip: 143.08 kB\u001b[22m | \u001b[2mC:/Users/ADMINI~1/AppData/Local/Temp/mofeng-apibase-1795701141548/override/\u001b[22m\u001b[36massets/index-MVwmWztI.js                           \u001b[39m\u001b[1m\u001b[2m1,796.48 kB\u001b[22m\u001b[1m\u001b[22m\u001b[2m │ gzip: 574.74 kB\u001b[22m | \u001b[32m✓ built in 8.25s\u001b[39m"
+        },
+        "contexts": {
+          "node8787": null,
+          "java8088": null,
+          "overrideHost": "(){return t},get pendingAgain(){return n},get putCount(){return o}}}const m9=\"http://java-probe.invalid:9999\";async function"
+        }
+      },
+      "contexts": {
+        "node8787": null,
+        "java8088": null,
+        "overrideHost": "(){return t},get pendingAgain(){return n},get putCount(){return o}}}const m9=\"http://java-probe.invalid:9999\";async function"
+      }
+    }
+  ],
+  "assertAll": {
+    "pass": true,
+    "scenarioCount": 3,
+    "results": [
+      {
+        "scenario": "dev",
+        "pass": true,
+        "regression": false,
+        "failedRules": [],
+        "checks": [
+          {
+            "id": "D1",
+            "label": "Node 通道保留 8787 默认基址",
+            "pass": true
+          },
+          {
+            "id": "D2",
+            "label": "Java 通道保留 8088 默认基址",
+            "pass": true
+          },
+          {
+            "id": "D3",
+            "label": "两变量均以 import.meta.env 属性访问保留（未注入）",
+            "pass": true
+          }
+        ],
+        "reason": "dev 场景 3/3 规则通过",
+        "metrics": {
+          "assetPath": "assets/index-CC7WV40D.js",
+          "bytes": 1796587,
+          "node8787Count": 1,
+          "java8088Count": 1,
+          "overrideHostCount": 0,
+          "v1BaseLiteralCount": 1,
+          "nodeBaseLiteralCount": 1
+        }
+      },
+      {
+        "scenario": "prod",
+        "pass": true,
+        "regression": false,
+        "failedRules": [],
+        "checks": [
+          {
+            "id": "P1",
+            "label": "Node 通道 8787 已折叠（同源 /api 生效）",
+            "pass": true
+          },
+          {
+            "id": "P2",
+            "label": "Java 通道 8088 保持（回归已修复 · 核心规则）",
+            "pass": true
+          },
+          {
+            "id": "P3",
+            "label": "VITE_API_BASE 已被编译期静态消去",
+            "pass": true
+          },
+          {
+            "id": "P4",
+            "label": "VITE_API_V1_BASE 独立保留（证明两通道已解耦）",
+            "pass": true
+          },
+          {
+            "id": "P5",
+            "label": "未出现共用变量回归形态",
+            "pass": true
+          }
+        ],
+        "reason": "prod 场景 5/5 规则通过",
+        "metrics": {
+          "assetPath": "assets/index-sx90vn81.js",
+          "bytes": 1796522,
+          "node8787Count": 0,
+          "java8088Count": 1,
+          "overrideHostCount": 0,
+          "v1BaseLiteralCount": 1,
+          "nodeBaseLiteralCount": 0
+        }
+      },
+      {
+        "scenario": "override",
+        "pass": true,
+        "regression": false,
+        "failedRules": [],
+        "checks": [
+          {
+            "id": "O1",
+            "label": "Java 8088 默认已被独立变量覆盖",
+            "pass": true
+          },
+          {
+            "id": "O2",
+            "label": "覆盖基址真实出现在产物中",
+            "pass": true
+          },
+          {
+            "id": "O3",
+            "label": "Node 通道仍折叠（不受 Java 覆盖影响）",
+            "pass": true
+          },
+          {
+            "id": "O4",
+            "label": "独立变量被编译期替换（不再是属性访问）",
+            "pass": true
+          }
+        ],
+        "reason": "override 场景 4/4 规则通过",
+        "metrics": {
+          "assetPath": "assets/index-MVwmWztI.js",
+          "bytes": 1796484,
+          "node8787Count": 0,
+          "java8088Count": 0,
+          "overrideHostCount": 1,
+          "v1BaseLiteralCount": 0,
+          "nodeBaseLiteralCount": 0
+        }
+      }
+    ],
+    "totalRules": 12,
+    "passedRules": 12,
+    "sameSource": "deploy/api-base-verdict.cjs（probe 与 selftest 同源复用）"
+  },
+  "disclosure": [
+    "仅静态构建产物判定：证明 Node 通道折叠为同源 /api 与 Java 通道恢复默认 8088 两件事互不影响；不替代真实浏览器取证",
+    "Java /api/v1 恢复为 http://127.0.0.1:8088 属「内部联调基址」，按项目口径生产唯一对外后端仍是 Node 8787；本探针不宣称 Java 通道已打通",
+    "若生产页面未来真实触发 Java 通道，会跨源直连 8088；这是既定口径下的已知边界，不在本轮处置范围",
+    "本轮 Node 通道（repo.ts / AiChatPanel.vue / Dockerfile.web 注入逻辑）零改动，2026-11-25 浏览器同源取证结论仍成立",
+    "AC 判定与发布口径维持「内测/演示版」不翻盘"
+  ]
+}

@@ -319,3 +319,20 @@
 | 零污染 | 正式 `server/data` sha256 前后一致（`85af15a8…b4f` / `3727251b…8c5`）；应用在**隔离卷**自动播种，不触正式数据 |
 
 新增证据：`docs/DEPLOY-SAMEORIGIN-BROWSER-2026-11-25.md`、`.json`、`.attempt1.json`、`docs/DEPLOY-SAMEORIGIN-SELFTEST-2026-11-25.json`。
+
+### 12.8 Node / Java 通道解耦定案（2026-11-26：修复自身引入的回归）
+
+§12.7 登记的「`apiV1.ts` 共用 `VITE_API_BASE`、注入 `''` 后 Java `/api/v1` 亦变相对路径」定性为**上一轮注入改动引入的连带回归**，本轮按「只推进可本地自证、不越权」原则修复，非新设计决策。
+
+| 项 | 定案 |
+|---|---|
+| 修复 | `app/src/infra/apiV1.ts` 改读独立 `VITE_API_V1_BASE`（默认 `http://127.0.0.1:8088`）；`repo.ts` / `AiChatPanel.vue` / `ConsistencyProbeView.vue` / `REST-CONTRACT.md` 零改动；`Dockerfile.web` 仅追加更正注释、历史零改写 |
+| 单一权威 | `deploy/api-base-verdict.cjs`（12 规则含死样本回归识别、`assertAll` 零差异护栏）+ 20/20 死活空变异自证；`api-base-probe.cjs` 三场景真实构建 `PASS_LOCAL_STATIC_ONLY` |
+| 门禁 | 六门禁全绿（1 `vue-tsc 0` / 2 `vitest 1862/1862、117 文件` / 3 `vite build OK` / 4 `smoke 104/104 errors=0` / 5 `e2e 33/0` / 6 `chainOk=true count=18 checked=18 brokenAt=null`）|
+| 隔离留痕 | 新增 `deploy/gate-isolated.cjs`（8788 后端 + 4181 preview + `MOFENG_DATA_DIR` 临时目录）；attempt1/attempt2 的 smoke `exit=1` FAIL 原始证据保留，根因为空卷 `GET /api/state` 404（`server/index.js:613` 设计行为）被记为 console.error，经 404 URL 定位 + 预热对齐基准态后复跑，**验收脚本一字未改、判定未放宽** |
+| v4 复演 | `mofeng-drill-web:v4 ff5d444b709d` / `mofeng-drill-server:v4 6f41d0ac316d`；镜像内 `8787=0 / 8088=1`、主 JS sha256 与本地 prod 逐字一致；真实浏览器 `PASS_LOCAL_DRILL_ONLY`（17 请求 / 0 forbidden / 0 跨源 / 0 pageerror），Node 同源链路不回退 |
+| 新增如实披露 | Java `/api/v1` 恢复 `8088` 属**内部联调基址**，本轮零 `/api/v1` 运行时请求，**未验证、不宣称打通**；若生产页面触发该通道会跨源直连 8088，为既定口径下的已知边界。本轮未做全业务 DOM 流程与 Java 后端联调；隔离卷内自动播种属非纯只读取证 |
+| 判定 | `AC-22.1 / AC-40 / AC-45 / AC-03 / AC-38` **维持 ⏸ 一字未改**；发布口径继续「内测 / 演示版」，5 项外部依赖不变；U5 报告口径统一仍需授权 |
+| 零污染 | 正式 `server/data` sha256 前后一致（`85af15a8…b4f` / `3727251b…8c5`）；演练容器/卷/网络与 v4 tag 清理，用户原有 v1 基线 `latest` 两镜像保留 |
+
+新增证据：`docs/DEPLOY-API-BASE-DECOUPLE-2026-11-26.md` / `.json`、`docs/DEPLOY-API-BASE-SELFTEST-2026-11-26.json`、`docs/DEPLOY-GATE-ISOLATED-2026-11-26.json` / `.attempt1.json` / `.attempt2.json`、`docs/DEPLOY-SAMEORIGIN-BROWSER-2026-11-26.json`。

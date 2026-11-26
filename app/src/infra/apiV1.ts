@@ -25,9 +25,17 @@ export interface ApiResult<T = unknown> {
   error?: string
 }
 
-/** Java 后端基地址（VITE_API_BASE 可覆盖，默认对齐后端 8088）。 */
+/**
+ * Java 后端基地址（独立变量 VITE_API_V1_BASE 可覆盖，默认对齐后端 8088）。
+ *
+ * 与 Node 状态通道（infra/repo.ts 的 VITE_API_BASE）刻意解耦：生产镜像注入
+ * VITE_API_BASE='' 让 /api/* 走 nginx 同源反代时，本通道不应被连带折叠成
+ * 相对路径（否则 /api/v1/* 会打到 Node 8787 而非 Java 8088，返回 404）。
+ * 按项目口径 Java /api/v1 属内部联调通道；生产唯一对外后端仍是 Node 8787，
+ * 本通道打通与否不在此声明。
+ */
 export const API_V1_BASE =
-  (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_API_BASE ??
+  (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_API_V1_BASE ??
   'http://127.0.0.1:8088'
 
 // ------------------------------------------------------------------

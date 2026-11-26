@@ -13,6 +13,9 @@ COPY app/ ./
 # 可用 --build-arg VITE_API_BASE=http://<host>:8787 覆盖为绝对地址。
 # 连带影响：apiV1.ts 共用此变量作 Java /api/v1 基址，注入 '' 后亦变相对路径；
 # 按项目口径 Java 属内部联调通道，本镜像对外链路不验证、不宣称其打通。
+# 2026-11-26 更正（仅追加，历史注释零改写）：apiV1.ts 已拆分为独立变量
+# VITE_API_V1_BASE（默认 http://127.0.0.1:8088），上述「共用变量连带变相对路径」
+# 的连带影响已消除；本阶段仍只注入 VITE_API_BASE，Java 通道保持默认基址。
 ARG VITE_API_BASE=
 ENV VITE_API_BASE=${VITE_API_BASE}
 RUN npm run build

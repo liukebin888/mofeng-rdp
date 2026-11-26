@@ -244,3 +244,13 @@ DRILL_TAG=v3 docker compose -p mofeng-drill -f deploy/docker-compose.drill.yml d
 | **发布口径** | ⏸ 继续「内测 / 演示版」，5 项外部依赖不变 |
 
 **下一步建议（仍需授权/外部条件，不擅动）**：① Java `/api/v1` 通道设计债的正式处置口径（是否拆分独立变量）；② U5 报告「16 组/107」与源码「18 组/104」口径统一需用户明确授权；③ k6 性能压测、等保密评/国密网关、真实 UAT 签署、生产集群灰度、AI 真实 Key 仍为 5 项外部依赖。
+
+## 十三、后续补验索引（2026-11-26，① 的处置结果）
+
+上文「下一步建议 ①」中「是否拆分独立变量」已按「修复自身引入的回归」落实，本处仅追加索引，既有 §一~§十二 文字、数字与结论零改写。
+
+- `app/src/infra/apiV1.ts` 改读独立 `VITE_API_V1_BASE`（默认 8088）；`repo.ts` / `AiChatPanel.vue` / `Dockerfile.web` 的注入逻辑零改动，因此**本报告的同源 `/api` 链路结论继续成立**。
+- v4 官方镜像重建后真实浏览器复演 `PASS_LOCAL_DRILL_ONLY`（17 请求 / 0 forbidden / 0 跨源 / 0 pageerror / 零 `8787·8088·api-v1` 请求），另存 `docs/DEPLOY-SAMEORIGIN-BROWSER-2026-11-26.json`，不覆盖本报告证据。
+- 全六门禁复核通过（含隔离门禁 4/5/6 的 attempt1/attempt2 FAIL 留痕）；正式 `server/data` sha256 零污染。
+- 详见 `docs/DEPLOY-API-BASE-DECOUPLE-2026-11-26.md`。
+- **仍未处置**：Java `/api/v1` 通道是否纳入生产对外链路（涉及网关反代与认证）需拍板，本轮不验证、不宣称打通；②③ 两项不变。验收判定与发布口径仍维持 ⏸，不翻盘。
