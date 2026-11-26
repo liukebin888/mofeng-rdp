@@ -310,3 +310,12 @@ node deploy/rollback-drill.cjs
 - v4 官方镜像 `ff5d444b709d` 内主 JS sha256 与本地 prod 产物逐字一致；真实浏览器复演 `PASS_LOCAL_DRILL_ONLY`（17 请求 / 0 forbidden / 0 跨源 / 0 pageerror），**Node 同源 `/api` 链路不回退**。
 - 全六门禁复核通过（含隔离门禁 4/5/6，两次 FAIL 原始留痕保留）；正式 `server/data` sha256 零污染。
 - 详见 `docs/DEPLOY-API-BASE-DECOUPLE-2026-11-26.md`；**Java `/api/v1` 仍属内部联调基址、未验证打通；验收判定与发布口径仍维持 ⏸，不翻盘**。
+
+### 8.8 部署补验证据链总核验索引（2026-11-27）
+
+本处仅追加索引，§8.1~§8.7 既有文字与数字零改写：
+
+- 新增 `deploy/evidence-chain-verdict.cjs`（R1~R10 全 fail-closed 单一权威）、`deploy/evidence-chain-selftest.cjs`（23/23 死活空变异自证）、`deploy/evidence-chain-probe.cjs`（只读采集 + selftest 复跑还原 + 演示数据 sha256 活比对）。
+- 对 14 份历史证据 JSON / 4 份报告 / 13 个 deploy 脚本做收口级总核验：10/10 规则、63 条资产引用零断链、2 条叙述型·上下文型引用如实分类、阻断型 3 / 记录型 2 分类型核验、3 个 selftest 复跑判定一致且 `contentChangedCount=0`。
+- 正式 `server/data` sha256 报告登记值 vs 当前实际逐字一致；4 份报告零肯定式翻盘断言、零护栏表述缺失；`mofeng-drill-server:v2` 跨轮 3 个镜像 ID 如实披露、不静默去重。
+- 详见 `docs/DEPLOY-EVIDENCE-CHAIN-2026-11-27.md`；**判定 `PASS_LOCAL_READONLY_ONLY`（仅本地只读自证，不替代外部验收），AC 判定与发布口径仍维持 ⏸，不翻盘**。

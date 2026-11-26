@@ -1,0 +1,357 @@
+{
+  "artifact": "evidence-chain-verdict selftest",
+  "generatedAt": "2026-11-26T22:58:49.781Z",
+  "verdictSource": "deploy/evidence-chain-verdict.cjs",
+  "sameSource": "deploy/evidence-chain-verdict.cjs（本自证与 deploy/evidence-chain-probe.cjs 同源复用，未内联复制判定）",
+  "totalCases": 23,
+  "passed": 23,
+  "failed": 0,
+  "allPass": true,
+  "verdict": "PASS",
+  "liveSample": {
+    "totalRules": 10,
+    "passedRules": 10,
+    "verdict": "PASS_LOCAL_READONLY_ONLY"
+  },
+  "cases": [
+    {
+      "name": "L1 真实合规 collected 全绿（10/10 规则）",
+      "ok": true,
+      "expectOk": true,
+      "actualOk": true,
+      "threw": false,
+      "expectFailIds": [],
+      "failedIds": [],
+      "detail": ""
+    },
+    {
+      "name": "L2 活样本 totalRules=10 / passedRules=10 / verdict=PASS_LOCAL_READONLY_ONLY",
+      "ok": true,
+      "expectOk": true,
+      "actualOk": true,
+      "threw": false,
+      "expectFailIds": [],
+      "failedIds": [],
+      "detail": "totalRules=10 passedRules=10 verdict=PASS_LOCAL_READONLY_ONLY"
+    },
+    {
+      "name": "D1 null 空样本判 FAIL 且不抛异常",
+      "ok": true,
+      "expectOk": false,
+      "actualOk": false,
+      "threw": false,
+      "expectFailIds": [],
+      "failedIds": [
+        "R1",
+        "R2",
+        "R3",
+        "R4",
+        "R5",
+        "R6",
+        "R7",
+        "R8",
+        "R9",
+        "R10"
+      ],
+      "detail": ""
+    },
+    {
+      "name": "D2 {} 空对象判 FAIL",
+      "ok": true,
+      "expectOk": false,
+      "actualOk": false,
+      "threw": false,
+      "expectFailIds": [
+        "R1"
+      ],
+      "failedIds": [
+        "R1",
+        "R2",
+        "R3",
+        "R4",
+        "R5",
+        "R6",
+        "R7",
+        "R8",
+        "R9",
+        "R10"
+      ],
+      "detail": ""
+    },
+    {
+      "name": "D3 scanned 缺字段判 FAIL",
+      "ok": true,
+      "expectOk": false,
+      "actualOk": false,
+      "threw": false,
+      "expectFailIds": [
+        "R1"
+      ],
+      "failedIds": [
+        "R1",
+        "R2",
+        "R3",
+        "R4",
+        "R5",
+        "R6",
+        "R7",
+        "R8",
+        "R9",
+        "R10"
+      ],
+      "detail": ""
+    },
+    {
+      "name": "D4 证据 JSON 数量不足（3<14）→ R1 FAIL",
+      "ok": true,
+      "expectOk": false,
+      "actualOk": false,
+      "threw": false,
+      "expectFailIds": [
+        "R1",
+        "R2"
+      ],
+      "failedIds": [
+        "R1",
+        "R2"
+      ],
+      "detail": ""
+    },
+    {
+      "name": "D5 一份 JSON 解析失败 → R2 FAIL",
+      "ok": true,
+      "expectOk": false,
+      "actualOk": false,
+      "threw": false,
+      "expectFailIds": [
+        "R2"
+      ],
+      "failedIds": [
+        "R2"
+      ],
+      "detail": ""
+    },
+    {
+      "name": "D6 一份证据缺判定字段 → R3 FAIL",
+      "ok": true,
+      "expectOk": false,
+      "actualOk": false,
+      "threw": false,
+      "expectFailIds": [
+        "R3"
+      ],
+      "failedIds": [
+        "R3"
+      ],
+      "detail": ""
+    },
+    {
+      "name": "D7 阻断型留痕不足（2<3）→ R4 FAIL",
+      "ok": true,
+      "expectOk": false,
+      "actualOk": false,
+      "threw": false,
+      "expectFailIds": [
+        "R4"
+      ],
+      "failedIds": [
+        "R4"
+      ],
+      "detail": ""
+    },
+    {
+      "name": "D8 阻断型留痕被翻盘为 PASS → R4 FAIL",
+      "ok": true,
+      "expectOk": false,
+      "actualOk": false,
+      "threw": false,
+      "expectFailIds": [
+        "R4"
+      ],
+      "failedIds": [
+        "R4"
+      ],
+      "detail": ""
+    },
+    {
+      "name": "D9 记录型留痕边界被抹除 → R5 FAIL",
+      "ok": true,
+      "expectOk": false,
+      "actualOk": false,
+      "threw": false,
+      "expectFailIds": [
+        "R5"
+      ],
+      "failedIds": [
+        "R5"
+      ],
+      "detail": ""
+    },
+    {
+      "name": "D10 资产引用真断链 → R6 FAIL",
+      "ok": true,
+      "expectOk": false,
+      "actualOk": false,
+      "threw": false,
+      "expectFailIds": [
+        "R6"
+      ],
+      "failedIds": [
+        "R6"
+      ],
+      "detail": ""
+    },
+    {
+      "name": "D11 删一条叙述型引用凑零断链（翻盘）→ R7 FAIL",
+      "ok": true,
+      "expectOk": false,
+      "actualOk": false,
+      "threw": false,
+      "expectFailIds": [
+        "R7"
+      ],
+      "failedIds": [
+        "R7"
+      ],
+      "detail": ""
+    },
+    {
+      "name": "D12 叙述型引用缺 reason（分类不完整）→ R7 FAIL",
+      "ok": true,
+      "expectOk": false,
+      "actualOk": false,
+      "threw": false,
+      "expectFailIds": [
+        "R7"
+      ],
+      "failedIds": [
+        "R7"
+      ],
+      "detail": ""
+    },
+    {
+      "name": "D13 演示数据 sha256 漂移 → R8 FAIL",
+      "ok": true,
+      "expectOk": false,
+      "actualOk": false,
+      "threw": false,
+      "expectFailIds": [
+        "R8"
+      ],
+      "failedIds": [
+        "R8"
+      ],
+      "detail": ""
+    },
+    {
+      "name": "D14 登记值非 64 位（锚点无效）→ R8 FAIL",
+      "ok": true,
+      "expectOk": false,
+      "actualOk": false,
+      "threw": false,
+      "expectFailIds": [
+        "R8"
+      ],
+      "failedIds": [
+        "R8"
+      ],
+      "detail": ""
+    },
+    {
+      "name": "D15 selftest 复跑 exit=1 → R9 FAIL",
+      "ok": true,
+      "expectOk": false,
+      "actualOk": false,
+      "threw": false,
+      "expectFailIds": [
+        "R9"
+      ],
+      "failedIds": [
+        "R9"
+      ],
+      "detail": ""
+    },
+    {
+      "name": "D16 复跑后未还原（内容变化>0）→ R9 FAIL",
+      "ok": true,
+      "expectOk": false,
+      "actualOk": false,
+      "threw": false,
+      "expectFailIds": [
+        "R9"
+      ],
+      "failedIds": [
+        "R9"
+      ],
+      "detail": ""
+    },
+    {
+      "name": "D17 复跑判定与历史不一致 → R9 FAIL",
+      "ok": true,
+      "expectOk": false,
+      "actualOk": false,
+      "threw": false,
+      "expectFailIds": [
+        "R9"
+      ],
+      "failedIds": [
+        "R9"
+      ],
+      "detail": ""
+    },
+    {
+      "name": "D18 肯定式翻盘断言 → R10 FAIL",
+      "ok": true,
+      "expectOk": false,
+      "actualOk": false,
+      "threw": false,
+      "expectFailIds": [
+        "R10"
+      ],
+      "failedIds": [
+        "R10"
+      ],
+      "detail": ""
+    },
+    {
+      "name": "D19 报告缺护栏表述 → R10 FAIL",
+      "ok": true,
+      "expectOk": false,
+      "actualOk": false,
+      "threw": false,
+      "expectFailIds": [
+        "R10"
+      ],
+      "failedIds": [
+        "R10"
+      ],
+      "detail": ""
+    },
+    {
+      "name": "L3 变异活样本：新增一份合规证据 + 一条资产引用，仍全绿",
+      "ok": true,
+      "expectOk": true,
+      "actualOk": true,
+      "threw": false,
+      "expectFailIds": [],
+      "failedIds": [],
+      "detail": ""
+    },
+    {
+      "name": "L4 变异活样本：新增一条如实分类的叙述型引用，仍全绿",
+      "ok": true,
+      "expectOk": true,
+      "actualOk": true,
+      "threw": false,
+      "expectFailIds": [],
+      "failedIds": [],
+      "detail": ""
+    }
+  ],
+  "disclosure": [
+    "死样本覆盖 R1~R10 每条规则的定向失败，且要求「对应规则确已 FAIL」而非仅整体 FAIL，避免恒 FAIL 摆设规则。",
+    "空样本 / null / 畸形对象必须判 FAIL 且不得抛异常（fail-closed 且不靠崩溃翻红）。",
+    "D11/D12 专防探针翻盘：删除或弱化叙述型引用以凑「零断链」必须被 R7 抓住。",
+    "L3/L4 变异活样本证明判定非恒 FAIL；合规增量不误报。"
+  ]
+}

@@ -1,0 +1,720 @@
+{
+  "artifact": "部署补验证据链自一致性与可复现性总核验",
+  "generatedAt": "2026-11-26T23:02:43.922Z",
+  "verdict": "PASS_LOCAL_READONLY_ONLY",
+  "ok": true,
+  "fatal": null,
+  "sameSource": "deploy/evidence-chain-verdict.cjs（采集与回退自证同源复用）",
+  "rules": [
+    {
+      "id": "R1",
+      "ok": true,
+      "detail": "json=14/>=14 md=4/>=4 deploy=13/>=10"
+    },
+    {
+      "id": "R2",
+      "ok": true,
+      "detail": "parsed=14 files=14 bad=0"
+    },
+    {
+      "id": "R3",
+      "ok": true,
+      "detail": "withVerdict=14/14 missing=0"
+    },
+    {
+      "id": "R4",
+      "ok": true,
+      "detail": "blocking=3/>=3 flipped=0"
+    },
+    {
+      "id": "R5",
+      "ok": true,
+      "detail": "recording=2/>=2 lostBoundary=0"
+    },
+    {
+      "id": "R6",
+      "ok": true,
+      "detail": "assetRefs=68 missing=0"
+    },
+    {
+      "id": "R7",
+      "ok": true,
+      "detail": "rawNonAsset=2 classified=2 withReason=2"
+    },
+    {
+      "id": "R8",
+      "ok": true,
+      "detail": "match=true regState=85af15a8 regAudit=3727251b actState=85af15a8 actAudit=3727251b"
+    },
+    {
+      "id": "R9",
+      "ok": true,
+      "detail": "selftests=3/>=3 bad=0 restored=3"
+    },
+    {
+      "id": "R10",
+      "ok": true,
+      "detail": "scannedMd=4 flipHits=0 guardMissing=0"
+    }
+  ],
+  "metrics": {
+    "jsonCount": 14,
+    "mdCount": 4,
+    "deployScriptCount": 13,
+    "parsedOkCount": 14,
+    "withVerdictCount": 14,
+    "blockingTraceCount": 3,
+    "recordingTraceCount": 2,
+    "assetRefCount": 68,
+    "narrativeRefCount": 2,
+    "missingAssetRefCount": 0,
+    "demoDataMatch": true,
+    "selftestReproCount": 3,
+    "selftestRestoredCount": 3,
+    "selftestContentChanged": 0,
+    "contentChangedCount": 0,
+    "flipScanScannedMd": 4,
+    "flipHitCount": 0,
+    "totalRules": 10,
+    "passedRules": 10
+  },
+  "disclosure": {
+    "verdictScope": "PASS_LOCAL_READONLY_ONLY（仅本地只读自证，不替代任何外部验收；不重跑演练/浏览器取证/镜像构建）",
+    "failTraceClassification": "阻断型 FAIL 留痕（verdict=FAIL）与记录型留痕（verdict=PASS 但证据内记录边界）分类型核验；记录型不得误判为必须 FAIL，阻断型不得翻盘为 PASS",
+    "referenceClassification": "资产型引用必须存在；容器内路径（/app/index.js 报错栈）与历史构建产物名（app/dist/assets/...）归为叙述型/上下文型，如实登记不阻断、不静默删除",
+    "appendOnly": "selftest 复跑前预读原始 buffer、复跑后无条件还原，还原后 sha256 与复跑前逐字一致（contentChangedCount=0）",
+    "versionChainDuplicateTags": [
+      {
+        "tag": "server:v2",
+        "ids": [
+          "e541ce9ac27f",
+          "67146bb9fe6b",
+          "2b95f28ec93b"
+        ],
+        "occurrences": [
+          {
+            "id": "e541ce9ac27f",
+            "doc": "docs/DEPLOY-ROLLBACK-DRILL-2026-11-25.md",
+            "lineNo": 51
+          },
+          {
+            "id": "67146bb9fe6b",
+            "doc": "docs/DEPLOY-ROLLBACK-DRILL-WEB-2026-11-25.md",
+            "lineNo": 52
+          },
+          {
+            "id": "2b95f28ec93b",
+            "doc": "docs/DEPLOY-SAMEORIGIN-BROWSER-2026-11-25.md",
+            "lineNo": 80
+          }
+        ]
+      }
+    ],
+    "notCovered": [
+      "未重新执行部署演练 / 真实浏览器取证 / 镜像构建（只读核验既有证据，不重跑外部动作）",
+      "未重新运行全六门禁（本轮 app/src 零改动，仅新增 deploy 下 Node 脚本）",
+      "AC-22.1 / AC-40 / AC-45 / AC-03 / AC-38 判定维持 ⏸ 不翻盘；发布口径仍「内测 / 演示版」",
+      "5 项外部依赖、U5 报告口径统一、Java /api/v1 是否纳入生产对外链路均需授权 / 外部条件，本轮未擅动"
+    ]
+  },
+  "collected": {
+    "scanned": {
+      "jsonFiles": [
+        "docs/DEPLOY-API-BASE-DECOUPLE-2026-11-26.json",
+        "docs/DEPLOY-API-BASE-SELFTEST-2026-11-26.json",
+        "docs/DEPLOY-GATE-ISOLATED-2026-11-26.attempt1.json",
+        "docs/DEPLOY-GATE-ISOLATED-2026-11-26.attempt2.json",
+        "docs/DEPLOY-GATE-ISOLATED-2026-11-26.json",
+        "docs/DEPLOY-ROLLBACK-DRILL-2026-11-25-web-selftest.json",
+        "docs/DEPLOY-ROLLBACK-DRILL-2026-11-25-web.json",
+        "docs/DEPLOY-ROLLBACK-DRILL-2026-11-25.attempt1.json",
+        "docs/DEPLOY-ROLLBACK-DRILL-2026-11-25.attempt2.json",
+        "docs/DEPLOY-ROLLBACK-DRILL-2026-11-25.json",
+        "docs/DEPLOY-SAMEORIGIN-BROWSER-2026-11-25.attempt1.json",
+        "docs/DEPLOY-SAMEORIGIN-BROWSER-2026-11-25.json",
+        "docs/DEPLOY-SAMEORIGIN-BROWSER-2026-11-26.json",
+        "docs/DEPLOY-SAMEORIGIN-SELFTEST-2026-11-25.json"
+      ],
+      "mdFiles": [
+        "docs/DEPLOY-ROLLBACK-DRILL-2026-11-25.md",
+        "docs/DEPLOY-ROLLBACK-DRILL-WEB-2026-11-25.md",
+        "docs/DEPLOY-SAMEORIGIN-BROWSER-2026-11-25.md",
+        "docs/DEPLOY-API-BASE-DECOUPLE-2026-11-26.md"
+      ],
+      "deployScripts": [
+        "deploy/api-base-probe.cjs",
+        "deploy/api-base-verdict-selftest.cjs",
+        "deploy/api-base-verdict.cjs",
+        "deploy/browser-sameorigin.cjs",
+        "deploy/evidence-chain-probe.cjs",
+        "deploy/evidence-chain-selftest.cjs",
+        "deploy/evidence-chain-verdict.cjs",
+        "deploy/frontend-fingerprint-selftest.cjs",
+        "deploy/frontend-fingerprint.cjs",
+        "deploy/gate-isolated.cjs",
+        "deploy/rollback-drill.cjs",
+        "deploy/sameorigin-verdict-selftest.cjs",
+        "deploy/sameorigin-verdict.cjs"
+      ]
+    },
+    "jsonParse": [
+      {
+        "file": "docs/DEPLOY-API-BASE-DECOUPLE-2026-11-26.json",
+        "ok": true,
+        "isNonEmptyObject": true,
+        "hasVerdictField": true,
+        "verdict": "PASS_LOCAL_STATIC_ONLY",
+        "hasFatal": false,
+        "hasSameSource": true,
+        "topKeys": [
+          "artifact",
+          "generatedAt",
+          "verdict",
+          "fatal",
+          "sameSource",
+          "buildCommand",
+          "tempRoot",
+          "sourceChanges",
+          "scenarios",
+          "assertAll",
+          "disclosure"
+        ]
+      },
+      {
+        "file": "docs/DEPLOY-API-BASE-SELFTEST-2026-11-26.json",
+        "ok": true,
+        "isNonEmptyObject": true,
+        "hasVerdictField": true,
+        "verdict": "PASS",
+        "hasFatal": false,
+        "hasSameSource": true,
+        "topKeys": [
+          "artifact",
+          "generatedAt",
+          "sameSource",
+          "verdictSource",
+          "totalCases",
+          "passed",
+          "failed",
+          "verdictAllPass",
+          "liveSamples",
+          "cases",
+          "disclosure"
+        ]
+      },
+      {
+        "file": "docs/DEPLOY-GATE-ISOLATED-2026-11-26.attempt1.json",
+        "ok": true,
+        "isNonEmptyObject": true,
+        "hasVerdictField": true,
+        "verdict": "FAIL",
+        "hasFatal": false,
+        "hasSameSource": false,
+        "topKeys": [
+          "artifact",
+          "generatedAt",
+          "verdict",
+          "fatal",
+          "isolation",
+          "frontendInjection",
+          "gates",
+          "gateChecks",
+          "demoData",
+          "isolatedDataFiles",
+          "disclosure"
+        ]
+      },
+      {
+        "file": "docs/DEPLOY-GATE-ISOLATED-2026-11-26.attempt2.json",
+        "ok": true,
+        "isNonEmptyObject": true,
+        "hasVerdictField": true,
+        "verdict": "FAIL",
+        "hasFatal": false,
+        "hasSameSource": false,
+        "topKeys": [
+          "artifact",
+          "generatedAt",
+          "verdict",
+          "fatal",
+          "isolation",
+          "frontendInjection",
+          "gates",
+          "gateChecks",
+          "demoData",
+          "isolatedDataFiles",
+          "disclosure"
+        ]
+      },
+      {
+        "file": "docs/DEPLOY-GATE-ISOLATED-2026-11-26.json",
+        "ok": true,
+        "isNonEmptyObject": true,
+        "hasVerdictField": true,
+        "verdict": "PASS_ISOLATED_GATES_4_5_6",
+        "hasFatal": false,
+        "hasSameSource": false,
+        "topKeys": [
+          "artifact",
+          "generatedAt",
+          "verdict",
+          "fatal",
+          "isolation",
+          "frontendInjection",
+          "warmup",
+          "gates",
+          "gateChecks",
+          "demoData",
+          "isolatedDataFiles",
+          "disclosure"
+        ]
+      },
+      {
+        "file": "docs/DEPLOY-ROLLBACK-DRILL-2026-11-25-web-selftest.json",
+        "ok": true,
+        "isNonEmptyObject": true,
+        "hasVerdictField": true,
+        "verdict": "PASS",
+        "hasFatal": false,
+        "hasSameSource": true,
+        "topKeys": [
+          "selfTest",
+          "at",
+          "evidence",
+          "sameSource",
+          "cases",
+          "passed",
+          "total",
+          "allPass",
+          "verdict"
+        ]
+      },
+      {
+        "file": "docs/DEPLOY-ROLLBACK-DRILL-2026-11-25-web.json",
+        "ok": true,
+        "isNonEmptyObject": true,
+        "hasVerdictField": true,
+        "verdict": "PASS_LOCAL_DRILL_ONLY",
+        "hasFatal": false,
+        "hasSameSource": false,
+        "topKeys": [
+          "runId",
+          "startedAt",
+          "finishedAt",
+          "environment",
+          "steps",
+          "metrics",
+          "disclosure",
+          "verdict",
+          "fatal"
+        ]
+      },
+      {
+        "file": "docs/DEPLOY-ROLLBACK-DRILL-2026-11-25.attempt1.json",
+        "ok": true,
+        "isNonEmptyObject": true,
+        "hasVerdictField": true,
+        "verdict": "FAIL",
+        "hasFatal": true,
+        "hasSameSource": false,
+        "topKeys": [
+          "runId",
+          "startedAt",
+          "finishedAt",
+          "environment",
+          "steps",
+          "metrics",
+          "disclosure",
+          "verdict",
+          "fatal"
+        ]
+      },
+      {
+        "file": "docs/DEPLOY-ROLLBACK-DRILL-2026-11-25.attempt2.json",
+        "ok": true,
+        "isNonEmptyObject": true,
+        "hasVerdictField": true,
+        "verdict": "PASS_LOCAL_DRILL_ONLY",
+        "hasFatal": false,
+        "hasSameSource": false,
+        "topKeys": [
+          "runId",
+          "startedAt",
+          "finishedAt",
+          "environment",
+          "steps",
+          "metrics",
+          "disclosure",
+          "verdict",
+          "fatal"
+        ]
+      },
+      {
+        "file": "docs/DEPLOY-ROLLBACK-DRILL-2026-11-25.json",
+        "ok": true,
+        "isNonEmptyObject": true,
+        "hasVerdictField": true,
+        "verdict": "PASS_LOCAL_DRILL_ONLY",
+        "hasFatal": false,
+        "hasSameSource": false,
+        "topKeys": [
+          "runId",
+          "startedAt",
+          "finishedAt",
+          "environment",
+          "steps",
+          "metrics",
+          "disclosure",
+          "verdict",
+          "fatal"
+        ]
+      },
+      {
+        "file": "docs/DEPLOY-SAMEORIGIN-BROWSER-2026-11-25.attempt1.json",
+        "ok": true,
+        "isNonEmptyObject": true,
+        "hasVerdictField": true,
+        "verdict": "PASS_LOCAL_DRILL_ONLY",
+        "hasFatal": false,
+        "hasSameSource": true,
+        "topKeys": [
+          "verdict",
+          "ok",
+          "reason",
+          "checks",
+          "metrics",
+          "disclosure",
+          "sameSource",
+          "evidence"
+        ]
+      },
+      {
+        "file": "docs/DEPLOY-SAMEORIGIN-BROWSER-2026-11-25.json",
+        "ok": true,
+        "isNonEmptyObject": true,
+        "hasVerdictField": true,
+        "verdict": "PASS_LOCAL_DRILL_ONLY",
+        "hasFatal": false,
+        "hasSameSource": true,
+        "topKeys": [
+          "verdict",
+          "ok",
+          "reason",
+          "checks",
+          "metrics",
+          "disclosure",
+          "sameSource",
+          "evidence"
+        ]
+      },
+      {
+        "file": "docs/DEPLOY-SAMEORIGIN-BROWSER-2026-11-26.json",
+        "ok": true,
+        "isNonEmptyObject": true,
+        "hasVerdictField": true,
+        "verdict": "PASS_LOCAL_DRILL_ONLY",
+        "hasFatal": false,
+        "hasSameSource": true,
+        "topKeys": [
+          "verdict",
+          "ok",
+          "reason",
+          "checks",
+          "metrics",
+          "disclosure",
+          "sameSource",
+          "evidence"
+        ]
+      },
+      {
+        "file": "docs/DEPLOY-SAMEORIGIN-SELFTEST-2026-11-25.json",
+        "ok": true,
+        "isNonEmptyObject": true,
+        "hasVerdictField": true,
+        "verdict": "PASS",
+        "hasFatal": false,
+        "hasSameSource": true,
+        "topKeys": [
+          "verdict",
+          "total",
+          "passed",
+          "failed",
+          "judgmentUnchanged",
+          "cases",
+          "sameSource",
+          "generatedAt"
+        ]
+      }
+    ],
+    "failTraces": {
+      "blocking": [
+        {
+          "file": "docs/DEPLOY-ROLLBACK-DRILL-2026-11-25.attempt1.json",
+          "verdict": "FAIL",
+          "hasFatal": true,
+          "note": "带 fatal 的阻断型 FAIL"
+        },
+        {
+          "file": "docs/DEPLOY-GATE-ISOLATED-2026-11-26.attempt1.json",
+          "verdict": "FAIL",
+          "hasFatal": false,
+          "note": "verdict=FAIL 但 fatal=null（gate 隔离门禁 FAIL 留痕）"
+        },
+        {
+          "file": "docs/DEPLOY-GATE-ISOLATED-2026-11-26.attempt2.json",
+          "verdict": "FAIL",
+          "hasFatal": false,
+          "note": "verdict=FAIL 但 fatal=null（gate 隔离门禁 FAIL 留痕）"
+        }
+      ],
+      "recording": [
+        {
+          "file": "docs/DEPLOY-ROLLBACK-DRILL-2026-11-25.attempt2.json",
+          "verdict": "PASS_LOCAL_DRILL_ONLY",
+          "boundaryField": "metrics.faultInjection: firstFailAt=null, outageMs=null, sampleCount=4（探针无效证据）",
+          "preserved": true
+        },
+        {
+          "file": "docs/DEPLOY-SAMEORIGIN-BROWSER-2026-11-25.attempt1.json",
+          "verdict": "PASS_LOCAL_DRILL_ONLY",
+          "boundaryField": "evidence.routeResults[].ok=false（C:/Program Files/WorkBuddy/resources/vendor/PortableGit/#/basic/naming）",
+          "preserved": true
+        }
+      ]
+    },
+    "refs": {
+      "assetRefs": [
+        "docs/ACCEPTANCE-MATRIX.md",
+        "server/index.js",
+        "server/security.js",
+        "deploy/docker-compose.drill.yml",
+        "deploy/rollback-drill.cjs",
+        "deploy/nginx.conf.template",
+        "docs/DEPLOY-ROLLBACK-DRILL-2026-11-25.attempt1.json",
+        "docs/DEPLOY-ROLLBACK-DRILL-2026-11-25.attempt2.json",
+        "docs/DEPLOY-ROLLBACK-DRILL-2026-11-25.json",
+        "docs/DEPLOY-ROLLBACK-DRILL-WEB-2026-11-25.md",
+        "docs/DEPLOY-ROLLBACK-DRILL-2026-11-25-web.json",
+        "docs/DEPLOY-ROLLBACK-DRILL-2026-11-25-web-selftest.json",
+        "docs/DEPLOY-ROLLBACK-DRILL-2026-11-25.md",
+        "app/src/infra/repo.ts",
+        "deploy/frontend-fingerprint.cjs",
+        "deploy/frontend-fingerprint-selftest.cjs",
+        "docs/DEPLOYMENT.md",
+        "docs/DECISION-LIST.md",
+        "deploy/sameorigin-verdict.cjs",
+        "docs/DEPLOY-SAMEORIGIN-BROWSER-2026-11-25.md",
+        "app/src/infra/apiV1.ts",
+        "docs/DEPLOY-API-BASE-DECOUPLE-2026-11-26.md",
+        "app/vite.config.ts",
+        "deploy/sameorigin-verdict-selftest.cjs",
+        "docs/DEPLOY-SAMEORIGIN-SELFTEST-2026-11-25.json",
+        "app/scripts/browser-path.cjs",
+        "docs/DEPLOY-SAMEORIGIN-BROWSER-2026-11-25.attempt1.json",
+        "docs/DEPLOY-SAMEORIGIN-BROWSER-2026-11-25.json",
+        "server/data/state-T-1001.json",
+        "server/data/audit-T-1001.json",
+        "deploy/browser-sameorigin.cjs",
+        "docs/DEPLOY-SAMEORIGIN-BROWSER-2026-11-26.json",
+        "docs/REST-CONTRACT.md",
+        "deploy/api-base-verdict.cjs",
+        "deploy/api-base-probe.cjs",
+        "deploy/api-base-verdict-selftest.cjs",
+        "deploy/gate-isolated.cjs",
+        "docs/DEPLOY-API-BASE-DECOUPLE-2026-11-26.json",
+        "docs/DEPLOY-API-BASE-SELFTEST-2026-11-26.json",
+        "docs/DEPLOY-GATE-ISOLATED-2026-11-26.json",
+        "docs/DEPLOY-GATE-ISOLATED-2026-11-26.attempt1.json",
+        "docs/DEPLOY-EVIDENCE-CHAIN-2026-11-27.md",
+        "server/test-security.cjs",
+        "deploy/evidence-chain-verdict.cjs",
+        "deploy/evidence-chain-selftest.cjs",
+        "deploy/evidence-chain-probe.cjs",
+        "docs/GAP-ANALYSIS.md",
+        "docs/METHODOLOGY-CORRECTION.md",
+        "docs/SRS-CHANGE-REQUEST.md",
+        "docs/PRD-SAMPLE-REVIEW-TEMPLATE-2026-11-24.md",
+        "docs/DESIGN-SAMPLE-REVIEW-TEMPLATE-2026-11-24.md",
+        "app/src/domain/sampleReviewTemplate.ts",
+        "app/src/domain/stateMigration.ts",
+        "app/tests/sampleReviewTemplate.spec.ts",
+        "app/tests/stateMigration.spec.ts",
+        "app/src/domain/types.ts",
+        "app/src/data/seed.ts",
+        "app/src/store/app.ts",
+        "docs/WF-001-WorkflowForm-Spec.md",
+        "app/src/domain/sampleReviewEngine.ts",
+        "app/src/domain/workflowForm.ts",
+        "app/src/domain/flowEngine.ts",
+        "docs/BUSINESS-CLOSURE-REVIEW-2026-11-25.md",
+        "app/src/infra/persistScheduler.ts",
+        "app/tests/persistCoalescing.spec.ts",
+        "app/src/router/index.ts",
+        "app/src/domain/locale.ts",
+        "docs/DEPLOY-EVIDENCE-CHAIN-SELFTEST-2026-11-27.json"
+      ],
+      "narrativeRefs": [
+        {
+          "ref": "app/index.js",
+          "reason": "Docker 容器内报错栈路径 /app/... 被正则误提取，非仓库资产（上下文型误命中）",
+          "hits": [
+            {
+              "doc": "docs/DEPLOY-ROLLBACK-DRILL-2026-11-25.md",
+              "lineNo": 26,
+              "text": "#   Require stack: /app/index.js"
+            }
+          ]
+        },
+        {
+          "ref": "app/dist/assets/index-BGV6B8Cf.js",
+          "reason": "历史构建产物名，dist/ 被 .gitignore 排除；引用属历史叙述，非当前资产",
+          "hits": [
+            {
+              "doc": "docs/DEPLOY-SAMEORIGIN-BROWSER-2026-11-25.md",
+              "lineNo": 94,
+              "text": "对照：本地未注入基线 `app/dist/assets/index-BGV6B8Cf.js` 中 `8787` / `8088` 各 1 处。上轮 v2 前端为 `index-BGV6B8Cf.js`（未注入），本轮 v3 为 `index-9vWnONnC.js`（注入），同源源码、不同注入，指纹真实不同。"
+            }
+          ]
+        }
+      ],
+      "rawNonAssetRefs": [
+        "app/index.js",
+        "app/dist/assets/index-BGV6B8Cf.js"
+      ],
+      "missingAssetRefs": []
+    },
+    "demoData": {
+      "registered": {
+        "state": "85af15a8c8e8a92fd5985303072116a53cf5f66d99c44d160a689af1759a3b4f",
+        "audit": "3727251ba41fa006609f2b9ce6fb3dd5925d84dd0026402dfc39b066b7cb85c5",
+        "source": "docs/DEPLOY-SAMEORIGIN-BROWSER-2026-11-25.md:185-186"
+      },
+      "actual": {
+        "state": "85af15a8c8e8a92fd5985303072116a53cf5f66d99c44d160a689af1759a3b4f",
+        "audit": "3727251ba41fa006609f2b9ce6fb3dd5925d84dd0026402dfc39b066b7cb85c5",
+        "source": "crypto sha256 直算当前 server/data/*"
+      }
+    },
+    "selftests": [
+      {
+        "script": "deploy/frontend-fingerprint-selftest.cjs",
+        "evidenceFile": "docs/DEPLOY-ROLLBACK-DRILL-2026-11-25-web-selftest.json",
+        "exit": 0,
+        "restored": true,
+        "beforeSha": "04f8f7b343b069990939508122c20060ab872b24e1fff4e9a0370ab97ba57eba",
+        "afterSha": "04f8f7b343b069990939508122c20060ab872b24e1fff4e9a0370ab97ba57eba",
+        "history": {
+          "verdict": "PASS",
+          "passed": 8,
+          "total": 8
+        },
+        "reproduced": {
+          "verdict": "PASS",
+          "passed": 8,
+          "total": 8
+        },
+        "verdictMatchesHistory": true,
+        "verdict": "PASS",
+        "stdoutTail": "[PASS] 变异：仅 indexSha256 不同也应 distinct=true |  | === PASS (8/8) === | 证据: F:\\WorkBuddy\\2026-10-31-19-11-31\\docs\\DEPLOY-ROLLBACK-DRILL-2026-11-25-web-selftest.json",
+        "stderrTail": "",
+        "spawnError": null
+      },
+      {
+        "script": "deploy/sameorigin-verdict-selftest.cjs",
+        "evidenceFile": "docs/DEPLOY-SAMEORIGIN-SELFTEST-2026-11-25.json",
+        "exit": 0,
+        "restored": true,
+        "beforeSha": "dfc6f3e945c6784d7cc1d8da1eaddb67315aff8f6d53f4ef9dda124ac1381fbe",
+        "afterSha": "dfc6f3e945c6784d7cc1d8da1eaddb67315aff8f6d53f4ef9dda124ac1381fbe",
+        "history": {
+          "verdict": "PASS",
+          "passed": 12,
+          "total": 12
+        },
+        "reproduced": {
+          "verdict": "PASS",
+          "passed": 12,
+          "total": 12
+        },
+        "verdictMatchesHistory": true,
+        "verdict": "PASS",
+        "stdoutTail": "    } |   ] | } | WROTE F:\\WorkBuddy\\2026-10-31-19-11-31\\docs\\DEPLOY-SAMEORIGIN-SELFTEST-2026-11-25.json",
+        "stderrTail": "",
+        "spawnError": null
+      },
+      {
+        "script": "deploy/api-base-verdict-selftest.cjs",
+        "evidenceFile": "docs/DEPLOY-API-BASE-SELFTEST-2026-11-26.json",
+        "exit": 0,
+        "restored": true,
+        "beforeSha": "3086795c1c81b9c04413b19351096de45522bb8e298f1582358ad60746455369",
+        "afterSha": "3086795c1c81b9c04413b19351096de45522bb8e298f1582358ad60746455369",
+        "history": {
+          "verdict": "PASS",
+          "passed": 20,
+          "total": 20
+        },
+        "reproduced": {
+          "verdict": "PASS",
+          "passed": 20,
+          "total": 20
+        },
+        "verdictMatchesHistory": true,
+        "verdict": "PASS",
+        "stdoutTail": "  PASS  C20 变异·assertAll 场景重复 |  | === SELFTEST 20/20 PASS, verdictAllPass=true === | evidence: F:\\WorkBuddy\\2026-10-31-19-11-31\\docs\\DEPLOY-API-BASE-SELFTEST-2026-11-26.json",
+        "stderrTail": "",
+        "spawnError": null
+      }
+    ],
+    "flipScan": {
+      "scannedMd": [
+        {
+          "doc": "docs/DEPLOY-ROLLBACK-DRILL-2026-11-25.md",
+          "lineCount": 150
+        },
+        {
+          "doc": "docs/DEPLOY-ROLLBACK-DRILL-WEB-2026-11-25.md",
+          "lineCount": 227
+        },
+        {
+          "doc": "docs/DEPLOY-SAMEORIGIN-BROWSER-2026-11-25.md",
+          "lineCount": 257
+        },
+        {
+          "doc": "docs/DEPLOY-API-BASE-DECOUPLE-2026-11-26.md",
+          "lineCount": 173
+        }
+      ],
+      "assertedClaims": [],
+      "guardMissing": []
+    },
+    "versionChainDuplicateTags": [
+      {
+        "tag": "server:v2",
+        "ids": [
+          "e541ce9ac27f",
+          "67146bb9fe6b",
+          "2b95f28ec93b"
+        ],
+        "occurrences": [
+          {
+            "id": "e541ce9ac27f",
+            "doc": "docs/DEPLOY-ROLLBACK-DRILL-2026-11-25.md",
+            "lineNo": 51
+          },
+          {
+            "id": "67146bb9fe6b",
+            "doc": "docs/DEPLOY-ROLLBACK-DRILL-WEB-2026-11-25.md",
+            "lineNo": 52
+          },
+          {
+            "id": "2b95f28ec93b",
+            "doc": "docs/DEPLOY-SAMEORIGIN-BROWSER-2026-11-25.md",
+            "lineNo": 80
+          }
+        ]
+      }
+    ]
+  },
+  "reproductionNote": "复跑本 probe 会因 generatedAt 产生不同字节，但 R1~R10 判定字段、contentChangedCount=0、三份 selftest 证据 sha256 保持不变；本探针自身不改变任何既有文件。"
+}

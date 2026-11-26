@@ -336,3 +336,19 @@
 | 零污染 | 正式 `server/data` sha256 前后一致（`85af15a8…b4f` / `3727251b…8c5`）；演练容器/卷/网络与 v4 tag 清理，用户原有 v1 基线 `latest` 两镜像保留 |
 
 新增证据：`docs/DEPLOY-API-BASE-DECOUPLE-2026-11-26.md` / `.json`、`docs/DEPLOY-API-BASE-SELFTEST-2026-11-26.json`、`docs/DEPLOY-GATE-ISOLATED-2026-11-26.json` / `.attempt1.json` / `.attempt2.json`、`docs/DEPLOY-SAMEORIGIN-BROWSER-2026-11-26.json`。
+
+### 12.9 部署补验证据链总核验（2026-11-27，收口级只读自证）
+
+三项待办（Java `/api/v1` 生产化拍板、U5 报告口径统一、5 项外部依赖）**均需授权 / 外部条件，本轮未擅动**；按「只推进可本地自证」原则，选择把前 5 轮累积证据链做一次收口级总核验，非新设计决策、不碰任何文案 / 菜单 / 数字。
+
+| 项 | 定案 |
+|---|---|
+| 单一权威 | `deploy/evidence-chain-verdict.cjs`（R1~R10 纯函数、全 fail-closed）；`evidence-chain-probe.cjs`（采集）与 `evidence-chain-selftest.cjs`（回退自证）同源复用，未内联复制判定 |
+| 分类型核验 | FAIL 留痕分「阻断型 3 份（`verdict=FAIL`）」与「记录型 2 份（`verdict=PASS` 但证据内记录探针无效 / 路由转换失败）」；引用分「资产型 63 条（零断链）」与「叙述型·上下文型 2 条（如实登记 reason）」；R7 专防「删样本凑零断链」翻盘 |
+| 可复现 + 零改写 | 3 个既有 selftest 复跑 `8/8`·`12/12`·`20/20` 判定与历史一致；复跑前预读原始 buffer、复跑后无条件还原，**3 份证据 sha256 前后逐字一致、`contentChangedCount=0`** |
+| 回退自证 | `23/23` 死 / 活 / 空 / 变异样本；D8 阻断型翻盘、D11/D12 叙述型删样本、D16 未还原均被对应规则抓为 FAIL；L3/L4 变异活样本仍全绿 |
+| 零污染 / 不翻盘 | 正式 `server/data` sha256 登记值 vs 当前实际逐字一致（`85af15a8…b4f` / `3727251b…8c5`）；4 份报告 `flipHits=0`、`guardMissing=0`；`AC-22.1 / AC-40 / AC-45 / AC-03 / AC-38` 维持 ⏸ 一字未改，发布口径继续「内测 / 演示版」 |
+| 如实披露 | `mofeng-drill-server:v2` 跨轮 3 个镜像 ID（`e541ce9ac27f` / `67146bb9fe6b` / `2b95f28ec93b`）为每轮独立构建的真实 tag 复用，不静默去重；`vitest 1796→1862`、`audit count=3（隔离卷）vs 18（正式后端）` 均为合法演进 / 容器差异，历史数字零改写 |
+| 边界 | 本轮**未重跑**部署演练 / 浏览器取证 / 镜像构建 / 全六门禁（`app/src` 零改动，仅新增 deploy 下 Node 脚本）；判定 `PASS_LOCAL_READONLY_ONLY` 仅本地只读自证，不替代外部验收 |
+
+新增证据：`docs/DEPLOY-EVIDENCE-CHAIN-2026-11-27.md` / `.json`、`docs/DEPLOY-EVIDENCE-CHAIN-SELFTEST-2026-11-27.json`。
