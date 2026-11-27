@@ -388,3 +388,22 @@
 | 判定 | `AC-22.1 / AC-40 / AC-45 / AC-03 / AC-38` **维持 ⏸ 一字未改**；发布口径继续「内测 / 演示版」；5 项外部依赖不变 |
 
 新增证据：`docs/U5-CALIBER-DIFF-2026-11-27.md` / `.json`。
+
+### 12.12 无障碍 overlay 真实违规整改（2026-11-27，用户点单第 3 项）
+
+| 项 | 内容 |
+|---|---|
+| 指令 | 用户点单勾选第 3 项「无障碍 overlay 整改」；按勾选顺序在 `#577` / `#578` 收口后推进 |
+| 判定 | `REMEDIATION_EFFECT_VERIFIED_READONLY` —— **只读子集复测，非全量取证、非验收判定、不替代 `a11y:overlay`** |
+| 违规定位 | 真实 Chromium 探针（abort 所有非 GET）钉死：标签 12 条去重 4 个 = `NamingView.vue:161/165/167/171`「命名约束」`.seg-box` 内 4 个 `el-input__inner`（复合 `el-form-item` 只关联首个控件，placeholder 不算可读标签）；键盘 6 条 = `el-input-number__decrease/increase` 的 `span[role=button]`（无 tabindex、Vue `addEventListener` 绑定） |
+| 改动 | **仅 1 文件 4 行**：4 个 `el-input` 补 `aria-label`（命名约束：前缀 / 最小长度 / 最大长度 / 禁用字符）；不扩大到未取证的「编码模板」分段输入；页面文案 / 菜单 / 标题零改动 |
+| 整改效果 | 零写入子集复测（3 路由 / `abortedNonGet=0`）：**标签 12 → 0**；键盘 **6 如实保持**；动态键盘实测 **2/2 PASS**（ArrowUp 1→2、ArrowDown 2→1 还原，focus `outline: solid/2px`） |
+| 键盘 6 项定性 | Element Plus 框架能力边界 + 快照不识别 `addEventListener` 的口径边界；**不改业务模板、不改判定逻辑、不删样本、不翻盘为 0** |
+| 六门禁 | 1 `vue-tsc 0` / 2 `vitest 117 文件 1862 用例` / 3 `vite build OK`（`index-CfUV0RTP.js`）/ 4 `smoke 104/104 errors=0` / 5 `e2e 33/0` / 6 `chainOk=true count=18 checked=18 brokenAt=null`，**全部隔离跑**（`MOFENG_DATA_DIR` 临时目录 + 独立 8790/4182），`demoData.unchanged=true` |
+| a11y 四件套 | `gate-selftest 11/11`、`keyboard --strict exit=0`、`evidence exit=0`（静态 27 / 0 / 4 未翻盘）、**`overlay exit=1` 如实披露** |
+| overlay exit=1 根因 | 全量取证窗口内 `/trial/inspect`「新增」触发 `POST /api/audit` + `PUT /api/state` 各 1 次 → `writeAttempts=2`，红线保护判「取证无效」；属样件评审页既有写入与只读白名单的适配缺口，**与本次 aria-label 整改无关**（8787 与隔离 8790 两段均复现）；不放宽判定、不冒充通过 |
+| 零改写 / 零污染 | 6 份历史 A11Y 证据 + `DEPLOY-GATE-ISOLATED-2026-11-26.json` 重跑覆盖后**全部还原**（sha256 与备份逐字一致）；正式演示数据 `85af15a8…b4f` / `3727251b…8c5` 首尾一致；证据链基线 `1ec19042…0544` 不变，不重跑 `evidence-chain-probe.cjs` |
+| 待拍板 | A11Y-D1~D4（overlay 白名单排除项 / 扩采 SKIP / 编码模板同类补齐 / 升级 `hasKeyHandler` 判定）全部 `needsAuthorization=true` / `decided=false` |
+| 判定 | `AC-22.1 / AC-40 / AC-45 / AC-03 / AC-38` **维持 ⏸ 一字未改**；发布口径继续「内测 / 演示版」；5 项外部依赖不变；剩余能力边界（6 项键盘违规 / 50 SKIP / 屏幕阅读器 / 复合键）不得翻盘为达标 |
+
+新增证据：主报告 `docs/A11Y-OVERLAY-REMEDIATION-2026-11-27.md` / `.json`、整改前基线 `docs/A11Y-OVERLAY-BEFORE-REMEDIATION-2026-11-27.json`；新增可复现采集器 `app/scripts/a11y-overlay-remediation.cjs`。

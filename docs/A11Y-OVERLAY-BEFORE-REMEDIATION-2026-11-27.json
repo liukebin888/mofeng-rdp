@@ -1,0 +1,1315 @@
+{
+  "generatedAt": "2026-11-24T12:10:34.327Z",
+  "base": "http://127.0.0.1:4181",
+  "apiBase": "http://127.0.0.1:8787",
+  "tenant": "T-1001",
+  "method": "真实 Chromium 遍历 router 全量路由 → 点击白名单只读触发按钮打开 .el-dialog/.el-drawer → 页面同源接口 window.__MOFENG_A11Y__.collectIn(selector) 采集容器内控件（判定走 domain/auditFromSnapshots）",
+  "readOnlyPolicy": {
+    "whitelist": "新增|添加|编辑|查看|详情|配置|导入|设置|选择|分配|维护|预览",
+    "blacklist": "提交|保存|删除|下达|审批|通过|驳回|发布|关闭|确定|导出|清空|重置|执行|运行|生成|下发|发送|取消",
+    "note": "黑名单硬过滤，绝不点击写入类按钮；只采集不填表不提交；Escape/关闭按钮关闭并确认不可见；脚本仅在浏览器内临时打 data-a11y-ovl 定位标记，不写业务数据"
+  },
+  "metrics": {
+    "routesTotal": 104,
+    "pagesVisited": 104,
+    "triggerAttempts": 64,
+    "overlayOpened": 14,
+    "skipCount": 50,
+    "abortedWriteCount": 0,
+    "apiMissingCount": 0,
+    "totalElements": 235,
+    "totalInteractive": 157,
+    "totalControls": 104,
+    "distinctSampleCounts": 7,
+    "keyboardViolationCount": 6,
+    "labelViolationCount": 12,
+    "uniqueKeyboardViolationCount": 6,
+    "uniqueLabelViolationCount": 4,
+    "focusIndicatorMissing": 6,
+    "excludedContainers": 75,
+    "nonGetRequestCount": 0,
+    "writeAttempts": 0,
+    "initPhaseWriteCount": 0,
+    "pageErrorCount": 0,
+    "stateRevBefore": 1,
+    "stateRevAfter": 1,
+    "auditCountBefore": 0,
+    "auditCountAfter": 0,
+    "stateRevUnchanged": true,
+    "auditCountUnchanged": true,
+    "markersReadable": true,
+    "collectInAvailable": true,
+    "mutationOk": true,
+    "mutationSource": "real-overlay",
+    "closedOkCount": 14
+  },
+  "backendMarkers": {
+    "before": {
+      "stateRev": 1,
+      "auditCount": 0,
+      "stateOk": true,
+      "auditOk": true,
+      "error": ""
+    },
+    "after": {
+      "stateRev": 1,
+      "auditCount": 0,
+      "stateOk": true,
+      "auditOk": true,
+      "error": ""
+    },
+    "stateRevUnchanged": true,
+    "auditCountUnchanged": true,
+    "markersReadable": true
+  },
+  "nonGetRequests": [],
+  "mutation": {
+    "source": "real-overlay",
+    "ok": true,
+    "labelDetected": true,
+    "keyboardDetected": true,
+    "labelRecovered": true,
+    "keyboardRecovered": true,
+    "residue": false,
+    "during": {
+      "sampledElements": 15,
+      "keyboardViolations": [
+        "A11Y-OVL-MUT-NO-FOCUS"
+      ],
+      "labelViolations": [
+        "A11Y-OVL-MUT-NO-LABEL"
+      ]
+    },
+    "after": {
+      "sampledElements": 13,
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    "path": "/admin/org",
+    "triggerText": "+新增",
+    "container": ".el-dialog"
+  },
+  "overlays": [
+    {
+      "path": "/admin/org",
+      "triggerIndex": 0,
+      "triggerText": "导入",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/admin/org",
+      "triggerIndex": 1,
+      "triggerText": "+新增",
+      "triggerTag": "BUTTON",
+      "status": "OK",
+      "container": ".el-dialog",
+      "closed": true,
+      "note": "",
+      "writeEvents": [],
+      "evidence": {
+        "sampledElements": 13,
+        "interactiveCount": 8,
+        "controlCount": 5,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "snapshotsCount": 13,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 8 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 5 个表单控件具备可读标签",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/admin/overload",
+      "triggerIndex": 0,
+      "triggerText": "供需与超分配",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/basic/customer",
+      "triggerIndex": 0,
+      "triggerText": "新增客户",
+      "triggerTag": "BUTTON",
+      "status": "OK",
+      "container": ".el-dialog",
+      "closed": true,
+      "note": "",
+      "writeEvents": [],
+      "evidence": {
+        "sampledElements": 12,
+        "interactiveCount": 7,
+        "controlCount": 4,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 4,
+        "evidenceCollected": true
+      },
+      "snapshotsCount": 12,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 7 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 4 个表单控件具备可读标签",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/basic/customer",
+      "triggerIndex": 1,
+      "triggerText": "编辑",
+      "triggerTag": "BUTTON",
+      "status": "OK",
+      "container": ".el-dialog",
+      "closed": true,
+      "note": "",
+      "writeEvents": [],
+      "evidence": {
+        "sampledElements": 14,
+        "interactiveCount": 9,
+        "controlCount": 4,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 4,
+        "evidenceCollected": true
+      },
+      "snapshotsCount": 14,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 9 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 4 个表单控件具备可读标签",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/basic/customer",
+      "triggerIndex": 2,
+      "triggerText": "编辑",
+      "triggerTag": "BUTTON",
+      "status": "OK",
+      "container": ".el-dialog",
+      "closed": true,
+      "note": "",
+      "writeEvents": [],
+      "evidence": {
+        "sampledElements": 14,
+        "interactiveCount": 9,
+        "controlCount": 4,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 4,
+        "evidenceCollected": true
+      },
+      "snapshotsCount": 14,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 9 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 4 个表单控件具备可读标签",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/basic/naming",
+      "triggerIndex": 0,
+      "triggerText": "新增规则",
+      "triggerTag": "BUTTON",
+      "status": "OK",
+      "container": ".el-dialog",
+      "closed": true,
+      "note": "",
+      "writeEvents": [],
+      "evidence": {
+        "sampledElements": 24,
+        "interactiveCount": 17,
+        "controlCount": 14,
+        "keyboardViolations": [],
+        "labelViolations": [
+          "el-id-2497-370",
+          "el-id-2497-371",
+          "el-id-2497-372",
+          "el-id-2497-373"
+        ],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 7,
+        "evidenceCollected": true
+      },
+      "snapshotsCount": 24,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 17 个交互元素键盘可达",
+      "labelOk": false,
+      "labelNote": "真实 DOM 取证 4/14 个控件缺标签",
+      "keyboardViolations": [],
+      "labelViolations": [
+        {
+          "id": "el-id-2497-370",
+          "hasLabel": false,
+          "labelText": ""
+        },
+        {
+          "id": "el-id-2497-371",
+          "hasLabel": false,
+          "labelText": ""
+        },
+        {
+          "id": "el-id-2497-372",
+          "hasLabel": false,
+          "labelText": ""
+        },
+        {
+          "id": "el-id-2497-373",
+          "hasLabel": false,
+          "labelText": ""
+        }
+      ]
+    },
+    {
+      "path": "/basic/naming",
+      "triggerIndex": 1,
+      "triggerText": "编辑",
+      "triggerTag": "BUTTON",
+      "status": "OK",
+      "container": ".el-dialog",
+      "closed": true,
+      "note": "",
+      "writeEvents": [],
+      "evidence": {
+        "sampledElements": 24,
+        "interactiveCount": 17,
+        "controlCount": 14,
+        "keyboardViolations": [],
+        "labelViolations": [
+          "el-id-2497-370",
+          "el-id-2497-371",
+          "el-id-2497-372",
+          "el-id-2497-373"
+        ],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 7,
+        "evidenceCollected": true
+      },
+      "snapshotsCount": 24,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 17 个交互元素键盘可达",
+      "labelOk": false,
+      "labelNote": "真实 DOM 取证 4/14 个控件缺标签",
+      "keyboardViolations": [],
+      "labelViolations": [
+        {
+          "id": "el-id-2497-370",
+          "hasLabel": false,
+          "labelText": ""
+        },
+        {
+          "id": "el-id-2497-371",
+          "hasLabel": false,
+          "labelText": ""
+        },
+        {
+          "id": "el-id-2497-372",
+          "hasLabel": false,
+          "labelText": ""
+        },
+        {
+          "id": "el-id-2497-373",
+          "hasLabel": false,
+          "labelText": ""
+        }
+      ]
+    },
+    {
+      "path": "/basic/naming",
+      "triggerIndex": 2,
+      "triggerText": "编辑",
+      "triggerTag": "BUTTON",
+      "status": "OK",
+      "container": ".el-dialog",
+      "closed": true,
+      "note": "",
+      "writeEvents": [],
+      "evidence": {
+        "sampledElements": 24,
+        "interactiveCount": 17,
+        "controlCount": 14,
+        "keyboardViolations": [],
+        "labelViolations": [
+          "el-id-2497-370",
+          "el-id-2497-371",
+          "el-id-2497-372",
+          "el-id-2497-373"
+        ],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 7,
+        "evidenceCollected": true
+      },
+      "snapshotsCount": 24,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 17 个交互元素键盘可达",
+      "labelOk": false,
+      "labelNote": "真实 DOM 取证 4/14 个控件缺标签",
+      "keyboardViolations": [],
+      "labelViolations": [
+        {
+          "id": "el-id-2497-370",
+          "hasLabel": false,
+          "labelText": ""
+        },
+        {
+          "id": "el-id-2497-371",
+          "hasLabel": false,
+          "labelText": ""
+        },
+        {
+          "id": "el-id-2497-372",
+          "hasLabel": false,
+          "labelText": ""
+        },
+        {
+          "id": "el-id-2497-373",
+          "hasLabel": false,
+          "labelText": ""
+        }
+      ]
+    },
+    {
+      "path": "/basic/product",
+      "triggerIndex": 0,
+      "triggerText": "新增类别",
+      "triggerTag": "BUTTON",
+      "status": "OK",
+      "container": ".el-dialog",
+      "closed": true,
+      "note": "",
+      "writeEvents": [],
+      "evidence": {
+        "sampledElements": 5,
+        "interactiveCount": 4,
+        "controlCount": 1,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 1,
+        "evidenceCollected": true
+      },
+      "snapshotsCount": 5,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 4 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 1 个表单控件具备可读标签",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/basic/product",
+      "triggerIndex": 1,
+      "triggerText": "+新增产品线",
+      "triggerTag": "BUTTON",
+      "status": "OK",
+      "container": ".el-dialog",
+      "closed": true,
+      "note": "",
+      "writeEvents": [],
+      "evidence": {
+        "sampledElements": 9,
+        "interactiveCount": 6,
+        "controlCount": 3,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 3,
+        "evidenceCollected": true
+      },
+      "snapshotsCount": 9,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 6 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 3 个表单控件具备可读标签",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/basic/product",
+      "triggerIndex": 2,
+      "triggerText": "+新增产品",
+      "triggerTag": "BUTTON",
+      "status": "OK",
+      "container": ".el-dialog",
+      "closed": true,
+      "note": "",
+      "writeEvents": [],
+      "evidence": {
+        "sampledElements": 9,
+        "interactiveCount": 6,
+        "controlCount": 3,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 3,
+        "evidenceCollected": true
+      },
+      "snapshotsCount": 9,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 6 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 3 个表单控件具备可读标签",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/cost/deviation",
+      "triggerIndex": 0,
+      "triggerText": "供需与超分配",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/cost/evm",
+      "triggerIndex": 0,
+      "triggerText": "供需与超分配",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/cost/hours",
+      "triggerIndex": 0,
+      "triggerText": "供需与超分配",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/dev/ebom",
+      "triggerIndex": 0,
+      "triggerText": "尝试编辑已冻结结构",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/dev/ebom",
+      "triggerIndex": 1,
+      "triggerText": "查看齐套校验",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/dev/external-part-approval",
+      "triggerIndex": 0,
+      "triggerText": "新增",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/dev/external-part-approval",
+      "triggerIndex": 1,
+      "triggerText": "新增外购外协件认可",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "触发按钮点击失败（locator.click: Timeout 1500ms exceeded.）",
+      "writeEvents": []
+    },
+    {
+      "path": "/dev/gate",
+      "triggerIndex": 0,
+      "triggerText": "查看准入明细",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/dev/gate",
+      "triggerIndex": 1,
+      "triggerText": "查看准入明细",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/dev/gate",
+      "triggerIndex": 2,
+      "triggerText": "查看准入明细",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/dev/part-number-apply",
+      "triggerIndex": 0,
+      "triggerText": "新增",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/dev/part-number-apply",
+      "triggerIndex": 1,
+      "triggerText": "新增零件号申请",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "触发按钮点击失败（locator.click: Timeout 1500ms exceeded.）",
+      "writeEvents": []
+    },
+    {
+      "path": "/dev/requirements",
+      "triggerIndex": 0,
+      "triggerText": "查看追溯与覆盖率",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/dev/requirements",
+      "triggerIndex": 1,
+      "triggerText": "导入需求",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "触发按钮点击失败（locator.click: Timeout 1500ms exceeded.）",
+      "writeEvents": []
+    },
+    {
+      "path": "/dev/requirements",
+      "triggerIndex": 2,
+      "triggerText": "列配置",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "触发按钮点击失败（locator.click: Timeout 1500ms exceeded.）",
+      "writeEvents": []
+    },
+    {
+      "path": "/dev/software-release",
+      "triggerIndex": 0,
+      "triggerText": "新增",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/flow/apqp",
+      "triggerIndex": 0,
+      "triggerText": "查看流程",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/issue-risk/risk",
+      "triggerIndex": 0,
+      "triggerText": "+新增风险",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/issue-risk/risk",
+      "triggerIndex": 1,
+      "triggerText": "查看受影响门禁",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/plan/list",
+      "triggerIndex": 0,
+      "triggerText": "查看",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/plan/list",
+      "triggerIndex": 1,
+      "triggerText": "查看",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "触发按钮点击失败（locator.click: Timeout 1500ms exceeded.）",
+      "writeEvents": []
+    },
+    {
+      "path": "/plan/list",
+      "triggerIndex": 2,
+      "triggerText": "查看",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "触发按钮点击失败（locator.click: Timeout 1500ms exceeded.）",
+      "writeEvents": []
+    },
+    {
+      "path": "/plan/resource",
+      "triggerIndex": 0,
+      "triggerText": "裁决超分配",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/presale/apply",
+      "triggerIndex": 0,
+      "triggerText": "新增",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/presale/apply",
+      "triggerIndex": 1,
+      "triggerText": "新增立项",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "触发按钮点击失败（locator.click: Timeout 1500ms exceeded.）",
+      "writeEvents": []
+    },
+    {
+      "path": "/presale/presale-apply",
+      "triggerIndex": 0,
+      "triggerText": "新增",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/presale/presale-apply",
+      "triggerIndex": 1,
+      "triggerText": "新增前期交流",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "触发按钮点击失败（locator.click: Timeout 1500ms exceeded.）",
+      "writeEvents": []
+    },
+    {
+      "path": "/presale/quote-apply",
+      "triggerIndex": 0,
+      "triggerText": "新增",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/presale/quote-apply",
+      "triggerIndex": 1,
+      "triggerText": "新增报价",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "触发按钮点击失败（locator.click: Timeout 1500ms exceeded.）",
+      "writeEvents": []
+    },
+    {
+      "path": "/presale/scheme",
+      "triggerIndex": 0,
+      "triggerText": "新增",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/presale/scheme",
+      "triggerIndex": 1,
+      "triggerText": "新增技术方案",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "触发按钮点击失败（locator.click: Timeout 1500ms exceeded.）",
+      "writeEvents": []
+    },
+    {
+      "path": "/project/ots",
+      "triggerIndex": 0,
+      "triggerText": "新增",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/project/ots",
+      "triggerIndex": 1,
+      "triggerText": "新增OTS认可",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "触发按钮点击失败（locator.click: Timeout 1500ms exceeded.）",
+      "writeEvents": []
+    },
+    {
+      "path": "/project/plan",
+      "triggerIndex": 0,
+      "triggerText": "查看WBS与任务",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/project/ppap",
+      "triggerIndex": 0,
+      "triggerText": "新增",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/project/sop",
+      "triggerIndex": 0,
+      "triggerText": "新增",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/project/sop",
+      "triggerIndex": 1,
+      "triggerText": "新增SOP",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "触发按钮点击失败（locator.click: Timeout 1500ms exceeded.）",
+      "writeEvents": []
+    },
+    {
+      "path": "/project/task",
+      "triggerIndex": 0,
+      "triggerText": "新增",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/project/task",
+      "triggerIndex": 1,
+      "triggerText": "新增任务书",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "触发按钮点击失败（locator.click: Timeout 1500ms exceeded.）",
+      "writeEvents": []
+    },
+    {
+      "path": "/quality/risk",
+      "triggerIndex": 0,
+      "triggerText": "+新增风险",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/quality/risk",
+      "triggerIndex": 1,
+      "triggerText": "查看受影响门禁",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/quality/vuln",
+      "triggerIndex": 0,
+      "triggerText": "+新增风险",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/quality/vuln",
+      "triggerIndex": 1,
+      "triggerText": "查看受影响门禁",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/supply/purchase-plan",
+      "triggerIndex": 0,
+      "triggerText": "新增采购计划",
+      "triggerTag": "BUTTON",
+      "status": "OK",
+      "container": ".el-dialog",
+      "closed": true,
+      "note": "",
+      "writeEvents": [],
+      "evidence": {
+        "sampledElements": 37,
+        "interactiveCount": 23,
+        "controlCount": 15,
+        "keyboardViolations": [
+          "span#17",
+          "span#18",
+          "span#23",
+          "span#24"
+        ],
+        "labelViolations": [],
+        "focusIndicatorMissing": 4,
+        "excludedContainers": 14,
+        "evidenceCollected": true
+      },
+      "snapshotsCount": 37,
+      "keyboardOk": false,
+      "keyboardNote": "真实 DOM 取证 4/23 个交互元素不达标",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 15 个表单控件具备可读标签",
+      "keyboardViolations": [
+        {
+          "id": "span#17",
+          "tabbable": false,
+          "keyboardActivatable": false,
+          "focusIndicator": false
+        },
+        {
+          "id": "span#18",
+          "tabbable": false,
+          "keyboardActivatable": false,
+          "focusIndicator": false
+        },
+        {
+          "id": "span#23",
+          "tabbable": false,
+          "keyboardActivatable": false,
+          "focusIndicator": false
+        },
+        {
+          "id": "span#24",
+          "tabbable": false,
+          "keyboardActivatable": false,
+          "focusIndicator": false
+        }
+      ],
+      "labelViolations": []
+    },
+    {
+      "path": "/supply/sample-purchase",
+      "triggerIndex": 0,
+      "triggerText": "新增样件采购",
+      "triggerTag": "BUTTON",
+      "status": "OK",
+      "container": ".el-dialog",
+      "closed": true,
+      "note": "",
+      "writeEvents": [],
+      "evidence": {
+        "sampledElements": 24,
+        "interactiveCount": 15,
+        "controlCount": 10,
+        "keyboardViolations": [
+          "span#11",
+          "span#12"
+        ],
+        "labelViolations": [],
+        "focusIndicatorMissing": 2,
+        "excludedContainers": 9,
+        "evidenceCollected": true
+      },
+      "snapshotsCount": 24,
+      "keyboardOk": false,
+      "keyboardNote": "真实 DOM 取证 2/15 个交互元素不达标",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 10 个表单控件具备可读标签",
+      "keyboardViolations": [
+        {
+          "id": "span#11",
+          "tabbable": false,
+          "keyboardActivatable": false,
+          "focusIndicator": false
+        },
+        {
+          "id": "span#12",
+          "tabbable": false,
+          "keyboardActivatable": false,
+          "focusIndicator": false
+        }
+      ],
+      "labelViolations": []
+    },
+    {
+      "path": "/supply/supplier",
+      "triggerIndex": 0,
+      "triggerText": "查看试制需求",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/system/data",
+      "triggerIndex": 0,
+      "triggerText": "导入",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/system/data",
+      "triggerIndex": 1,
+      "triggerText": "+新增",
+      "triggerTag": "BUTTON",
+      "status": "OK",
+      "container": ".el-dialog",
+      "closed": true,
+      "note": "",
+      "writeEvents": [],
+      "evidence": {
+        "sampledElements": 13,
+        "interactiveCount": 8,
+        "controlCount": 5,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 5,
+        "evidenceCollected": true
+      },
+      "snapshotsCount": 13,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 8 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 5 个表单控件具备可读标签",
+      "keyboardViolations": [],
+      "labelViolations": []
+    },
+    {
+      "path": "/system/dict",
+      "triggerIndex": 0,
+      "triggerText": "新增码值",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/trial/kitting",
+      "triggerIndex": 0,
+      "triggerText": "查看门禁（Gate4）",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/trial/samples",
+      "triggerIndex": 0,
+      "triggerText": "查看门禁（Gate4）",
+      "triggerTag": "BUTTON",
+      "status": "SKIP",
+      "container": "",
+      "closed": null,
+      "note": "点击后未出现可见 .el-dialog / .el-drawer（未打开 overlay）",
+      "writeEvents": []
+    },
+    {
+      "path": "/workbench/light-task-board",
+      "triggerIndex": 0,
+      "triggerText": "+新增字段",
+      "triggerTag": "BUTTON",
+      "status": "OK",
+      "container": ".el-dialog",
+      "closed": true,
+      "note": "",
+      "writeEvents": [],
+      "evidence": {
+        "sampledElements": 13,
+        "interactiveCount": 11,
+        "controlCount": 8,
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "focusIndicatorMissing": 0,
+        "excludedContainers": 2,
+        "evidenceCollected": true
+      },
+      "snapshotsCount": 13,
+      "keyboardOk": true,
+      "keyboardNote": "真实 DOM 取证 11 个交互元素键盘可达",
+      "labelOk": true,
+      "labelNote": "真实 DOM 取证 8 个表单控件具备可读标签",
+      "keyboardViolations": [],
+      "labelViolations": []
+    }
+  ],
+  "keyboardViolations": [
+    {
+      "path": "/supply/purchase-plan",
+      "trigger": "新增采购计划",
+      "container": ".el-dialog",
+      "id": "span#17",
+      "tabbable": false,
+      "keyboardActivatable": false,
+      "focusIndicator": false
+    },
+    {
+      "path": "/supply/purchase-plan",
+      "trigger": "新增采购计划",
+      "container": ".el-dialog",
+      "id": "span#18",
+      "tabbable": false,
+      "keyboardActivatable": false,
+      "focusIndicator": false
+    },
+    {
+      "path": "/supply/purchase-plan",
+      "trigger": "新增采购计划",
+      "container": ".el-dialog",
+      "id": "span#23",
+      "tabbable": false,
+      "keyboardActivatable": false,
+      "focusIndicator": false
+    },
+    {
+      "path": "/supply/purchase-plan",
+      "trigger": "新增采购计划",
+      "container": ".el-dialog",
+      "id": "span#24",
+      "tabbable": false,
+      "keyboardActivatable": false,
+      "focusIndicator": false
+    },
+    {
+      "path": "/supply/sample-purchase",
+      "trigger": "新增样件采购",
+      "container": ".el-dialog",
+      "id": "span#11",
+      "tabbable": false,
+      "keyboardActivatable": false,
+      "focusIndicator": false
+    },
+    {
+      "path": "/supply/sample-purchase",
+      "trigger": "新增样件采购",
+      "container": ".el-dialog",
+      "id": "span#12",
+      "tabbable": false,
+      "keyboardActivatable": false,
+      "focusIndicator": false
+    }
+  ],
+  "labelViolations": [
+    {
+      "path": "/basic/naming",
+      "trigger": "新增规则",
+      "container": ".el-dialog",
+      "id": "el-id-2497-370",
+      "hasLabel": false,
+      "labelText": ""
+    },
+    {
+      "path": "/basic/naming",
+      "trigger": "新增规则",
+      "container": ".el-dialog",
+      "id": "el-id-2497-371",
+      "hasLabel": false,
+      "labelText": ""
+    },
+    {
+      "path": "/basic/naming",
+      "trigger": "新增规则",
+      "container": ".el-dialog",
+      "id": "el-id-2497-372",
+      "hasLabel": false,
+      "labelText": ""
+    },
+    {
+      "path": "/basic/naming",
+      "trigger": "新增规则",
+      "container": ".el-dialog",
+      "id": "el-id-2497-373",
+      "hasLabel": false,
+      "labelText": ""
+    },
+    {
+      "path": "/basic/naming",
+      "trigger": "编辑",
+      "container": ".el-dialog",
+      "id": "el-id-2497-370",
+      "hasLabel": false,
+      "labelText": ""
+    },
+    {
+      "path": "/basic/naming",
+      "trigger": "编辑",
+      "container": ".el-dialog",
+      "id": "el-id-2497-371",
+      "hasLabel": false,
+      "labelText": ""
+    },
+    {
+      "path": "/basic/naming",
+      "trigger": "编辑",
+      "container": ".el-dialog",
+      "id": "el-id-2497-372",
+      "hasLabel": false,
+      "labelText": ""
+    },
+    {
+      "path": "/basic/naming",
+      "trigger": "编辑",
+      "container": ".el-dialog",
+      "id": "el-id-2497-373",
+      "hasLabel": false,
+      "labelText": ""
+    },
+    {
+      "path": "/basic/naming",
+      "trigger": "编辑",
+      "container": ".el-dialog",
+      "id": "el-id-2497-370",
+      "hasLabel": false,
+      "labelText": ""
+    },
+    {
+      "path": "/basic/naming",
+      "trigger": "编辑",
+      "container": ".el-dialog",
+      "id": "el-id-2497-371",
+      "hasLabel": false,
+      "labelText": ""
+    },
+    {
+      "path": "/basic/naming",
+      "trigger": "编辑",
+      "container": ".el-dialog",
+      "id": "el-id-2497-372",
+      "hasLabel": false,
+      "labelText": ""
+    },
+    {
+      "path": "/basic/naming",
+      "trigger": "编辑",
+      "container": ".el-dialog",
+      "id": "el-id-2497-373",
+      "hasLabel": false,
+      "labelText": ""
+    }
+  ],
+  "pageErrors": []
+}

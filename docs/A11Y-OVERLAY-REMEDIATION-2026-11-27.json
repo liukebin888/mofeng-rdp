@@ -1,0 +1,288 @@
+{
+  "verdict": "REMEDIATION_EFFECT_VERIFIED_READONLY",
+  "nature": "只读子集复测，非全量 104 路由取证、非验收判定、不替代 a11y:overlay；只证明整改效果与框架边界",
+  "generatedAt": "2026-11-27T13:41:29.150Z",
+  "base": "http://127.0.0.1:5178",
+  "sameSource": "window.__MOFENG_A11Y__.collectIn → infra/accessibilityProbe → domain/auditFromSnapshots",
+  "zeroWrite": {
+    "policy": "page.route 主动 abort 所有非 GET 请求（含初始化/路由切换/overlay 打开）",
+    "abortedNonGet": 0,
+    "pageErrors": 0,
+    "businessWriteAllowed": false
+  },
+  "before": {
+    "source": "docs/A11Y-OVERLAY-BEFORE-REMEDIATION-2026-11-27.json（取自 git HEAD 历史证据）",
+    "routesTotal": 104,
+    "labelViolationCount": 12,
+    "keyboardViolationCount": 6,
+    "skipCount": 50
+  },
+  "afterSubset": {
+    "routesChecked": 3,
+    "labelViolationCount": 0,
+    "keyboardViolationCount": 6,
+    "labelViolationIds": [],
+    "keyboardViolationIds": [
+      "span#17",
+      "span#18",
+      "span#23",
+      "span#24",
+      "span#11",
+      "span#12"
+    ]
+  },
+  "routes": [
+    {
+      "path": "/basic/naming",
+      "trigger": "新增规则",
+      "clicked": "新增规则",
+      "collectIn": {
+        "evidence": {
+          "sampledElements": 24,
+          "interactiveCount": 17,
+          "controlCount": 14,
+          "keyboardViolations": [],
+          "labelViolations": [],
+          "focusIndicatorMissing": 0,
+          "excludedContainers": 7,
+          "evidenceCollected": true
+        },
+        "keyboardViolations": [],
+        "labelViolations": [],
+        "violationDetail": [],
+        "snapshotsCount": 24
+      },
+      "dynamicKeyboard": {
+        "available": false
+      }
+    },
+    {
+      "path": "/supply/purchase-plan",
+      "trigger": "新增采购计划",
+      "clicked": "新增采购计划",
+      "collectIn": {
+        "evidence": {
+          "sampledElements": 37,
+          "interactiveCount": 23,
+          "controlCount": 15,
+          "keyboardViolations": [
+            "span#17",
+            "span#18",
+            "span#23",
+            "span#24"
+          ],
+          "labelViolations": [],
+          "focusIndicatorMissing": 4,
+          "excludedContainers": 14,
+          "evidenceCollected": true
+        },
+        "keyboardViolations": [
+          "span#17",
+          "span#18",
+          "span#23",
+          "span#24"
+        ],
+        "labelViolations": [],
+        "violationDetail": [
+          {
+            "id": "span#17",
+            "tag": "span",
+            "cls": "el-input-number__decrease is-disabled",
+            "role": "button",
+            "tabindex": null,
+            "ariaLabel": "减少数值",
+            "html": "<span role=\"button\" aria-label=\"减少数值\" class=\"el-input-number__decrease is-disabled\"><i class=\"el-icon\"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1024 1024\"><path fill=\"currentColor\" d=\"M128 544h768a32 32 0 1 0 0-64H128a32 32 0 0 0 0 64\"></path></svg></i></span>"
+          },
+          {
+            "id": "span#18",
+            "tag": "span",
+            "cls": "el-input-number__increase",
+            "role": "button",
+            "tabindex": null,
+            "ariaLabel": "增加数值",
+            "html": "<span role=\"button\" aria-label=\"增加数值\" class=\"el-input-number__increase\"><i class=\"el-icon\"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1024 1024\"><path fill=\"currentColor\" d=\"M480 480V128a32 32 0 0 1 64 0v352h352a32 32 0 1 1 0 64H544v352a32 32 0 1 1-64 0V544H128a32 32 0 0 1 0-64z\"></path></svg></i></span>"
+          },
+          {
+            "id": "span#23",
+            "tag": "span",
+            "cls": "el-input-number__decrease is-disabled",
+            "role": "button",
+            "tabindex": null,
+            "ariaLabel": "减少数值",
+            "html": "<span role=\"button\" aria-label=\"减少数值\" class=\"el-input-number__decrease is-disabled\"><i class=\"el-icon\"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1024 1024\"><path fill=\"currentColor\" d=\"M128 544h768a32 32 0 1 0 0-64H128a32 32 0 0 0 0 64\"></path></svg></i></span>"
+          },
+          {
+            "id": "span#24",
+            "tag": "span",
+            "cls": "el-input-number__increase",
+            "role": "button",
+            "tabindex": null,
+            "ariaLabel": "增加数值",
+            "html": "<span role=\"button\" aria-label=\"增加数值\" class=\"el-input-number__increase\"><i class=\"el-icon\"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1024 1024\"><path fill=\"currentColor\" d=\"M480 480V128a32 32 0 0 1 64 0v352h352a32 32 0 1 1 0 64H544v352a32 32 0 1 1-64 0V544H128a32 32 0 0 1 0-64z\"></path></svg></i></span>"
+          }
+        ],
+        "snapshotsCount": 37
+      },
+      "dynamicKeyboard": {
+        "available": true,
+        "before": "1",
+        "focusedElementIsInput": true,
+        "focusOutline": "solid/2px",
+        "stepperSpans": [
+          {
+            "cls": "el-input-number__decrease is-disabled",
+            "role": "button",
+            "tabindex": null,
+            "ariaLabel": "减少数值"
+          },
+          {
+            "cls": "el-input-number__increase",
+            "role": "button",
+            "tabindex": null,
+            "ariaLabel": "增加数值"
+          },
+          {
+            "cls": "el-input-number__decrease is-disabled",
+            "role": "button",
+            "tabindex": null,
+            "ariaLabel": "减少数值"
+          },
+          {
+            "cls": "el-input-number__increase",
+            "role": "button",
+            "tabindex": null,
+            "ariaLabel": "增加数值"
+          }
+        ],
+        "afterArrowUp": "2",
+        "afterArrowDown": "1",
+        "arrowUpIncremented": true,
+        "arrowDownRestored": true
+      }
+    },
+    {
+      "path": "/supply/sample-purchase",
+      "trigger": "新增样件采购",
+      "clicked": "新增样件采购",
+      "collectIn": {
+        "evidence": {
+          "sampledElements": 24,
+          "interactiveCount": 15,
+          "controlCount": 10,
+          "keyboardViolations": [
+            "span#11",
+            "span#12"
+          ],
+          "labelViolations": [],
+          "focusIndicatorMissing": 2,
+          "excludedContainers": 9,
+          "evidenceCollected": true
+        },
+        "keyboardViolations": [
+          "span#11",
+          "span#12"
+        ],
+        "labelViolations": [],
+        "violationDetail": [
+          {
+            "id": "span#11",
+            "tag": "span",
+            "cls": "el-input-number__decrease is-disabled",
+            "role": "button",
+            "tabindex": null,
+            "ariaLabel": "减少数值",
+            "html": "<span role=\"button\" aria-label=\"减少数值\" class=\"el-input-number__decrease is-disabled\"><i class=\"el-icon\"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1024 1024\"><path fill=\"currentColor\" d=\"M128 544h768a32 32 0 1 0 0-64H128a32 32 0 0 0 0 64\"></path></svg></i></span>"
+          },
+          {
+            "id": "span#12",
+            "tag": "span",
+            "cls": "el-input-number__increase",
+            "role": "button",
+            "tabindex": null,
+            "ariaLabel": "增加数值",
+            "html": "<span role=\"button\" aria-label=\"增加数值\" class=\"el-input-number__increase\"><i class=\"el-icon\"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1024 1024\"><path fill=\"currentColor\" d=\"M480 480V128a32 32 0 0 1 64 0v352h352a32 32 0 1 1 0 64H544v352a32 32 0 1 1-64 0V544H128a32 32 0 0 1 0-64z\"></path></svg></i></span>"
+          }
+        ],
+        "snapshotsCount": 24
+      },
+      "dynamicKeyboard": {
+        "available": true,
+        "before": "1",
+        "focusedElementIsInput": true,
+        "focusOutline": "solid/2px",
+        "stepperSpans": [
+          {
+            "cls": "el-input-number__decrease is-disabled",
+            "role": "button",
+            "tabindex": null,
+            "ariaLabel": "减少数值"
+          },
+          {
+            "cls": "el-input-number__increase",
+            "role": "button",
+            "tabindex": null,
+            "ariaLabel": "增加数值"
+          }
+        ],
+        "afterArrowUp": "2",
+        "afterArrowDown": "1",
+        "arrowUpIncremented": true,
+        "arrowDownRestored": true
+      }
+    }
+  ],
+  "keyboardBoundary": {
+    "element": "Element Plus el-input-number 内部 el-input-number__decrease / __increase span",
+    "staticSnapshotFacts": "role=button + aria-label 存在，但无 tabindex、无 onkeydown 属性（Vue 用 addEventListener 绑定），focus() 无 computed style 变化 → 快照判 keyboardActivatable=false / focusIndicator=false",
+    "dynamicProof": {
+      "checked": 2,
+      "passed": 2,
+      "note": "原生 input 聚焦后 outline=solid/2px（焦点可见）；ArrowUp 1→2、ArrowDown 2→1 真实生效并还原"
+    },
+    "verdict": "框架能力边界 + 快照口径边界，非真实键盘缺陷；不删样本、不改判定、不把 6 项翻盘为 0"
+  },
+  "fullOverlayGate": {
+    "exit": 1,
+    "reason": "全量 a11y:overlay 在 /trial/inspect「新增」按钮取证窗口内检出 POST /api/audit + PUT /api/state 各 1 次，红线保护判「取证无效」，如实披露不冒充通过",
+    "unrelatedToThisRemediation": true,
+    "note": "该写入是样件评审页既有行为，与 NamingView.vue 的 aria-label 整改无关；两段不同后端（8787 与隔离 8790）均复现"
+  },
+  "staticBaselineUnchanged": true,
+  "acceptanceNotFlipped": {
+    "items": [
+      "AC-22.1",
+      "AC-40",
+      "AC-45",
+      "AC-03",
+      "AC-38"
+    ],
+    "status": "⏸ 外部依赖，一字未改",
+    "releaseWording": "内测 / 演示版"
+  },
+  "pendingDecisions": [
+    {
+      "id": "A11Y-D1",
+      "item": "是否把 /trial/inspect「新增」加入 a11y:overlay 只读触发白名单的排除项（或调整取证时序）以恢复全量脚本 exit=0",
+      "needsAuthorization": true,
+      "decided": false
+    },
+    {
+      "id": "A11Y-D2",
+      "item": "是否把 50 个 SKIP / 屏幕阅读器 / 复合键纳入后续取证覆盖",
+      "needsAuthorization": true,
+      "decided": false
+    },
+    {
+      "id": "A11Y-D3",
+      "item": "是否对「编码模板」分段输入补同类 aria-label（当前取证态未展开，无违规证据）",
+      "needsAuthorization": true,
+      "decided": false
+    },
+    {
+      "id": "A11Y-D4",
+      "item": "是否升级 hasKeyHandler 判定以识别 addEventListener（属判定口径变更，须独立死活空变异自证）",
+      "needsAuthorization": true,
+      "decided": false
+    }
+  ]
+}

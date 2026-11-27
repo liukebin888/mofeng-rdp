@@ -158,17 +158,17 @@
             <div class="seg-box">
               <div class="seg-row">
                 <span class="dim" style="width: 60px">前缀</span>
-                <el-input v-model="form.namePattern.prefix" size="small" placeholder="如 DOC-（可空）" style="width: 180px" />
+                <el-input v-model="form.namePattern.prefix" size="small" aria-label="命名约束：前缀" placeholder="如 DOC-（可空）" style="width: 180px" />
               </div>
               <div class="seg-row">
                 <span class="dim" style="width: 60px">长度</span>
-                <el-input v-model.number="form.namePattern.minLength" size="small" type="number" placeholder="最小" style="width: 80px" />
+                <el-input v-model.number="form.namePattern.minLength" size="small" aria-label="命名约束：最小长度" type="number" placeholder="最小" style="width: 80px" />
                 <span class="dim">~</span>
-                <el-input v-model.number="form.namePattern.maxLength" size="small" type="number" placeholder="最大" style="width: 80px" />
+                <el-input v-model.number="form.namePattern.maxLength" size="small" aria-label="命名约束：最大长度" type="number" placeholder="最大" style="width: 80px" />
               </div>
               <div class="seg-row">
                 <span class="dim" style="width: 60px">禁用字符</span>
-                <el-input v-model="form.namePattern.forbidden" size="small" placeholder="正则，如 \d 禁用数字" style="width: 180px" />
+                <el-input v-model="form.namePattern.forbidden" size="small" aria-label="命名约束：禁用字符" placeholder="正则，如 \d 禁用数字" style="width: 180px" />
               </div>
               <div class="seg-row">
                 <span class="dim" style="width: 60px">大小写</span>
