@@ -465,3 +465,7 @@
 | 网络 | 本地提交因代理 `Empty reply / 502` 未推送，`api.github.com=200` / `github.com=000`；按纪律停止重试、不走 API 合并、不伪造 `0 0`，恢复后补推 |
 
 新增证据：主报告 `docs/BUSINESS-CLOSURE-IMPROVEMENT-2026-11-27.md`；`docs/URL-NAMESPACE-MIGRATION-2026-11-27.json` / `.md`（迁移，`verdict`）、`docs/EVM-REUSE-CONVERGENCE-2026-11-27.json`（核实，`verdict`）、`docs/A11Y-POST-MIGRATION-2026-11-27.json`（迁移后取证，`verdict`）；新增可复现脚本 `deploy/url-namespace-migration.cjs`、`deploy/evm-reuse-verify.cjs`；临时编排 `deploy/_a11y-migration-verify.cjs` 用完即删不进提交。
+
+> **终态补记（append，不改上表「网络」行的当时状态）**：收口时探活 `api.github.com=200` / `github.com=000`，一次补推成功 `d63ba2b..2c9d754 main -> main`，此前累积的 5 个待推提交（`cc36c17` / `4dd7e9c` / `c7fec13` / `8858105` / `2c9d754`）一次性全部落地；`ls-remote` 远端真实 HEAD 与本地一致，`main...origin/main = 0 0`、工作区干净、正式演示数据与全部历史证据 sha256 首尾一致。上文「未推送/待推」为提交时点如实状态，保留不改。
+>
+> **勘误（append，不改上节「新增证据」行原文）**：§12.15「新增证据」行中「`docs/URL-NAMESPACE-MIGRATION-2026-11-27.json` / `.md`」的 `/ .md` 为笔误 —— 迁移机器证据**只有 `.json` 一份**，无同名 `.md`；迁移的可读主报告是 `docs/BUSINESS-CLOSURE-IMPROVEMENT-2026-11-27.md`（§12.15 首行已列）。按本项目「历史文字零改写、如实 append 勘误」惯例保留原文、仅此声明，不产生删除行。

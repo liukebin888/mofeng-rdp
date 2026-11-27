@@ -154,6 +154,8 @@
 - 本地提交因代理链路抖动（`curl 56 / CONNECT tunnel 502 / Empty reply from server`）**未推送**；探活 `api.github.com=200` / `github.com=000`（超时）。按项目纪律**停止重试、不走 API 合并、保持提交历史完整、不伪造 `0 0`**，本地留提交待网络恢复后补推。
 - 恢复后第一步：`git -c http.sslBackend=schannel -c http.version=HTTP/1.1 push origin main`，复核 `main...origin/main = 0 0`、工作区干净、正式演示数据零污染。
 
+> **终态补记（append，不改上文）**：本轮收口时探活 `api.github.com=200` / `github.com=000`，按口径尝试一次补推即成功 —— `d63ba2b..2c9d754 main -> main`，**此前累积的 5 个待推提交一次性全部补推完成**（`cc36c17` / `4dd7e9c` / `c7fec13` / `8858105` / `2c9d754`）。`ls-remote` 复核远端真实 HEAD `2c9d7545a299aa918f8ddb5819e16cd1a64b0442` 与本地一致，`main...origin/main = 0 0`、工作区干净；正式演示数据 / 证据链基线 / 6 份历史 A11Y 证据 / 隔离门禁证据 sha256 首尾一致，零污染。上文「未推送/待推」为提交时点的如实状态，保留不改。
+
 ---
 
 ## 附：交付物索引与复现
