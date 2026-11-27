@@ -1,0 +1,335 @@
+{
+  "verdict": "READONLY_STATUS_SNAPSHOT_CHECK_FAILED",
+  "nature": "纯只读全景状态汇总；不改写任何验收判定、不翻盘、不新增放行结论、不替代 UAT / 测评 / 项目方拍板",
+  "generatedAt": "2026-11-27T13:56:00.797Z",
+  "headCommit": "d63ba2b",
+  "aheadBehind": "0 0",
+  "checks": [
+    {
+      "id": "R1",
+      "name": "远端同步 0 0 且 tracked 文件零修改",
+      "ok": true,
+      "detail": "ahead/behind=0 0 trackedDiff=none"
+    },
+    {
+      "id": "R2",
+      "name": "正式演示数据 2 份 sha256 零污染",
+      "ok": true,
+      "detail": "2/2 match"
+    },
+    {
+      "id": "R3",
+      "name": "证据链总核验基线 sha256 零改写",
+      "ok": true,
+      "detail": "1ec19042… match"
+    },
+    {
+      "id": "R4",
+      "name": "AC ⏸ 外部依赖完整 11 项且与汇总行一致",
+      "ok": true,
+      "detail": "header=true rows=11 ids=AC-03,AC-03.1,AC-21,AC-22,AC-22.1,AC-24,AC-25,AC-38,AC-39,AC-40,AC-45"
+    },
+    {
+      "id": "R5",
+      "name": "发布口径「有条件放行内测 / 演示版，未达正式生产发布门槛」",
+      "ok": true,
+      "detail": "复验报告 §五 命中"
+    },
+    {
+      "id": "R6",
+      "name": "复验报告 §四 8 项：2 项已闭环 / 5 项仍外部依赖 / 1 项部分闭环",
+      "ok": false,
+      "detail": "closed(~~)=0 openTitles=5/5"
+    },
+    {
+      "id": "R7",
+      "name": "Java /api/v1 D1~D8 全未决且判定为只读评估",
+      "ok": true,
+      "detail": "verdict=ASSESSMENT_ONLY_READONLY pendingCount=8 rules=10/10"
+    },
+    {
+      "id": "R8",
+      "name": "U5-D1~D4 与 A11Y-D1~D4 共 8 项全 needsAuthorization / undecided",
+      "ok": true,
+      "detail": "u5=4 a11y=4 allUndecided=true"
+    },
+    {
+      "id": "R9",
+      "name": "隔离门禁 4/5/6 历史有效证据未被改写",
+      "ok": true,
+      "detail": "PASS_ISOLATED_GATES_4_5_6 smoke=104/104 e2e=33/0 chainOk=true"
+    },
+    {
+      "id": "R10",
+      "name": "6 份历史 A11Y 证据 sha256 零改写",
+      "ok": true,
+      "detail": "6/6 match"
+    },
+    {
+      "id": "R11",
+      "name": "overlay 全量 exit=1 如实披露、静态基线未翻盘",
+      "ok": true,
+      "detail": "exit=1 staticUnchanged=true label=0 keyboard=6"
+    },
+    {
+      "id": "R12",
+      "name": "不翻盘护栏 5 项 AC 仍为 ⏸",
+      "ok": true,
+      "detail": "guard=AC-22.1,AC-40,AC-45,AC-03,AC-38 allHold=true"
+    }
+  ],
+  "allPassed": false,
+  "passedChecks": "11/12",
+  "releaseWording": {
+    "verdict": "有条件放行内测 / 演示版，未达正式生产发布门槛",
+    "source": "docs/EXPERT-REVIEW-RECHECK-2026-11-23.md §五",
+    "forbidden": "不得宣称正式生产发布；不得以单测/隔离演练替代真实压测、测评与 UAT 签署"
+  },
+  "acceptanceMatrix": {
+    "source": "docs/ACCEPTANCE-MATRIX.md:12 / :25~:89 / :119~:129",
+    "total": 85,
+    "passed": 36,
+    "conditional": 38,
+    "externalDependency": 11,
+    "externalDependencyIds": [
+      "AC-03",
+      "AC-03.1",
+      "AC-21",
+      "AC-22",
+      "AC-22.1",
+      "AC-24",
+      "AC-25",
+      "AC-38",
+      "AC-39",
+      "AC-40",
+      "AC-45"
+    ],
+    "breakdownSource": "docs/EXPERT-REVIEW-RECHECK-2026-11-23.md:54（36 通过 / 38 有条件 / 11 外部依赖）",
+    "noFlipGuardItems": [
+      "AC-22.1",
+      "AC-40",
+      "AC-45",
+      "AC-03",
+      "AC-38"
+    ],
+    "note": "11 项为完整 ⏸ 清单；5 项护栏代表项只用于不翻盘复核，不得据此把其余 6 项判为通过"
+  },
+  "externalDependencies": {
+    "source": "docs/EXPERT-REVIEW-RECHECK-2026-11-23.md §四（8 项清单，2026-11-23 时点）",
+    "remainingOpen": [
+      {
+        "no": 1,
+        "item": "性能压测与可靠性演练",
+        "ac": "AC-03/03.1/38/39/40",
+        "required": "k6 压测报告 + RTO/RPO 演练记录",
+        "status": "⏸ 外部依赖"
+      },
+      {
+        "no": 2,
+        "item": "等保三级 / 密评 / 国密网关",
+        "ac": "AC-24/25，C-30 判 FAIL",
+        "required": "有资质机构测评报告 + 网关协议扫描",
+        "status": "⏸ 外部依赖"
+      },
+      {
+        "no": 3,
+        "item": "真实 UAT 签署与试点报告",
+        "ac": "85 条 AC 无真人签署；AC-21/22",
+        "required": "逐条补证据并 UAT 签署",
+        "status": "⏸ 外部依赖"
+      },
+      {
+        "no": 7,
+        "item": "灰度/回滚/无状态部署演练",
+        "ac": "AC-22.1/45",
+        "required": "真实编排环境演练记录",
+        "status": "⏸ 外部依赖（本地隔离演练不等价，不翻盘）"
+      },
+      {
+        "no": 8,
+        "item": "AI 真实模型与短信网关凭据",
+        "ac": "AI 真实 Key 未注入，占位降级",
+        "required": "外部注入 Key 后 verify-wma.js 见 realModel:true",
+        "status": "⏸ 外部依赖"
+      }
+    ],
+    "closedInReview": [
+      {
+        "no": 4,
+        "item": "CI / 覆盖率 / 变异测试",
+        "status": "✅ P1 已闭环（.github/workflows/ci.yml + docs/CI-PIPELINE.md；Java jacoco 未配如实标注）"
+      },
+      {
+        "no": 5,
+        "item": "OpenAPI 3.1 落盘与契约测试",
+        "status": "✅ P0-6 已闭环（docs/OPENAPI-3.1.yaml + BACKEND-SELECTION.md + test-contract.cjs 19/19）"
+      }
+    ],
+    "partiallyClosed": [
+      {
+        "no": 6,
+        "item": "无障碍真实 DOM 取证",
+        "status": "🟡 取证机制 + 真实缺陷闭环 + P2-3 覆盖边界压缩；更窄覆盖边界保留，不判「无障碍 100% 达标」"
+      }
+    ],
+    "note": "隔离 Docker Compose 灰度/回滚/无状态演练已在独立 project/卷/端口完成并留证，但属本地演练，不等价于 §四 #7 要求的「真实编排环境演练记录」，故不翻盘"
+  },
+  "taskBoard": {
+    "source": "TaskList 会话工具实测（非文件可复现，如实标注，不伪装同源）",
+    "observedAtSnapshot": "生成本证据时",
+    "total": 578,
+    "completed": 576,
+    "inProgress": 0,
+    "pending": 2,
+    "pendingIds": [
+      121,
+      580
+    ],
+    "pendingItems": [
+      {
+        "id": 121,
+        "item": "合规底线落地：等保三级/密评/国密网关",
+        "status": "pending · 真实外部依赖，不翻盘"
+      },
+      {
+        "id": 580,
+        "item": "项目全景只读状态快照",
+        "status": "pending · 本任务，完成后应仅剩 #121"
+      }
+    ],
+    "descriptionMentionedPending": 8,
+    "caliberNote": "#580 描述写「8 个 pending」，为任务创建时的时点数；本快照实测 2 项。属时点差（#577/#578/#579 已闭环、#580 进行中），不改写任务描述、不伪造 8 项"
+  },
+  "pendingDecisions": {
+    "source": "docs/DEPLOY-JAVA-API-V1-IMPACT-2026-11-27.json / docs/U5-CALIBER-DIFF-2026-11-27.json / docs/A11Y-OVERLAY-REMEDIATION-2026-11-27.json",
+    "total": 16,
+    "groups": [
+      {
+        "group": "Java /api/v1 纳入生产对外链路",
+        "ids": "D1~D8",
+        "count": 8,
+        "verdict": "ASSESSMENT_ONLY_READONLY",
+        "items": [
+          "推翻裁决",
+          "认证拓扑",
+          "网关拆分",
+          "注入值与 CORS",
+          "重冻 OpenAPI",
+          "数据权威归一",
+          "编排与中间件",
+          "门禁范围与 PoC"
+        ],
+        "allNeedsAuthorization": true,
+        "allDecided": false
+      },
+      {
+        "group": "U5 报告口径统一",
+        "ids": "U5-D1,U5-D2,U5-D3,U5-D4",
+        "count": 4,
+        "verdict": "READONLY_DIFF_LIST_NO_CHANGE",
+        "items": [
+          "是否把报告 16/107 改为 18/104",
+          "是否在报告内追加口径说明+时点而不改数字",
+          "是否更新 router/index.ts:26 注释 16→18",
+          "是否统一 PRD / README / 报告全套口径"
+        ],
+        "allNeedsAuthorization": true,
+        "allDecided": false
+      },
+      {
+        "group": "无障碍 overlay 后续",
+        "ids": "A11Y-D1,A11Y-D2,A11Y-D3,A11Y-D4",
+        "count": 4,
+        "verdict": "REMEDIATION_EFFECT_VERIFIED_READONLY",
+        "items": [
+          "是否把 /trial/inspect「新增」加入 a11y:overlay 只读触发白名单的排除项（或调整取证时序）以恢复全量脚本 exit=0",
+          "是否把 50 个 SKIP / 屏幕阅读器 / 复合键纳入后续取证覆盖",
+          "是否对「编码模板」分段输入补同类 aria-label（当前取证态未展开，无违规证据）",
+          "是否升级 hasKeyHandler 判定以识别 addEventListener（属判定口径变更，须独立死活空变异自证）"
+        ],
+        "allNeedsAuthorization": true,
+        "allDecided": false
+      }
+    ],
+    "note": "16 项全部 needsAuthorization=true / decided=false；AI 未代替项目方拍板"
+  },
+  "closedHighlights": {
+    "source": "docs/DECISION-LIST.md §11 / §12 + docs/EXPERT-REVIEW-RECHECK-2026-11-23.md + docs/DEPLOY-GATE-ISOLATED-2026-11-26.json",
+    "phases": [
+      "P0-1~P0-6",
+      "P1",
+      "P2-1",
+      "P2-2",
+      "P2-3"
+    ],
+    "sixGates": {
+      "gate1": "vue-tsc --noEmit 0 error",
+      "gate2": "vitest 117 文件 / 1862 用例全绿（覆盖率 84.54/84.54/94.74/85.07）",
+      "gate3": "vite build OK",
+      "gate4": "smoke 104/104 errors=0（隔离）",
+      "gate5": "e2e 33 PASS / 0 FAIL（隔离）",
+      "gate6": "GET /api/audit chainOk=true count=18 checked=18 brokenAt=null",
+      "isolation": "MOFENG_DATA_DIR 临时目录 + 独立后端 8788 / preview 4181，demoData.unchanged=true"
+    },
+    "additionalAcceptance": [
+      "Node 安全 16/16、租户隔离 12/12、契约 19/19、短信 13/13",
+      "Java mvn test 474/474（JDK21）",
+      "a11y gate-selftest 11/11、keyboard --strict exit=0、evidence exit=0",
+      "证据链总核验 10/10 + selftest 41/41；Java 影响面评估 10/10",
+      "CI workflow（六门禁 + 覆盖率 + Node 验收 + Java 并行）",
+      "生产后端选型裁决 + OpenAPI 3.1 契约 + Dockerfile.security.js 缺陷修复 + VITE_API_BASE 同源注入"
+    ],
+    "demoDataIntact": "2/2 sha256 与基线一致（state rev=6 / audit 18 条）"
+  },
+  "capabilityBoundaries": [
+    {
+      "area": "无障碍",
+      "facts": "静态 104 路由基线 27 键盘违规 / 4 焦点缺失（快照口径，动态实测 7 tab 组 + 2 input-number 全 PASS）；overlay 内 6 项键盘违规如实保留；50/64 SKIP；屏幕阅读器实测、复合键、.el-drawer / 分步弹窗未采到；对比度仅 6 组令牌色值。不判「无障碍 100% 达标」"
+    },
+    {
+      "area": "overlay 全量取证",
+      "facts": "a11y-overlay.cjs 因 /trial/inspect「新增」触发 POST /api/audit + PUT /api/state 各 1 次被红线判 exit=1「取证无效」；不放宽判定、不删样本、不改白名单；整改效果由独立零写入子集复测证明"
+    },
+    {
+      "area": "Java /api/v1",
+      "facts": "生产对外唯一后端 = Node 8787；Java 8088 为内部领域计算联调契约；影响面评估为静态推演，零 /api/v1 运行时请求、未启动 Java 后端、未验证 GET 端点权限注解覆盖"
+    },
+    {
+      "area": "AI",
+      "facts": "每人自带 Key（仅 sessionStorage + 内存，不落库/不入审计/不入 git）；Key 未注入前占位降级不虚假接通；realModel 仅真实调用成功后 true"
+    },
+    {
+      "area": "部署演练",
+      "facts": "隔离 Docker Compose 回滚/无状态演练已留证，但属本地隔离环境，不等价于真实生产编排环境演练记录"
+    }
+  ],
+  "noFlip": {
+    "items": [
+      "AC-22.1",
+      "AC-40",
+      "AC-45",
+      "AC-03",
+      "AC-38"
+    ],
+    "status": "⏸ 外部依赖，一字未改",
+    "fullExternalCount": 11,
+    "releaseWording": "内测 / 演示版",
+    "externalDependenciesUnchanged": 5,
+    "note": "本快照只汇总既有判定，不新增放行结论、不把任何 ⏸ 改为通过、不把静态违规计数改为 0"
+  },
+  "sourceRefs": [
+    "docs/ACCEPTANCE-MATRIX.md",
+    "docs/EXPERT-REVIEW-RECHECK-2026-11-23.md",
+    "docs/DECISION-LIST.md",
+    "docs/DEPLOY-JAVA-API-V1-IMPACT-2026-11-27.json",
+    "docs/U5-CALIBER-DIFF-2026-11-27.json",
+    "docs/A11Y-OVERLAY-REMEDIATION-2026-11-27.json",
+    "docs/A11Y-OVERLAY.json",
+    "docs/DEPLOY-GATE-ISOLATED-2026-11-26.json",
+    "docs/DEPLOY-EVIDENCE-CHAIN-2026-11-27.json",
+    "server/data/state-T-1001.json",
+    "server/data/audit-T-1001.json"
+  ],
+  "reproduction": "node deploy/project-status-snapshot.cjs（纯只读；若任一 R1~R12 不通过则 verdict=READONLY_STATUS_SNAPSHOT_CHECK_FAILED 且 exit=1）",
+  "nonReproducibleDisclosure": "taskBoard 计数来自会话 TaskList 工具，非文件可复现；已如实标注，不伪装为脚本同源采集"
+}

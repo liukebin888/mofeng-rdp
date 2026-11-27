@@ -407,3 +407,22 @@
 | 判定 | `AC-22.1 / AC-40 / AC-45 / AC-03 / AC-38` **维持 ⏸ 一字未改**；发布口径继续「内测 / 演示版」；5 项外部依赖不变；剩余能力边界（6 项键盘违规 / 50 SKIP / 屏幕阅读器 / 复合键）不得翻盘为达标 |
 
 新增证据：主报告 `docs/A11Y-OVERLAY-REMEDIATION-2026-11-27.md` / `.json`、整改前基线 `docs/A11Y-OVERLAY-BEFORE-REMEDIATION-2026-11-27.json`；新增可复现采集器 `app/scripts/a11y-overlay-remediation.cjs`。
+
+### 12.13 项目全景只读状态快照（2026-11-27，用户点单第 4 项）
+
+| 项 | 内容 |
+|---|---|
+| 指令 | 用户点单勾选第 4 项「项目全景只读状态快照」，按勾选顺序在 `#577` / `#578` / `#579` 全部收口后推进 |
+| 判定 | `READONLY_STATUS_SNAPSHOT_NO_CHANGE` —— **纯只读汇总，不改写任何验收判定、不翻盘、不新增放行结论、不替代 UAT / 测评 / 项目方拍板** |
+| 发布口径 | **有条件放行内测 / 演示版，未达正式生产发布门槛**（`EXPERT-REVIEW-RECHECK-2026-11-23.md §五:80`）；不得宣称正式生产发布 |
+| 外部依赖 | **5 项仍开放**：性能压测与可靠性演练 / 等保三级·密评·国密网关 / 真实 UAT 签署 / 真实编排环境灰度回滚演练 / AI 真实 Key。§四 8 项中 #4 CI、#5 OpenAPI 契约已闭环，#6 无障碍为部分闭环（更窄覆盖边界保留）。隔离 Docker Compose 演练属本地演练，**不等价于真实编排环境记录，不翻盘** |
+| AC ⏸ | 85 条 = 36 通过 / 38 有条件 / **11 外部依赖**（`AC-03/03.1/21/22/22.1/24/25/38/39/40/45`）；`ACCEPTANCE-MATRIX.md:12` 汇总行 `⏸ 11` 一致。护栏 5 项（AC-22.1/40/45/03/38）是代表项而非 ⏸ 全集，不得据此把其余 6 项判通过 |
+| 任务面板 | 实测 **578 项 / 576 completed / 0 in_progress / 2 pending**（`#121`、`#580`）；`#580` 描述「8 个 pending」为创建时时点数，属**时点差**，不改写任务描述、不伪造 8 项。`TaskList` 为会话工具实测，机器证据已标注 `nonReproducibleDisclosure` |
+| 已闭环 | P0-1~P0-6 / P1 / P2-1~P2-3；六门禁全绿（vue-tsc 0、vitest 117 文件 1862 用例、vite build OK、smoke 104/104、e2e 33/0、chainOk true count=18）；Node 16/16·12/12·19/19·13/13、Java 474/474、a11y 11/11、证据链 10/10 + 41/41；演示数据 2/2 sha256 零污染 |
+| 未决项 | **16 项全 `needsAuthorization=true` / `decided=false`**：Java `/api/v1` D1~D8（8）、U5-D1~D4（4）、A11Y-D1~D4（4）；AI 未代替项目方拍板 |
+| 能力边界 | 静态 27 键盘 / 4 焦点缺失（快照口径）、overlay 6 键盘违规、50/64 SKIP、屏幕阅读器 / 复合键 / `.el-drawer` 未采到；全量 `a11y:overlay exit=1` 如实披露；Java 影响面为静态推演零运行时请求；AI Key 未注入占位降级；隔离演练非生产编排 |
+| 核对 | `deploy/project-status-snapshot.cjs` R1~R12 全 fail-closed，终态 **12/12 PASS / exit=0 / 基准 `d63ba2b`**；**attempt1 11/12（R6 FAIL）如实留痕**：采集器断言误用 `^~~N~~` 行首正则，而复验报告 §四 已闭环行实为 `| ~~4~~ |` / `| ~~5~~ |`（`:70/:71`），属采集器断言缺陷非项目状态缺陷，改为表格行匹配后 12/12；原始失败证据 `.attempt1.json` 完整保留 |
+| 零改写 / 零污染 | 新增 3 份状态快照资产 + 1 采集器，既有文档仅 append 本索引；不重跑 `evidence-chain-probe.cjs`（保 `jsonCount=14`）；正式演示数据 / 证据链基线 / 6 份历史 A11Y 证据 sha256 逐字一致；新增 `PROJECT-STATUS-SNAPSHOT-*.json` 全部带 `verdict` 以兼容既有证据链 R3 |
+| 判定 | `AC-22.1/40/45/03/38` **及全部 11 项 ⏸ 维持一字未改**；发布口径继续「内测 / 演示版」；5 项外部依赖不变；静态违规计数保持原样不改为 0；不宣称 Java 通道已打通、不判无障碍 100% 达标 |
+
+新增证据：主报告 `docs/PROJECT-STATUS-SNAPSHOT-2026-11-27.md`、机器证据 `.json`、首次失败留痕 `.attempt1.json`；新增可复现采集器 `deploy/project-status-snapshot.cjs`。
