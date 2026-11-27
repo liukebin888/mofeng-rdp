@@ -1,0 +1,204 @@
+{
+  "verdict": "READONLY_RECHECK_ALIGNED_WITH_EXISTING_RULINGS_NO_CHANGE",
+  "ok": true,
+  "passedRules": "10/10",
+  "generatedAt": "2026-11-27T14:43:17.629Z",
+  "baselineHead": "4dd7e9c",
+  "scope": "READONLY_ONLY",
+  "sourceReport": {
+    "path": "docs/BUSINESS-CLOSURE-REVIEW-2026-11-27.md",
+    "tracked": false,
+    "selfDeclared": "只读静态审查（路由/菜单、视图跳转、domain 引擎、store 编排、业务文档），未运行任何命令、未修改代码"
+  },
+  "caliberCorrection": {
+    "reportClaim": "一级菜单 18 组 / 二级菜单 107 / 视图文件 90 / domain 引擎 135 / store 6275 行",
+    "sourceMeasured": {
+      "menuGroups": 18,
+      "menuItems": 104,
+      "pathLiterals": 110
+    },
+    "identity": "110 = 104 菜单项 + 5 处 routes + 1 处类型声明",
+    "ruling": "docs/DECISION-LIST.md §11.5：以源码为准、不替报告改数"
+  },
+  "reportFindingsVerified": {
+    "portfolioPaths": [
+      "/cost/score",
+      "/cost/capacity",
+      "/cost/analysis",
+      "/cost/eps",
+      "/cost/gate-consistency"
+    ],
+    "deliveryPaths": [
+      "/supply/deliverables",
+      "/supply/ship",
+      "/supply/soft"
+    ],
+    "oldPathsPresent": [
+      "/cost/score",
+      "/cost/capacity",
+      "/cost/analysis",
+      "/cost/eps",
+      "/cost/gate-consistency",
+      "/supply/deliverables",
+      "/supply/ship",
+      "/supply/soft"
+    ],
+    "evmReuseLines": [
+      133,
+      134,
+      135,
+      206
+    ],
+    "routerCommentLine26": "16 个一级菜单，与 SOLUTION 11.1 一一对应",
+    "urlPrefixDoesNotBreakHighlight": true
+  },
+  "existingRulings": {
+    "q12KeepPath": true,
+    "q12RejectPathRewrite": true,
+    "q12I18nDegrade": true,
+    "q12EvidenceMismatch": true,
+    "q12BrowserPass": true,
+    "q13EvmNotNow": true,
+    "q14NoRestore": true,
+    "q14NoDeadLink": true,
+    "q14PortalTrap": true,
+    "u5NoRewrite": true,
+    "u5D3Pending": true,
+    "undecided16": true
+  },
+  "regressionRiskIfPathRewritten": {
+    "i18nSilentFallback": true,
+    "probeHardcoded": true,
+    "historicalA11yEvidenceMismatch": [
+      "docs/A11Y-EVIDENCE.json",
+      "docs/A11Y-EVIDENCE.md",
+      "docs/A11Y-KEYBOARD.json"
+    ],
+    "deepLinkBreak": true,
+    "browserRegressionEvidence": "§11.2 QA#9：方案 1（path 零改）真实浏览器 PASS=159 FAIL=0"
+  },
+  "impactFiles": [
+    "app/scripts/probe-consistency.cjs",
+    "docs/A11Y-EVIDENCE.json",
+    "docs/A11Y-EVIDENCE.md",
+    "docs/A11Y-KEYBOARD.json",
+    "docs/DECISION-LIST.md",
+    "app/src/router/index.ts",
+    "app/src/domain/locale.ts"
+  ],
+  "specDebt": {
+    "srsFun024": true,
+    "srsChapter12": true,
+    "srsClosureCriterion": true,
+    "prd311": true
+  },
+  "checks": [
+    {
+      "id": "R1",
+      "name": "复查报告存在且自述为只读静态审查",
+      "ok": true,
+      "detail": "报告存在=true"
+    },
+    {
+      "id": "R2",
+      "name": "报告 §八 5 条整改建议可逐条定位",
+      "ok": true,
+      "detail": "P0-1 / P1-2 / P1-3 / P1-4 / P2-5"
+    },
+    {
+      "id": "R3",
+      "name": "router 实测口径（校准报告「107 二级菜单」）",
+      "ok": true,
+      "detail": "实测 MENUS 组数=18 菜单项=104 path字面量=110；报告写 107 二级菜单"
+    },
+    {
+      "id": "R4",
+      "name": "8 条 URL 命名空间残留属实且尚无 /portfolio/* // /delivery/* 新路径",
+      "ok": true,
+      "detail": "命中旧路径=8/8；新路径=0/0"
+    },
+    {
+      "id": "R5",
+      "name": "菜单高亮不依赖 URL 前缀（如实纠正推断）",
+      "ok": true,
+      "detail": "meta.group 注入=true / layout 优先 meta=true / startsWith 仅 fallback=true"
+    },
+    {
+      "id": "R6",
+      "name": "改路径会触发 i18n 静默降级（真实回归风险）",
+      "ok": true,
+      "detail": "PageHeader 用 route.path 拼 key=true；locale 中英词条键={\"costScoreZh\":true,\"costScoreEn\":true,\"deliverablesZh\":true,\"deliverablesEn\":true}"
+    },
+    {
+      "id": "R7",
+      "name": "§11.2 Q12 已裁决「path 零改」并否决方案 2",
+      "ok": true,
+      "detail": "keepPath=true reject=true i18nRisk=true browserPASS=true"
+    },
+    {
+      "id": "R8",
+      "name": "§11.3 / §11.4 / §11.5 已覆盖 P0-1 / P1-4 / P2-5",
+      "ok": true,
+      "detail": "EvmNotNow=true noRestore=true noDeadLink=true noRewrite=true"
+    },
+    {
+      "id": "R9",
+      "name": "U5-D3 与 16 项未决全部 decided=false（AI 不越权）",
+      "ok": true,
+      "detail": "u5D3Pending=true undecided16=true"
+    },
+    {
+      "id": "R10",
+      "name": "改路径影响面含历史 A11Y 证据基线（零改写约束）",
+      "ok": true,
+      "detail": "引用旧路径文件数=7：probe-consistency.cjs, A11Y-EVIDENCE.json, A11Y-EVIDENCE.md, A11Y-KEYBOARD.json, DECISION-LIST.md, index.ts, locale.ts"
+    }
+  ],
+  "zeroChange": {
+    "businessCodeFilesModified": 0,
+    "menuOrTextModified": 0,
+    "historicalA11yEvidenceRewritten": 0,
+    "acceptanceMatrixFlipped": 0,
+    "demoDataTouched": 0,
+    "appendOnlyDocs": [
+      "docs/DECISION-LIST.md §12.14",
+      ".workbuddy/memory/2026-11-27.md"
+    ]
+  },
+  "pendingAuthorization": [
+    {
+      "id": "RECHECK-D1",
+      "item": "是否推翻 §11.2 Q12 裁决、授权把 8 条 URL 改为 /portfolio/* 与 /delivery/*（需承担 i18n 降级 / 探针 / A11Y 证据回归并全量同步）",
+      "needsAuthorization": true,
+      "decided": false
+    },
+    {
+      "id": "RECHECK-D2",
+      "item": "是否授权 U5-D3：把 router/index.ts:26 注释「16」改为「18」",
+      "needsAuthorization": true,
+      "decided": false
+    },
+    {
+      "id": "RECHECK-D3",
+      "item": "是否授权在 PRD §3.11 / SRS 第 12 章、FUN-024 追加「门户与协同已按 Q14 裁撤」的书面登记（不改既有正文、不恢复功能）",
+      "needsAuthorization": true,
+      "decided": false
+    },
+    {
+      "id": "RECHECK-D4",
+      "item": "是否授权 P2：EvmView 四处复用收敛（§11.3 已登记「本轮不实施」）",
+      "needsAuthorization": true,
+      "decided": false
+    },
+    {
+      "id": "RECHECK-D5",
+      "item": "是否把用户提供的第 3 轮复查报告纳入版本管理（当前未跟踪，原文零改写）",
+      "needsAuthorization": true,
+      "decided": false
+    }
+  ],
+  "disclosure": {
+    "assistantInferenceCorrected": "开工时推断「URL 前缀与 group key 不一致会导致 isGroupActive 高亮失效」，实测 router/index.ts:235 已注入 meta.group 且 AppLayout.vue:179-181 优先取 meta，startsWith 仅为 fallback，推断被证伪；报告 §六「不影响功能」判断准确，如实纠正不隐瞒",
+    "reportVsRulings": "报告 §八 5 条建议中：P1-2/P1-3 已被 §11.2 明确否决且带真实回归；P0-1 是 §11.4 既有用户裁决（非功能遗漏，报告不知情误判）；P1-4 = U5-D3 未决；P2-5 已被 §11.3 登记「本轮不实施」。无一条可直接照做，AI 不越权"
+  }
+}

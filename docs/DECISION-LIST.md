@@ -426,3 +426,22 @@
 | 判定 | `AC-22.1/40/45/03/38` **及全部 11 项 ⏸ 维持一字未改**；发布口径继续「内测 / 演示版」；5 项外部依赖不变；静态违规计数保持原样不改为 0；不宣称 Java 通道已打通、不判无障碍 100% 达标 |
 
 新增证据：主报告 `docs/PROJECT-STATUS-SNAPSHOT-2026-11-27.md`、机器证据 `.json`、首次失败留痕 `.attempt1.json`；新增可复现采集器 `deploy/project-status-snapshot.cjs`。
+
+### 12.14 第 3 轮业务闭环复查报告 · 只读核验与既有裁决对齐（2026-11-27，用户「按测试结果，进行改进」）
+
+| 项 | 内容 |
+|---|---|
+| 判定 | `READONLY_RECHECK_ALIGNED_WITH_EXISTING_RULINGS_NO_CHANGE` —— **只读核验 + 治理对齐，非整改实施、非验收、非放行** |
+| 依据 | 用户提供 `docs/BUSINESS-CLOSURE-REVIEW-2026-11-27.md`（第 3 轮，自述「只读静态审查，未运行任何命令、未修改代码」，当前 `??` 未跟踪、原文零改写） |
+| 核对 | `deploy/business-recheck-verify.cjs` R1~R10 全 fail-closed，**10/10 PASS / exit=0**；所有数字由 `fs.readFileSync` 实时读真实文件得到 |
+| 数字校准 | 报告写「二级菜单 107」，源码实测 `MENUS` **18 组 / 104 菜单项 / 110 个 `path:` 字面量**（110 = 104 + 5 + 1）；依 §11.5 **以源码为准、不替报告改数** |
+| P0-1 | 「会议决议→任务→督办」非功能遗漏，是 §11.4 Q14 既有用户裁决「彻底删除、只读说明、不恢复」，删除未留死链；报告因不知情误判 🔴。**但** `PRD.md:76 §3.11`、`SRS.md:332/375/462 FUN-024` 仍留旧章节与「会议决议转任务闭环可走通 1 次」验收标准，属**规格文档口径债**（唯一方向正确且不与裁决冲突的可改进项） |
+| P1-2 / P1-3 | 8 条 URL 改 `/portfolio/*` / `/delivery/*` **已被 §11.2 Q12 明确否决**（定案「保留全部 104 条 URL 一字不改」，QA#9 浏览器 `PASS=159 FAIL=0`）；实测 `PageHeader.vue:23/26` 用 `route.path` 拼 i18n key、`locale.ts:144/162/393/411` 词条键写死旧路径，改 path 会**静默降级到中文硬编码**；`probe-consistency.cjs` 硬编码 `/cost/score` 失效；7 文件引用旧路径（含 6 份零改写历史 A11Y 证据）失配 |
+| 实测纠正 | 开工推断「URL 前缀与 group key 不一致会使 `isGroupActive` 高亮失效」**被证伪**：`router/index.ts:235` 已注入 `meta.group`，`AppLayout.vue:179-181` 优先取 meta，`startsWith` 仅 fallback；报告 §六「不影响功能」判断准确，如实纠正不隐瞒 |
+| P1-4 / P2-5 | P1-4 = **U5-D3**（`decided=false`）；P2-5 已被 §11.3:216 登记「EvmView 4 处复用收敛属 P2，本轮不实施」 |
+| 结论 | §八 5 条建议中 **2 条已被否决且带真实回归、1 条是既有裁决误判、1 条是未决项、1 条是已登记不实施项，无一条可直接照做**；AI 不越权 |
+| 待拍板 | `RECHECK-D1~D5` 全部 `needsAuthorization=true / decided=false`：① 推翻 §11.2 改 8 条 URL ② U5-D3 注释 16→18 ③ PRD/SRS 追加裁撤登记 ④ EvmView 复用收敛 ⑤ 第 3 轮报告纳入版本管理；与既有 16 项未决并列 |
+| 零改写 / 零污染 | 业务代码 0 / 菜单文案 0 / 历史 A11Y 证据改写 0 / 验收矩阵翻盘 0（11 项 ⏸ 原样）/ 演示数据触碰 0；仅本索引与工作日志纯 append；发布口径继续「内测 / 演示版」 |
+| 网络 | 本地 `cc36c17` / `4dd7e9c` 因代理 `502` 待推，不反复重试、不走 API 合并、不伪造 `0 0` |
+
+新增证据：主报告 `docs/BUSINESS-CLOSURE-RECHECK-VERIFICATION-2026-11-27.md`、机器证据 `.json`（带 `verdict`）、新增可复现采集器 `deploy/business-recheck-verify.cjs`。
