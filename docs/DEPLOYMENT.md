@@ -319,3 +319,15 @@ node deploy/rollback-drill.cjs
 - 对 14 份历史证据 JSON / 4 份报告 / 13 个 deploy 脚本做收口级总核验：10/10 规则、63 条资产引用零断链、2 条叙述型·上下文型引用如实分类、阻断型 3 / 记录型 2 分类型核验、3 个 selftest 复跑判定一致且 `contentChangedCount=0`。
 - 正式 `server/data` sha256 报告登记值 vs 当前实际逐字一致；4 份报告零肯定式翻盘断言、零护栏表述缺失；`mofeng-drill-server:v2` 跨轮 3 个镜像 ID 如实披露、不静默去重。
 - 详见 `docs/DEPLOY-EVIDENCE-CHAIN-2026-11-27.md`；**判定 `PASS_LOCAL_READONLY_ONLY`（仅本地只读自证，不替代外部验收），AC 判定与发布口径仍维持 ⏸，不翻盘**。
+
+### 8.9 Java `/api/v1` 纳入生产对外链路 · 只读影响面评估索引（2026-11-27）
+
+本处仅追加索引，§8.1~§8.8 既有文字与数字零改写。用户点单「评估 Java 通道纳入」，按约定**只出只读影响面清单，不改配置、不落地、供拍板后再实施**：
+
+- 新增 `deploy/java-api-v1-impact-verdict.cjs`（R1~R10 纯函数单一权威 + 44 条事实 / 11 风险 / 8 待拍板清单）、`-selftest.cjs`（41/41 死活空变异）、`-probe.cjs`（真实逐行复核 + 护栏扫描 + sha256 活比对 + 契约兼容 + 零落地）。
+- 关键结论：`nginx.conf.template:27` 的 `location /api/` 是**前缀匹配**，`/api/v1/*` 会一并被转到 Node 8787（无该路由 → `server/index.js:1092` 404）；第 35 行 `proxy_set_header Authorization` 还会把前端 Java JWT 覆盖成 Node Token。生产镜像未注入 `VITE_API_V1_BASE`，默认回环 8088。三条路径（回环 / 相对 / 绝对）均不可达。
+- 影响面覆盖：网关前缀与凭据覆盖、双认证模型（Node 网关 Token vs Java 前端自签 JWT）、Java `AuthController` 可伪造任意身份、`{ok,...}` 18 错误码 vs `{code,message,data}` 6 常量、OpenAPI 未登记 17 端点、compose 无 Java + MySQL/Redis/ES/Kafka、Node 落盘审计链 vs Java 内存态哈希链双权威、Controller 层零 HTTP 测试。风险 **P0 3 / P1 5 / P2 3**，全部 ⏸ 待拍板；D1~D8 全部 `decided=false`，AI 未代替项目方决策。
+- 两处修错如实留痕：attempt1 `37/41`（R9 源码正则自指误命中，保留 `.attempt1.json`）；重跑 `40/41`（D32 暴露采集/判定不同源，收紧 R9 为三条件）→ 终态 **41/41**。
+- 契约兼容：3 份新增 `DEPLOY-*.json` 全部带 `verdict`，既有证据链总核验 R3 不会被拖垮；**本轮不重跑** `evidence-chain-probe.cjs`，其 `jsonCount=14` 历史指标零改写（写前/写后 sha256 一致）。
+- 门禁 1/2/3/6 只读复核通过（`vue-tsc 0` / `vitest 1862/1862、117 文件` / `vite build OK` / 审计链复算 `chainOk=true count=18 checked=18 brokenAt=null`），4/5 未重跑；正式 `server/data` sha256 零污染。
+- 详见 `docs/DEPLOY-JAVA-API-V1-IMPACT-2026-11-27.md`；**判定 `ASSESSMENT_ONLY_READONLY`（只读评估，非裁决、非验收、非放行、非实施），`AC-22.1 / AC-40 / AC-45 / AC-03 / AC-38` 维持 ⏸，发布口径仍「内测 / 演示版」，不翻盘**。

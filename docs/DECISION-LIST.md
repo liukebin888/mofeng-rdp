@@ -352,3 +352,23 @@
 | 边界 | 本轮**未重跑**部署演练 / 浏览器取证 / 镜像构建 / 全六门禁（`app/src` 零改动，仅新增 deploy 下 Node 脚本）；判定 `PASS_LOCAL_READONLY_ONLY` 仅本地只读自证，不替代外部验收 |
 
 新增证据：`docs/DEPLOY-EVIDENCE-CHAIN-2026-11-27.md` / `.json`、`docs/DEPLOY-EVIDENCE-CHAIN-SELFTEST-2026-11-27.json`。
+
+### 12.10 Java `/api/v1` 纳入生产对外链路 · 只读影响面评估（2026-11-27，用户点单）
+
+§12.9 登记的三项待办中，「Java `/api/v1` 是否纳入生产对外链路」由用户**明确点单选择「评估」**（非「实施」）。按选项约定「先出只读影响面清单：网关反代 / 认证 / 契约差异与风险，**不改配置、不落地，供你拍板后再实施**」执行，非新设计决策、非架构裁决。
+
+| 项 | 定案 |
+|---|---|
+| 边界 | 配置 / 源码 / 编排 / 网关模板零改动；零容器、零 `/api/v1` 运行时请求、零镜像构建；`AC-22.1 / AC-40 / AC-45 / AC-03 / AC-38` 维持 ⏸；发布口径继续「内测 / 演示版」 |
+| 单一权威 | `deploy/java-api-v1-impact-verdict.cjs`（R1~R10 全 fail-closed；44 条事实 / 11 风险 / 8 待拍板清单），`-selftest.cjs` 与 `-probe.cjs` 均 require 复用，未内联复制判定 |
+| 事实可复核 | 44 条事实逐条读取真实源码/文档行（文件存在 + 行号有效 + 唯一子串命中 + 实际行非空），`44/44` 全绿；分类 `gateway / frontend / java / contract` 4/4 |
+| 核心发现 | `nginx.conf.template:27` 前缀 `location /api/` 会吞掉 `/api/v1/*` 并转到 Node 8787（→ `server/index.js:1092` 404）；`:35` 覆盖前端 Authorization 为 Node Token；`Dockerfile.web` 未注入 `VITE_API_V1_BASE` → 默认回环 8088；国密网关模板亦 `proxy_pass 127.0.0.1:8787` 且无 Token 注入 |
+| 分级 | **P0 3**（网关前缀+Token 覆盖 / 双认证模型冲突 / Java 签发端点可伪造任意身份）、**P1 5**（回环基址 / CORS 仅本地 / 双响应契约 / 编排缺失 / 数据审计双权威）、**P2 3**（定时任务 / Controller 零 HTTP 测试 / 探针路由可达必失败），全部 ⏸ 待拍板 |
+| 不越权 | D1~D8（推翻裁决 / 认证拓扑 / 网关拆分 / 注入值与 CORS / 重冻 OpenAPI / 数据权威归一 / 编排与中间件 / 门禁范围与 PoC）全部 `needsAuthorization=true` / `decided=false`，R6 专防 AI 擅自决定 |
+| 回退自证 | **41/41** 死活空变异；两处修错如实留痕——attempt1 `37/41`（R9 源码正则自指误命中，原始 `.attempt1.json` 保留）、重跑 `40/41`（D32 暴露 `existingContractOk` 采集了但判定未消费，收紧 R9 为三条件） |
+| 契约兼容 / 零改写 | 3 份新增 `DEPLOY-*.json` 全部带 `verdict`（既有证据链总核验 R3 不受影响）；**本轮不重跑** `evidence-chain-probe.cjs`，`docs/DEPLOY-EVIDENCE-CHAIN-2026-11-27.json` 写前/写后 sha256 一致，其 `jsonCount=14` 历史指标零改写；如实披露若将来重跑计数会合法演进 `14→17` |
+| 门禁 | 1/2/3/6 只读复核通过（`vue-tsc 0` / `vitest 1862/1862、117 文件` / `vite build OK` / 审计链纯只读复算 `chainOk=true count=18 checked=18 brokenAt=null`）；**4/5 未重跑**（需隔离 preview，`app/src` 零改动），如实披露不冒充 |
+| 零污染 | 正式 `server/data` sha256 首尾一致（`85af15a8…b4f` / `3727251b…8c5`）；`git diff --name-only` 零 tracked 修改 |
+| 判定 | `ASSESSMENT_ONLY_READONLY` —— **只读影响面评估，不替代架构裁决、不替代外部验收、不构成放行结论、不是实施**。是否纳入由项目方对 D1~D8 书面拍板后才可推进；5 项外部依赖与 U5 报告口径统一仍待授权 |
+
+新增证据：`docs/DEPLOY-JAVA-API-V1-IMPACT-2026-11-27.md` / `.json`、`docs/DEPLOY-JAVA-API-V1-IMPACT-SELFTEST-2026-11-27.json`、`docs/DEPLOY-JAVA-API-V1-IMPACT-SELFTEST-2026-11-27.attempt1.json`。

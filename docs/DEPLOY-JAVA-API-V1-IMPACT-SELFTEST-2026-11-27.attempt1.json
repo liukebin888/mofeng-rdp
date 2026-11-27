@@ -1,0 +1,545 @@
+{
+  "artifact": "Java /api/v1 只读影响面评估 · 死活空变异回退自证",
+  "generatedAt": "2026-11-27T11:21:23.258Z",
+  "verdict": "FAIL",
+  "allPass": false,
+  "sameSource": "deploy/java-api-v1-impact-verdict.cjs（采集与回退自证同源复用）",
+  "verdictSource": "deploy/java-api-v1-impact-verdict.cjs#evaluate（与 probe 同源）",
+  "liveSample": {
+    "source": "deploy/java-api-v1-impact-probe.cjs#collect（真实只读采集）",
+    "rules": {
+      "factCount": 44,
+      "factCheckOkCount": 44,
+      "categoryCount": 4,
+      "riskCount": 11,
+      "p0Count": 3,
+      "p1Count": 5,
+      "p2Count": 3,
+      "pendingCount": 8,
+      "flipHitCount": 0,
+      "guardMissingCount": 0,
+      "demoDataMatch": true,
+      "totalRules": 10,
+      "passedRules": 9
+    }
+  },
+  "totalCases": 41,
+  "passed": 37,
+  "failed": 4,
+  "cases": [
+    {
+      "id": "L1",
+      "name": "真实采集活样本全绿",
+      "expectOk": true,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": false,
+      "failedRules": [
+        "R9"
+      ]
+    },
+    {
+      "id": "L2",
+      "name": "变异活样本：仅改一条 claim 文案（证据不变）",
+      "expectOk": true,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": false,
+      "failedRules": [
+        "R9"
+      ]
+    },
+    {
+      "id": "L3",
+      "name": "变异活样本：新增一条合法事实 + 对应逐行复核",
+      "expectOk": true,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": false,
+      "failedRules": [
+        "R9"
+      ]
+    },
+    {
+      "id": "L4",
+      "name": "变异活样本：新增一条待拍板项（仍未决策）",
+      "expectOk": true,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": false,
+      "failedRules": [
+        "R9"
+      ]
+    },
+    {
+      "id": "D1",
+      "name": "空样本：collected = {} 全部规则 fail-closed",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R1",
+        "R2",
+        "R3",
+        "R4",
+        "R5",
+        "R6",
+        "R7",
+        "R8",
+        "R9",
+        "R10"
+      ]
+    },
+    {
+      "id": "D2",
+      "name": "空样本：collected = null",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R1",
+        "R2",
+        "R3",
+        "R4",
+        "R5",
+        "R6",
+        "R7",
+        "R8",
+        "R9",
+        "R10"
+      ]
+    },
+    {
+      "id": "D3",
+      "name": "事实清单清空",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R1",
+        "R2",
+        "R3",
+        "R4",
+        "R9"
+      ]
+    },
+    {
+      "id": "D4",
+      "name": "事实清单删到低于最小集",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R1",
+        "R2",
+        "R3",
+        "R4",
+        "R9"
+      ]
+    },
+    {
+      "id": "D5",
+      "name": "事实 id 重复",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R1",
+        "R4",
+        "R9"
+      ]
+    },
+    {
+      "id": "D6",
+      "name": "事实缺 mustContain 字段",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R1",
+        "R9"
+      ]
+    },
+    {
+      "id": "D7",
+      "name": "缺一条逐行复核结果",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R2",
+        "R9"
+      ]
+    },
+    {
+      "id": "D8",
+      "name": "某条 fileExists=false（引用不存在文件）",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R2",
+        "R9"
+      ]
+    },
+    {
+      "id": "D9",
+      "name": "某条 lineValid=false（行号越界）",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R2",
+        "R9"
+      ]
+    },
+    {
+      "id": "D10",
+      "name": "某条 snippetHit=false（引用漂移）",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R2",
+        "R9"
+      ]
+    },
+    {
+      "id": "D11",
+      "name": "某条 actualLine 为空（空样本）",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R2",
+        "R9"
+      ]
+    },
+    {
+      "id": "D12",
+      "name": "删除 contract 分类（分类覆盖不全）",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R3",
+        "R9"
+      ]
+    },
+    {
+      "id": "D13",
+      "name": "删除全部 P0（防淡化）",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R4",
+        "R5",
+        "R9"
+      ]
+    },
+    {
+      "id": "D14",
+      "name": "删除全部 P1",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R4",
+        "R9"
+      ]
+    },
+    {
+      "id": "D15",
+      "name": "某风险 evidence 引用不存在事实 id",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R4",
+        "R9"
+      ]
+    },
+    {
+      "id": "D16",
+      "name": "某风险状态被改成「已整改」（AI 擅自决定）",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R4",
+        "R9"
+      ]
+    },
+    {
+      "id": "D17",
+      "name": "某风险缺整改方向",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R4",
+        "R9"
+      ]
+    },
+    {
+      "id": "D18",
+      "name": "待拍板项清空",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R6",
+        "R9"
+      ]
+    },
+    {
+      "id": "D19",
+      "name": "待拍板项删到低于最小集",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R6",
+        "R9"
+      ]
+    },
+    {
+      "id": "D20",
+      "name": "某待拍板项 decided=true（AI 越权决策）",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R6",
+        "R9"
+      ]
+    },
+    {
+      "id": "D21",
+      "name": "某待拍板项 needsAuthorization=false",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R6",
+        "R9"
+      ]
+    },
+    {
+      "id": "D22",
+      "name": "AC 判定被翻盘",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R7",
+        "R9"
+      ]
+    },
+    {
+      "id": "D23",
+      "name": "出现肯定式翻盘断言",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R7",
+        "R9"
+      ]
+    },
+    {
+      "id": "D24",
+      "name": "护栏表述缺失",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R7",
+        "R9"
+      ]
+    },
+    {
+      "id": "D25",
+      "name": "发布口径改为正式生产发布",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R7",
+        "R9"
+      ]
+    },
+    {
+      "id": "D26",
+      "name": "宣称 Java 通道已打通",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R7",
+        "R9"
+      ]
+    },
+    {
+      "id": "D27",
+      "name": "演示数据实际 sha256 与登记值不一致",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R8",
+        "R9"
+      ]
+    },
+    {
+      "id": "D28",
+      "name": "演示数据登记值缺失（空样本）",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R8",
+        "R9"
+      ]
+    },
+    {
+      "id": "D29",
+      "name": "演示数据实际值缺失",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R8",
+        "R9"
+      ]
+    },
+    {
+      "id": "D30",
+      "name": "新增证据缺 verdict 字段（破坏既有证据链 R3）",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R9"
+      ]
+    },
+    {
+      "id": "D31",
+      "name": "声明重跑了既有证据链探针（会改写历史指标）",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R9"
+      ]
+    },
+    {
+      "id": "D32",
+      "name": "既有证据契约扫描不通过",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R9"
+      ]
+    },
+    {
+      "id": "D33",
+      "name": "配置被改动",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R9",
+        "R10"
+      ]
+    },
+    {
+      "id": "D34",
+      "name": "源码被改动",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R9",
+        "R10"
+      ]
+    },
+    {
+      "id": "D35",
+      "name": "启动容器",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R9",
+        "R10"
+      ]
+    },
+    {
+      "id": "D36",
+      "name": "重跑门禁",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R9",
+        "R10"
+      ]
+    },
+    {
+      "id": "D37",
+      "name": "零落地声明缺失",
+      "expectOk": false,
+      "actualOk": false,
+      "verdict": "FAIL",
+      "pass": true,
+      "failedRules": [
+        "R9",
+        "R10"
+      ]
+    }
+  ],
+  "disclosure": {
+    "deadSamplePolicy": "每个死样本必须被对应规则抓为 FAIL；空样本 FAIL 且不抛异常；变异活样本仍全绿",
+    "noHardcodedPass": "活样本来自真实采集，未内联复制判定逻辑、未硬编码通过结论",
+    "notCovered": "自证不替代 Java 后端真实联调、不替代项目方对 D1~D8 的书面拍板"
+  }
+}
