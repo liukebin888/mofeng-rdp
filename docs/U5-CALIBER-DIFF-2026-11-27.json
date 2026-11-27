@@ -1,0 +1,79 @@
+{
+  "verdict": "READONLY_DIFF_LIST_NO_CHANGE",
+  "date": "2026-11-27",
+  "taskId": "#578",
+  "nature": "只读差异盘点，不是口径统一、不是改数、不是验收判定、不是实施",
+  "scope": "U5 报告口径差异",
+  "namingNote": "沿用 docs/DECISION-LIST.md §11.5 的「U5 报告」称谓，指 BUSINESS-CLOSURE-REVIEW-2026-11-25.md 的菜单口径数字；与 DESIGN-SAMPLE-REVIEW-TEMPLATE-2026-11-24.md 的 Q/A 编号 U5 非同一对象",
+  "taskDescriptionDeviation": {
+    "declaredFile": "docs/EXPERT-REVIEW-RECHECK-2026-11-23.md",
+    "declaredNumbersHit": false,
+    "actualFile": "docs/BUSINESS-CLOSURE-REVIEW-2026-11-25.md",
+    "actualLines": [31, 32, 158],
+    "handling": "按证据如实纠正落点，不改写任务描述、不改写历史文字"
+  },
+  "reportNumbers": [
+    { "file": "docs/BUSINESS-CLOSURE-REVIEW-2026-11-14.md", "lines": [40, 169], "menuGroups": 20, "secondary": 110, "unit": "二级页面", "asOf": "2026-11-14" },
+    { "file": "docs/BUSINESS-CLOSURE-REVIEW-2026-11-25.md", "lines": [31, 32, 158], "menuGroups": 16, "secondary": 107, "unit": "二级菜单/页面", "asOf": "2026-11-25" },
+    { "file": "docs/PRD.md", "lines": [8, 32], "menuGroups": 16, "secondary": 100, "unit": "二级页面", "asOf": "规格基线" },
+    { "file": "docs/README.md", "lines": [119, 120], "menuGroups": 18, "secondary": 83, "unit": "条路由", "asOf": "目录说明" },
+    { "file": "app/src/router/index.ts", "lines": [26], "menuGroups": 16, "secondary": null, "unit": "源码注释", "asOf": "源码注释" }
+  ],
+  "sourceMeasurements": {
+    "file": "app/src/router/index.ts",
+    "sha256Before": "0de39204e44aee11c343ce11a11bd010387fc449c2e88d8b6d50c38cdecbcdc5",
+    "menuGroups": 18,
+    "menuItems": 104,
+    "pathLiteralCount": 110,
+    "routesExtra": 5,
+    "typeDeclaration": 1,
+    "identity": "110 = 104 + 5 + 1",
+    "countRule": "menuGroups: /^[ ]{4}key:/ ; menuItems: /^[ ]{6}[{][ ]*path:/ ; pathLiteralCount: split('path:').length-1",
+    "reproducible": true,
+    "reproOutput": "18 104 110"
+  },
+  "differences": [
+    { "id": "D1", "item": "16 组 vs 18 组", "kind": "时点差", "evidence": "docs/DECISION-LIST.md:200-207 §11.2 用户点单恢复独立分组，U1 裁决 16→18，复验 PASS=159 FAIL=0" },
+    { "id": "D2", "item": "107 vs 104", "kind": "口径差", "evidence": "docs/DECISION-LIST.md:227 §11.5 报告口径含非菜单页" },
+    { "id": "D3", "item": "上轮 110 与本轮 110", "kind": "数值巧合·不同源", "evidence": "报告 110 为二级页面数；本轮 110 为 path: 字面量（104+5+1），不强行归因" },
+    { "id": "D4", "item": "router/index.ts:26 注释仍写 16 组", "kind": "源码注释文案债", "evidence": "app/src/router/index.ts:26" },
+    { "id": "D5", "item": "任务描述文件指向偏差", "kind": "落点偏差", "evidence": "EXPERT-REVIEW-RECHECK-2026-11-23.md 零命中 16 组/107" },
+    { "id": "D6", "item": "PRD 100 页 / README 83 条路由", "kind": "相邻独立口径", "evidence": "docs/PRD.md:32 / docs/README.md:120" }
+  ],
+  "governingVerdicts": [
+    "docs/DECISION-LIST.md:227 §11.5 以源码为准、不替报告改数，是否统一由后续轮次裁定",
+    "docs/DECISION-LIST.md:335 / 342 / 372 U5 报告口径统一仍需授权",
+    "docs/DEPLOY-EVIDENCE-CHAIN-2026-11-27.md:14 改历史数字需明确授权，未擅动"
+  ],
+  "zeroChange": {
+    "historicalReportsSha256": {
+      "docs/BUSINESS-CLOSURE-REVIEW-2026-11-14.md": "a157d68570a9b86a3a9eabd4552687cbf6e6acc8d73daca1802448cff06f4eb8",
+      "docs/BUSINESS-CLOSURE-REVIEW-2026-11-25.md": "d000db547d165c3d551b649a7c9515f4af22451f0a0866b58f2b81466d02a7bf",
+      "docs/EXPERT-REVIEW-RECHECK-2026-11-23.md": "cafe5dfb48124dcb61f2a8ef4e42ce069e195a43bf9b534bc05332225cd585c4",
+      "app/src/router/index.ts": "0de39204e44aee11c343ce11a11bd010387fc449c2e88d8b6d50c38cdecbcdc5"
+    },
+    "decisionListSha256Before": "bd618c4fad5c4c22592c86141bb1c5e284cf1d591959c1351a70b1bcb32fb054",
+    "decisionListAppendOnly": true,
+    "demoDataSha256": {
+      "server/data/state-T-1001.json": "85af15a8c8e8a92fd5985303072116a53cf5f66d99c44d160a689af1759a3b4f",
+      "server/data/audit-T-1001.json": "3727251ba41fa006609f2b9ce6fb3dd5925d84dd0026402dfc39b066b7cb85c5"
+    },
+    "appSrcChanged": false,
+    "serverDataChanged": false,
+    "gatesRerun": false,
+    "evidenceChainProbeRerun": false,
+    "historicalNumbersChanged": false
+  },
+  "pendingDecisions": [
+    { "id": "U5-D1", "item": "是否把报告 16/107 改为 18/104", "needsAuthorization": true, "decided": false },
+    { "id": "U5-D2", "item": "是否在报告内追加口径说明+时点而不改数字", "needsAuthorization": true, "decided": false },
+    { "id": "U5-D3", "item": "是否更新 router/index.ts:26 注释 16→18", "needsAuthorization": true, "decided": false },
+    { "id": "U5-D4", "item": "是否统一 PRD / README / 报告全套口径", "needsAuthorization": true, "decided": false }
+  ],
+  "acceptanceNotFlipped": {
+    "items": ["AC-22.1", "AC-40", "AC-45", "AC-03", "AC-38"],
+    "status": "⏸ 外部依赖，一字未改",
+    "releaseWording": "内测 / 演示版"
+  },
+  "conclusion": "差异不是报告写错，而是不同时点 + 不同计数对象的口径差：11-25 报告的 16 组 / 107 页面是当时快照，之后 U1 裁决把一级菜单 16→18，107 是含非菜单页的页面数、104 是菜单 path 数；源码当前精确实测 18 组 / 104 菜单项。按 §11.5 裁决以源码为准、不替报告改数，本轮只盘点、零改写、不翻盘，是否统一口径待项目方书面拍板。"
+}
