@@ -23,7 +23,7 @@ export interface MenuGroup {
 const viewModules = import.meta.glob('../views/**/*.vue')
 const v = (p: string) => viewModules[`../views/${p}.vue`] as () => Promise<unknown>
 
-/** 16 个一级菜单，与 SOLUTION 11.1 一一对应；二级页标注 P0/P1 批次 */
+/** 18 个一级菜单，与 SOLUTION 11.1 一一对应；二级页标注 P0/P1 批次 */
 export const MENUS: MenuGroup[] = [
   {
     key: 'workbench', title: '工作中心', icon: 'Grid', stage: 'P1–P7', role: '全员', cp: '—',
@@ -138,11 +138,11 @@ export const MENUS: MenuGroup[] = [
   {
     key: 'portfolio', title: '组合与投资', icon: 'PieChart', stage: 'P1–P7', role: 'PMO / 研发副总', cp: 'PFM-011~019',
     items: [
-      { path: '/cost/score', title: '评分与排序', desc: '40/35/25 三维加权 ×20', icon: 'Rank', comp: v('portfolio/ScoreView') },
-      { path: '/cost/capacity', title: '优选与容量', desc: '容量缺口三建议（PFM-019）', icon: 'Odometer', comp: v('portfolio/ScoreView') },
-      { path: '/cost/analysis', title: '组合分析', desc: 'ROI/决策留痕/What-if', icon: 'TrendCharts', comp: v('portfolio/AnalysisView') },
-      { path: '/cost/eps', title: 'EPS 节点树', desc: '四级树逐层汇总', icon: 'Share', comp: v('portfolio/EpsView') },
-      { path: '/cost/gate-consistency', title: '闸门一致性', desc: '跨项目判据集统一（PFM-011）', icon: 'Switch', comp: v('portfolio/GateConsistencyView') }
+      { path: '/portfolio/score', title: '评分与排序', desc: '40/35/25 三维加权 ×20', icon: 'Rank', comp: v('portfolio/ScoreView') },
+      { path: '/portfolio/capacity', title: '优选与容量', desc: '容量缺口三建议（PFM-019）', icon: 'Odometer', comp: v('portfolio/ScoreView') },
+      { path: '/portfolio/analysis', title: '组合分析', desc: 'ROI/决策留痕/What-if', icon: 'TrendCharts', comp: v('portfolio/AnalysisView') },
+      { path: '/portfolio/eps', title: 'EPS 节点树', desc: '四级树逐层汇总', icon: 'Share', comp: v('portfolio/EpsView') },
+      { path: '/portfolio/gate-consistency', title: '闸门一致性', desc: '跨项目判据集统一（PFM-011）', icon: 'Switch', comp: v('portfolio/GateConsistencyView') }
     ]
   },
   {
@@ -177,9 +177,9 @@ export const MENUS: MenuGroup[] = [
   {
     key: 'delivery', title: '交付管理', icon: 'Van', stage: 'P5–P7', role: '项目经理 / 交付', cp: 'C-19 HW-016',
     items: [
-      { path: '/supply/deliverables', title: '交付物清单', desc: '缺件率 0 方可提交（C-19）', icon: 'List', comp: v('delivery/DeliverableView') },
-      { path: '/supply/ship', title: '样件发运与签收', desc: '签收后转已交付（HW-016）', icon: 'Van', comp: v('delivery/DeliverableView') },
-      { path: '/supply/soft', title: '软件交付台账', desc: '版本与刷写记录', icon: 'Monitor', comp: v('delivery/SoftDeliverView') }
+      { path: '/delivery/deliverables', title: '交付物清单', desc: '缺件率 0 方可提交（C-19）', icon: 'List', comp: v('delivery/DeliverableView') },
+      { path: '/delivery/ship', title: '样件发运与签收', desc: '签收后转已交付（HW-016）', icon: 'Van', comp: v('delivery/DeliverableView') },
+      { path: '/delivery/soft', title: '软件交付台账', desc: '版本与刷写记录', icon: 'Monitor', comp: v('delivery/SoftDeliverView') }
     ]
   },
   {

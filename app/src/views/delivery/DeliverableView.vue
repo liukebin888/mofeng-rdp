@@ -76,10 +76,10 @@ import { useI18n } from '@/infra/i18nPlugin'
 const store = useAppStore()
 const { te } = useI18n()
 
-/** 本组件被 2 个菜单复用：交付物清单 / 样件发运与签收（现归属「交付管理」组；path 保留 /supply/* 不变） */
+/** 本组件被 2 个菜单复用：交付物清单 / 样件发运与签收（现归属「交付管理」组；path 已迁移至 /delivery/*） */
 const tabs = [
-  { path: '/supply/deliverables', label: '交付物清单' },
-  { path: '/supply/ship', label: '样件发运与签收' }
+  { path: '/delivery/deliverables', label: '交付物清单' },
+  { path: '/delivery/ship', label: '样件发运与签收' }
 ]
 const list = computed(() => store.projectDeliverables)
 const required = computed(() => list.value.filter((d) => d.required))

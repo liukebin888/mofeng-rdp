@@ -445,3 +445,23 @@
 | 网络 | 本地 `cc36c17` / `4dd7e9c` 因代理 `502` 待推，不反复重试、不走 API 合并、不伪造 `0 0` |
 
 新增证据：主报告 `docs/BUSINESS-CLOSURE-RECHECK-VERIFICATION-2026-11-27.md`、机器证据 `.json`（带 `verdict`）、新增可复现采集器 `deploy/business-recheck-verify.cjs`。
+
+### 12.15 第 3 轮复查报告 · 改进实施（2026-11-27，用户勾选全部 4 项）
+
+| 项 | 内容 |
+|---|---|
+| 判定 | `IMPROVEMENTS_APPLIED_GATES_ALL_GREEN` —— 用户「按测试结果进行改进」，在知情（含 i18n 降级 / 深链 / 证据基线风险）前提下 **AskUserQuestion 勾选全部 4 项**，按勾选顺序实施 |
+| 批次1 | `docs/PRD.md 附录 A.1` / `spec/SRS.md 附录 I.1` 各 append 独立裁撤登记（`11 0` / `12 0` 零删除，V1.4 规格基线文字原样保留，FUN-023 组合域不受影响，`ACCEPTANCE-MATRIX.md` 与 85 条准则一字未改）；用户第 3 轮报告原文零改写纳入版本管理（RECHECK-D5） |
+| 批次2 | `app/src/router/index.ts:26` 注释「16」→「18」1 行（U5-D3 单点）；U5-D1/D2/D4 仍 `decided=false` |
+| 批次3 · 新裁决 | 用户在知情前提下勾选 RECHECK-D1，**明确推翻 §11.2 Q12 方案 1「保留全部 104 条 URL 一字不改」**。以本节为准；§11.2 历史文字按 append-only 零改写保留 |
+| 批次3 · 映射 | 组合与投资 5 条 `/cost/score|capacity|analysis|eps|gate-consistency` → `/portfolio/*`；交付管理 3 条 `/supply/deliverables|ship|soft` → `/delivery/*` |
+| 批次3 · 全量配套 | `deploy/url-namespace-migration.cjs` 限 5 目标文件 + 完整路径带边界精确匹配 + 默认 dry-run；同步 router 8 path、`locale.ts` 16 个 `menu.item` 键（zh+en）、`ScoreView`/`DeliverableView` tabs 与 2 处技术注释、`probe-consistency.cjs` 1 处。**28/28 断言全过**、23 处改动、`18/104/110` 形状不变；成本管理组 4 个 `/cost/*` 键、采购组 5 个 `/supply/*` 键、`/cost/evm` 全部 `PRESERVED_UNCHANGED` |
+| 批次3 · 六门禁 | `vue-tsc 0` / `vitest 117 文件 1862 用例` / `vite build OK` / 隔离 `smoke 104/104` / 隔离 `e2e 33/0` / 隔离 `audit chainOk=true` / 正式演示数据 `unchanged=true` |
+| 批次3 · a11y | 隔离 8790/4182 四件套：`gate-selftest 0` / `keyboard --strict 0` / `evidence 0` / `overlay 1`（历史已知 `/trial/inspect` 写入红线，非迁移引入，不放宽、不冒充通过）。迁移后取证 `104/104 visited / 27 键盘 / 0 标签 / 4 焦点缺失 / 0 pageerror`，**与历史基线完全一致，零新增违规**；注入版 `node8787Count=0 / newPathCount=3 / oldPathCount=0` |
+| 批次3 · 零改写 | 7 份历史证据（6 份 `A11Y-*` + `DEPLOY-GATE-ISOLATED-2026-11-26.json`）备份→还原 `restoreAllMatch=true`、sha256 全等；21 个残留文件均为历史快照 / 证据 / 日志 / 采集器映射表，如实披露不动；`business-recheck-verify.cjs` 定为迁移前基线，迁移后 R4 预期不成立，**不重跑、不改写判定、不以其判定当前状态**；历史 A11Y 证据路径命名空间失配如实登记；历史深链失效为已知接受后果，未加 redirect |
+| 批次4 | `deploy/evm-reuse-verify.cjs` **6/6 PASS** `ALREADY_CONVERGED_VIA_SEMANTIC_TABS_NO_CHANGE`：报告 §4.3 / P2-5「复用未收敛」是只读静态审查的事实性偏差——`EvmView` 已有 `SemanticTabs` 页内 Tab 覆盖 4 视角、8 个 `menu.desc` + 8 个 `menu.item` 键 zh+en 齐全、`PageHeader` 按 `menu.* + route.path` 同源切换。**零源码改动**，不为完成勾选制造无意义或高风险改动；剩余跨组问题登记 `EVM-D4-A/B/C` 待授权 |
+| 不翻盘 / 零污染 | 菜单/标题/品牌名/文案改动 0（仅 2 处技术注释随迁移同步逐字披露）；验收矩阵 11 项 ⏸ 原样；正式演示数据 `85af15a8…b4f` / `3727251b…8c5`、证据链基线 `1ec19042…0544`、6 份历史 A11Y 证据 sha256 首尾一致；不重跑 `evidence-chain-probe.cjs`（保 `jsonCount=14`）；发布口径继续「内测 / 演示版」 |
+| 待拍板 | `U5-D1/D2/D4`、`EVM-D4-A/B/C`、`A11Y-D1~D4`、Java `D1~D8` 全部 `decided=false`；5 项外部依赖与 `#121` 未变，AI 未代替项目方拍板 |
+| 网络 | 本地提交因代理 `Empty reply / 502` 未推送，`api.github.com=200` / `github.com=000`；按纪律停止重试、不走 API 合并、不伪造 `0 0`，恢复后补推 |
+
+新增证据：主报告 `docs/BUSINESS-CLOSURE-IMPROVEMENT-2026-11-27.md`；`docs/URL-NAMESPACE-MIGRATION-2026-11-27.json` / `.md`（迁移，`verdict`）、`docs/EVM-REUSE-CONVERGENCE-2026-11-27.json`（核实，`verdict`）、`docs/A11Y-POST-MIGRATION-2026-11-27.json`（迁移后取证，`verdict`）；新增可复现脚本 `deploy/url-namespace-migration.cjs`、`deploy/evm-reuse-verify.cjs`；临时编排 `deploy/_a11y-migration-verify.cjs` 用完即删不进提交。

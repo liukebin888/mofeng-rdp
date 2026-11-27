@@ -1,0 +1,658 @@
+{
+  "verdict": "MIGRATION_APPLIED_VERIFIED",
+  "ok": true,
+  "passedChecks": "28/28",
+  "generatedAt": "2026-11-27T15:02:47.614Z",
+  "authorization": "RECHECK-D1（用户 2026-11-27 AskUserQuestion 明确勾选，推翻 §11.2 Q12 方案 1）",
+  "mappings": [
+    {
+      "from": "/cost/score",
+      "to": "/portfolio/score"
+    },
+    {
+      "from": "/cost/capacity",
+      "to": "/portfolio/capacity"
+    },
+    {
+      "from": "/cost/analysis",
+      "to": "/portfolio/analysis"
+    },
+    {
+      "from": "/cost/eps",
+      "to": "/portfolio/eps"
+    },
+    {
+      "from": "/cost/gate-consistency",
+      "to": "/portfolio/gate-consistency"
+    },
+    {
+      "from": "/supply/deliverables",
+      "to": "/delivery/deliverables"
+    },
+    {
+      "from": "/supply/ship",
+      "to": "/delivery/ship"
+    },
+    {
+      "from": "/supply/soft",
+      "to": "/delivery/soft"
+    }
+  ],
+  "targets": [
+    "app/src/router/index.ts",
+    "app/src/domain/locale.ts",
+    "app/src/views/portfolio/ScoreView.vue",
+    "app/src/views/delivery/DeliverableView.vue",
+    "app/scripts/probe-consistency.cjs"
+  ],
+  "shapeBefore": {
+    "menuGroups": 18,
+    "menuItems": 104,
+    "pathLiterals": 110
+  },
+  "shapeAfter": {
+    "menuGroups": 18,
+    "menuItems": 104,
+    "pathLiterals": 110
+  },
+  "perFileBefore": {
+    "app/src/router/index.ts": {
+      "/cost/score": 1,
+      "/cost/capacity": 1,
+      "/cost/analysis": 1,
+      "/cost/eps": 1,
+      "/cost/gate-consistency": 1,
+      "/supply/deliverables": 1,
+      "/supply/ship": 1,
+      "/supply/soft": 1
+    },
+    "app/src/domain/locale.ts": {
+      "/cost/score": 2,
+      "/cost/capacity": 2,
+      "/cost/analysis": 2,
+      "/cost/eps": 2,
+      "/cost/gate-consistency": 2,
+      "/supply/deliverables": 2,
+      "/supply/ship": 2,
+      "/supply/soft": 2
+    },
+    "app/src/views/portfolio/ScoreView.vue": {
+      "/cost/score": 1,
+      "/cost/capacity": 1,
+      "/cost/analysis": 0,
+      "/cost/eps": 0,
+      "/cost/gate-consistency": 0,
+      "/supply/deliverables": 0,
+      "/supply/ship": 0,
+      "/supply/soft": 0
+    },
+    "app/src/views/delivery/DeliverableView.vue": {
+      "/cost/score": 0,
+      "/cost/capacity": 0,
+      "/cost/analysis": 0,
+      "/cost/eps": 0,
+      "/cost/gate-consistency": 0,
+      "/supply/deliverables": 1,
+      "/supply/ship": 1,
+      "/supply/soft": 0
+    },
+    "app/scripts/probe-consistency.cjs": {
+      "/cost/score": 1,
+      "/cost/capacity": 0,
+      "/cost/analysis": 0,
+      "/cost/eps": 0,
+      "/cost/gate-consistency": 0,
+      "/supply/deliverables": 0,
+      "/supply/ship": 0,
+      "/supply/soft": 0
+    }
+  },
+  "expectedCounts": {
+    "/cost/score": 5,
+    "/cost/capacity": 4,
+    "/cost/analysis": 3,
+    "/cost/eps": 3,
+    "/cost/gate-consistency": 3,
+    "/supply/deliverables": 4,
+    "/supply/ship": 4,
+    "/supply/soft": 3
+  },
+  "applied": [
+    {
+      "file": "app/src/router/index.ts",
+      "from": "/cost/score",
+      "to": "/portfolio/score",
+      "count": 1
+    },
+    {
+      "file": "app/src/domain/locale.ts",
+      "from": "/cost/score",
+      "to": "/portfolio/score",
+      "count": 2
+    },
+    {
+      "file": "app/src/views/portfolio/ScoreView.vue",
+      "from": "/cost/score",
+      "to": "/portfolio/score",
+      "count": 1
+    },
+    {
+      "file": "app/scripts/probe-consistency.cjs",
+      "from": "/cost/score",
+      "to": "/portfolio/score",
+      "count": 1
+    },
+    {
+      "file": "app/src/router/index.ts",
+      "from": "/cost/capacity",
+      "to": "/portfolio/capacity",
+      "count": 1
+    },
+    {
+      "file": "app/src/domain/locale.ts",
+      "from": "/cost/capacity",
+      "to": "/portfolio/capacity",
+      "count": 2
+    },
+    {
+      "file": "app/src/views/portfolio/ScoreView.vue",
+      "from": "/cost/capacity",
+      "to": "/portfolio/capacity",
+      "count": 1
+    },
+    {
+      "file": "app/src/router/index.ts",
+      "from": "/cost/analysis",
+      "to": "/portfolio/analysis",
+      "count": 1
+    },
+    {
+      "file": "app/src/domain/locale.ts",
+      "from": "/cost/analysis",
+      "to": "/portfolio/analysis",
+      "count": 2
+    },
+    {
+      "file": "app/src/router/index.ts",
+      "from": "/cost/eps",
+      "to": "/portfolio/eps",
+      "count": 1
+    },
+    {
+      "file": "app/src/domain/locale.ts",
+      "from": "/cost/eps",
+      "to": "/portfolio/eps",
+      "count": 2
+    },
+    {
+      "file": "app/src/router/index.ts",
+      "from": "/cost/gate-consistency",
+      "to": "/portfolio/gate-consistency",
+      "count": 1
+    },
+    {
+      "file": "app/src/domain/locale.ts",
+      "from": "/cost/gate-consistency",
+      "to": "/portfolio/gate-consistency",
+      "count": 2
+    },
+    {
+      "file": "app/src/router/index.ts",
+      "from": "/supply/deliverables",
+      "to": "/delivery/deliverables",
+      "count": 1
+    },
+    {
+      "file": "app/src/domain/locale.ts",
+      "from": "/supply/deliverables",
+      "to": "/delivery/deliverables",
+      "count": 2
+    },
+    {
+      "file": "app/src/views/delivery/DeliverableView.vue",
+      "from": "/supply/deliverables",
+      "to": "/delivery/deliverables",
+      "count": 1
+    },
+    {
+      "file": "app/src/router/index.ts",
+      "from": "/supply/ship",
+      "to": "/delivery/ship",
+      "count": 1
+    },
+    {
+      "file": "app/src/domain/locale.ts",
+      "from": "/supply/ship",
+      "to": "/delivery/ship",
+      "count": 2
+    },
+    {
+      "file": "app/src/views/delivery/DeliverableView.vue",
+      "from": "/supply/ship",
+      "to": "/delivery/ship",
+      "count": 1
+    },
+    {
+      "file": "app/src/router/index.ts",
+      "from": "/supply/soft",
+      "to": "/delivery/soft",
+      "count": 1
+    },
+    {
+      "file": "app/src/domain/locale.ts",
+      "from": "/supply/soft",
+      "to": "/delivery/soft",
+      "count": 2
+    },
+    {
+      "file": "app/src/views/portfolio/ScoreView.vue",
+      "from": "path 保留 /cost/* 不变",
+      "to": "path 已迁移至 /portfolio/*",
+      "count": 1,
+      "kind": "comment-sync"
+    },
+    {
+      "file": "app/src/views/delivery/DeliverableView.vue",
+      "from": "path 保留 /supply/* 不变",
+      "to": "path 已迁移至 /delivery/*",
+      "count": 1,
+      "kind": "comment-sync"
+    }
+  ],
+  "checks": [
+    {
+      "id": "OLD_ZERO_/cost/score",
+      "ok": true,
+      "detail": "残留=0"
+    },
+    {
+      "id": "OLD_ZERO_/cost/capacity",
+      "ok": true,
+      "detail": "残留=0"
+    },
+    {
+      "id": "OLD_ZERO_/cost/analysis",
+      "ok": true,
+      "detail": "残留=0"
+    },
+    {
+      "id": "OLD_ZERO_/cost/eps",
+      "ok": true,
+      "detail": "残留=0"
+    },
+    {
+      "id": "OLD_ZERO_/cost/gate-consistency",
+      "ok": true,
+      "detail": "残留=0"
+    },
+    {
+      "id": "OLD_ZERO_/supply/deliverables",
+      "ok": true,
+      "detail": "残留=0"
+    },
+    {
+      "id": "OLD_ZERO_/supply/ship",
+      "ok": true,
+      "detail": "残留=0"
+    },
+    {
+      "id": "OLD_ZERO_/supply/soft",
+      "ok": true,
+      "detail": "残留=0"
+    },
+    {
+      "id": "ROUTER_ONE_/portfolio/score",
+      "ok": true,
+      "detail": "命中=1"
+    },
+    {
+      "id": "ROUTER_ONE_/portfolio/capacity",
+      "ok": true,
+      "detail": "命中=1"
+    },
+    {
+      "id": "ROUTER_ONE_/portfolio/analysis",
+      "ok": true,
+      "detail": "命中=1"
+    },
+    {
+      "id": "ROUTER_ONE_/portfolio/eps",
+      "ok": true,
+      "detail": "命中=1"
+    },
+    {
+      "id": "ROUTER_ONE_/portfolio/gate-consistency",
+      "ok": true,
+      "detail": "命中=1"
+    },
+    {
+      "id": "ROUTER_ONE_/delivery/deliverables",
+      "ok": true,
+      "detail": "命中=1"
+    },
+    {
+      "id": "ROUTER_ONE_/delivery/ship",
+      "ok": true,
+      "detail": "命中=1"
+    },
+    {
+      "id": "ROUTER_ONE_/delivery/soft",
+      "ok": true,
+      "detail": "命中=1"
+    },
+    {
+      "id": "LOCALE_ZH_EN_/portfolio/score",
+      "ok": true,
+      "detail": "命中=2（应 zh+en 各 1）"
+    },
+    {
+      "id": "LOCALE_ZH_EN_/portfolio/capacity",
+      "ok": true,
+      "detail": "命中=2（应 zh+en 各 1）"
+    },
+    {
+      "id": "LOCALE_ZH_EN_/portfolio/analysis",
+      "ok": true,
+      "detail": "命中=2（应 zh+en 各 1）"
+    },
+    {
+      "id": "LOCALE_ZH_EN_/portfolio/eps",
+      "ok": true,
+      "detail": "命中=2（应 zh+en 各 1）"
+    },
+    {
+      "id": "LOCALE_ZH_EN_/portfolio/gate-consistency",
+      "ok": true,
+      "detail": "命中=2（应 zh+en 各 1）"
+    },
+    {
+      "id": "LOCALE_ZH_EN_/delivery/deliverables",
+      "ok": true,
+      "detail": "命中=2（应 zh+en 各 1）"
+    },
+    {
+      "id": "LOCALE_ZH_EN_/delivery/ship",
+      "ok": true,
+      "detail": "命中=2（应 zh+en 各 1）"
+    },
+    {
+      "id": "LOCALE_ZH_EN_/delivery/soft",
+      "ok": true,
+      "detail": "命中=2（应 zh+en 各 1）"
+    },
+    {
+      "id": "PRESERVED_UNCHANGED",
+      "ok": true,
+      "detail": "{\"menu.item./cost/budget\":2,\"menu.item./cost/deviation\":2,\"menu.item./cost/hours\":2,\"menu.item./cost/evm\":2,\"menu.item./supply/supplier\":2,\"menu.item./supply/portal\":2,\"menu.item./supply/purchase-plan\":2,\"menu.item./supply/tender\":2,\"menu.item./supply/sample-purchase\":2}"
+    },
+    {
+      "id": "SHAPE_UNCHANGED",
+      "ok": true,
+      "detail": "{\"menuGroups\":18,\"menuItems\":104,\"pathLiterals\":110} -> {\"menuGroups\":18,\"menuItems\":104,\"pathLiterals\":110}"
+    },
+    {
+      "id": "PROBE_EVM_KEPT",
+      "ok": true,
+      "detail": "成本管理组 /cost/evm 探针保留"
+    },
+    {
+      "id": "I18N_SAME_SOURCE",
+      "ok": true,
+      "detail": "router path 与 locale 中英键同源"
+    }
+  ],
+  "preservedKeys": {
+    "before": {
+      "menu.item./cost/budget": 2,
+      "menu.item./cost/deviation": 2,
+      "menu.item./cost/hours": 2,
+      "menu.item./cost/evm": 2,
+      "menu.item./supply/supplier": 2,
+      "menu.item./supply/portal": 2,
+      "menu.item./supply/purchase-plan": 2,
+      "menu.item./supply/tender": 2,
+      "menu.item./supply/sample-purchase": 2
+    },
+    "after": {
+      "menu.item./cost/budget": 2,
+      "menu.item./cost/deviation": 2,
+      "menu.item./cost/hours": 2,
+      "menu.item./cost/evm": 2,
+      "menu.item./supply/supplier": 2,
+      "menu.item./supply/portal": 2,
+      "menu.item./supply/purchase-plan": 2,
+      "menu.item./supply/tender": 2,
+      "menu.item./supply/sample-purchase": 2
+    }
+  },
+  "commentFixes": [
+    {
+      "file": "app/src/views/portfolio/ScoreView.vue",
+      "from": "path 保留 /cost/* 不变",
+      "to": "path 已迁移至 /portfolio/*"
+    },
+    {
+      "file": "app/src/views/delivery/DeliverableView.vue",
+      "from": "path 保留 /supply/* 不变",
+      "to": "path 已迁移至 /delivery/*"
+    }
+  ],
+  "residualAfterScan": [
+    {
+      "file": ".qa-tmp/dist-p0/assets/DeliverableView-Bl5wW09f.js",
+      "oldPaths": [
+        "/supply/deliverables",
+        "/supply/ship"
+      ]
+    },
+    {
+      "file": ".qa-tmp/dist-p0/assets/DeliverableView-DVOM33TK.js",
+      "oldPaths": [
+        "/supply/deliverables",
+        "/supply/ship"
+      ]
+    },
+    {
+      "file": ".qa-tmp/dist-p0/assets/index-CH3677AN.js",
+      "oldPaths": [
+        "/cost/score",
+        "/cost/capacity",
+        "/cost/analysis",
+        "/cost/eps",
+        "/cost/gate-consistency",
+        "/supply/deliverables",
+        "/supply/ship",
+        "/supply/soft"
+      ]
+    },
+    {
+      "file": ".qa-tmp/dist-p0/assets/index-DtiQ7PVx.js",
+      "oldPaths": [
+        "/cost/score",
+        "/cost/capacity",
+        "/cost/analysis",
+        "/cost/eps",
+        "/cost/gate-consistency",
+        "/supply/deliverables",
+        "/supply/ship",
+        "/supply/soft"
+      ]
+    },
+    {
+      "file": ".qa-tmp/dist-p0/assets/ScoreView-CHxqPd1Q.js",
+      "oldPaths": [
+        "/cost/score",
+        "/cost/capacity"
+      ]
+    },
+    {
+      "file": ".qa-tmp/dist-p0/assets/ScoreView-X6X4Lr6M.js",
+      "oldPaths": [
+        "/cost/score",
+        "/cost/capacity"
+      ]
+    },
+    {
+      "file": ".qa-tmp/qa9-browser.cjs",
+      "oldPaths": [
+        "/cost/score",
+        "/cost/capacity",
+        "/cost/gate-consistency",
+        "/supply/deliverables",
+        "/supply/ship",
+        "/supply/soft"
+      ]
+    },
+    {
+      "file": ".qa-tmp/qa9-supplement.cjs",
+      "oldPaths": [
+        "/cost/score"
+      ]
+    },
+    {
+      "file": ".qa-tmp/router-HEAD.ts",
+      "oldPaths": [
+        "/cost/score",
+        "/cost/capacity",
+        "/cost/analysis",
+        "/cost/eps",
+        "/cost/gate-consistency",
+        "/supply/deliverables",
+        "/supply/ship",
+        "/supply/soft"
+      ]
+    },
+    {
+      "file": ".workbuddy/memory/2026-11-16.md",
+      "oldPaths": [
+        "/cost/score",
+        "/supply/deliverables",
+        "/supply/ship",
+        "/supply/soft"
+      ]
+    },
+    {
+      "file": ".workbuddy/memory/2026-11-25.md",
+      "oldPaths": [
+        "/cost/score"
+      ]
+    },
+    {
+      "file": ".workbuddy/memory/2026-11-27.md",
+      "oldPaths": [
+        "/cost/score"
+      ]
+    },
+    {
+      "file": "deploy/business-recheck-verify.cjs",
+      "oldPaths": [
+        "/cost/score",
+        "/cost/capacity",
+        "/cost/analysis",
+        "/cost/eps",
+        "/cost/gate-consistency",
+        "/supply/deliverables",
+        "/supply/ship",
+        "/supply/soft"
+      ]
+    },
+    {
+      "file": "deploy/url-namespace-migration.cjs",
+      "oldPaths": [
+        "/cost/score",
+        "/cost/capacity",
+        "/cost/analysis",
+        "/cost/eps",
+        "/cost/gate-consistency",
+        "/supply/deliverables",
+        "/supply/ship",
+        "/supply/soft"
+      ]
+    },
+    {
+      "file": "docs/A11Y-EVIDENCE.json",
+      "oldPaths": [
+        "/cost/score",
+        "/cost/capacity",
+        "/cost/analysis",
+        "/cost/eps",
+        "/cost/gate-consistency",
+        "/supply/deliverables",
+        "/supply/ship",
+        "/supply/soft"
+      ]
+    },
+    {
+      "file": "docs/A11Y-EVIDENCE.md",
+      "oldPaths": [
+        "/cost/score",
+        "/cost/capacity",
+        "/cost/analysis",
+        "/cost/eps",
+        "/cost/gate-consistency",
+        "/supply/deliverables",
+        "/supply/ship",
+        "/supply/soft"
+      ]
+    },
+    {
+      "file": "docs/A11Y-KEYBOARD.json",
+      "oldPaths": [
+        "/cost/score",
+        "/cost/capacity",
+        "/cost/analysis",
+        "/cost/eps",
+        "/cost/gate-consistency",
+        "/supply/deliverables",
+        "/supply/ship",
+        "/supply/soft"
+      ]
+    },
+    {
+      "file": "docs/BUSINESS-CLOSURE-RECHECK-VERIFICATION-2026-11-27.json",
+      "oldPaths": [
+        "/cost/score",
+        "/cost/capacity",
+        "/cost/analysis",
+        "/cost/eps",
+        "/cost/gate-consistency",
+        "/supply/deliverables",
+        "/supply/ship",
+        "/supply/soft"
+      ]
+    },
+    {
+      "file": "docs/BUSINESS-CLOSURE-RECHECK-VERIFICATION-2026-11-27.md",
+      "oldPaths": [
+        "/cost/score",
+        "/supply/deliverables"
+      ]
+    },
+    {
+      "file": "docs/BUSINESS-CLOSURE-REVIEW-2026-11-27.md",
+      "oldPaths": [
+        "/cost/score",
+        "/cost/capacity",
+        "/cost/analysis",
+        "/cost/eps",
+        "/cost/gate-consistency",
+        "/supply/deliverables",
+        "/supply/ship",
+        "/supply/soft"
+      ]
+    },
+    {
+      "file": "docs/DECISION-LIST.md",
+      "oldPaths": [
+        "/cost/score"
+      ]
+    }
+  ],
+  "disclosure": {
+    "historicalEvidenceMismatch": "docs/A11Y-EVIDENCE.json|md、A11Y-KEYBOARD.json、A11Y-OVERLAY.json|md、PROJECT-STATUS-SNAPSHOT-*.json、DECISION-LIST.md 等历史零改写证据仍记录迁移前路径，如实登记命名空间失配，不改写、不重跑覆盖、不翻盘静态计数",
+    "recheckCollectorFrozen": "deploy/business-recheck-verify.cjs 与其 JSON 是「迁移前基线」采集器/证据，迁移后 R4 断言预期不再成立；不重跑（会覆写历史证据）、不改写判定、不以其判定当前状态",
+    "deepLinks": "历史深链 #/cost/score、#/supply/deliverables 等按授权失效；未加 redirect 兼容，属已知并接受的后果，如实披露",
+    "a11yScriptsAutoFollow": "a11y-evidence/keyboard/overlay、smoke 均以正则运行时读 router/index.ts，迁移后自动跟随新路径",
+    "noPrefixReplace": "未使用 /cost/ → /portfolio/ 前缀替换；成本管理组 4 个 /cost/* 键与采购组 5 个 /supply/* 键、/cost/evm 全部原样保留（PRESERVED_UNCHANGED）"
+  }
+}

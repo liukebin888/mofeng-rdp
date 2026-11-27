@@ -1,0 +1,145 @@
+{
+  "verdict": "ALREADY_CONVERGED_VIA_SEMANTIC_TABS_NO_CHANGE",
+  "ok": true,
+  "passedRules": "6/6",
+  "generatedAt": "2026-11-27T15:05:54.018Z",
+  "reportClaim": "BUSINESS-CLOSURE-REVIEW-2026-11-27.md §4.3 / §八 P2-5：EvmView 四处复用「基本未收敛」，应加页内 Tab 或拆分组件",
+  "measured": {
+    "semanticTabsPresent": true,
+    "tabPaths": [
+      "/cost/deviation",
+      "/cost/hours",
+      "/cost/evm",
+      "/admin/overload"
+    ],
+    "tabLabels": [
+      "成本偏差",
+      "工时归集",
+      "四值与挣值报表",
+      "供需与超分配"
+    ],
+    "descKeysZhEn": [
+      {
+        "path": "/cost/deviation",
+        "count": 2
+      },
+      {
+        "path": "/cost/hours",
+        "count": 2
+      },
+      {
+        "path": "/cost/evm",
+        "count": 2
+      },
+      {
+        "path": "/admin/overload",
+        "count": 2
+      }
+    ],
+    "itemKeysZhEn": [
+      {
+        "path": "/cost/deviation",
+        "count": 2
+      },
+      {
+        "path": "/cost/hours",
+        "count": 2
+      },
+      {
+        "path": "/cost/evm",
+        "count": 2
+      },
+      {
+        "path": "/admin/overload",
+        "count": 2
+      }
+    ],
+    "pageHeaderSameSource": true
+  },
+  "checks": [
+    {
+      "id": "R1",
+      "name": "EvmView 已使用 SemanticTabs 页内 Tab",
+      "ok": true,
+      "detail": "命中=1"
+    },
+    {
+      "id": "R2",
+      "name": "tabs 数组覆盖 4 个复用视角且各 1 次",
+      "ok": true,
+      "detail": "/cost/deviation:1 /cost/hours:1 /cost/evm:1 /admin/overload:1"
+    },
+    {
+      "id": "R3",
+      "name": "router 中 4 条 path 均存在且 comp 指向 EvmView",
+      "ok": true,
+      "detail": "EvmView comp 复用=4"
+    },
+    {
+      "id": "R4",
+      "name": "4 个视角 menu.desc 键 zh+en 齐全（8 键）",
+      "ok": true,
+      "detail": "/cost/deviation:2 /cost/hours:2 /cost/evm:2 /admin/overload:2"
+    },
+    {
+      "id": "R5",
+      "name": "4 个视角 menu.item 键 zh+en 齐全（8 键）",
+      "ok": true,
+      "detail": "/cost/deviation:2 /cost/hours:2 /cost/evm:2 /admin/overload:2"
+    },
+    {
+      "id": "R6",
+      "name": "PageHeader 标题/描述均按 menu.*+route.path 同源求值（视角随路径切换）",
+      "ok": true,
+      "detail": "title=3 desc=3"
+    }
+  ],
+  "residual": {
+    "crossGroupPlacement": {
+      "fact": "4 条复用 path 中 /admin/overload 归属「行政管理」组，其余 3 条归属「成本管理」组",
+      "ruling": "docs/DECISION-LIST.md 菜单结构（均经用户确认）明载「新建行政管理（/admin/org|roles|overload|pool）」，该分组归属是用户确认过的既有裁决",
+      "options": [
+        {
+          "id": "EVM-D4-A",
+          "item": "把 /admin/overload 菜单项移到「成本管理」组（改 router 分组归属，推翻既有菜单结构裁决；18 组 / 104 项 / 110 path 字面量不变，但行政管理组少 1 项）",
+          "needsAuthorization": true,
+          "decided": false
+        },
+        {
+          "id": "EVM-D4-B",
+          "item": "为 /admin/overload 拆分独立 OverloadView 组件（新增组件 + 改变该页渲染内容，可能影响 a11y 静态取证与 smoke 字符基线）",
+          "needsAuthorization": true,
+          "decided": false
+        }
+      ],
+      "thisRound": "零改动、如实披露，不为了完成勾选而制造无意义或高风险改动"
+    }
+  },
+  "correction": "报告为只读静态审查，未注意到 SemanticTabs 页内 Tab 与 PageHeader 的 i18n 视角切换已落地；「页内 Tab」这一半诉求在源码中已实现，属报告事实性偏差，按证据如实纠正、不按预设保留",
+  "zeroChange": {
+    "sourceFilesModified": 0,
+    "menuStructureModified": 0,
+    "routesModified": 0,
+    "historicalEvidenceRewritten": 0
+  },
+  "pendingAuthorization": [
+    {
+      "id": "EVM-D4-A",
+      "item": "把 /admin/overload 菜单项移到「成本管理」组（改 router 分组归属，推翻既有菜单结构裁决；18 组 / 104 项 / 110 path 字面量不变，但行政管理组少 1 项）",
+      "needsAuthorization": true,
+      "decided": false
+    },
+    {
+      "id": "EVM-D4-B",
+      "item": "为 /admin/overload 拆分独立 OverloadView 组件（新增组件 + 改变该页渲染内容，可能影响 a11y 静态取证与 smoke 字符基线）",
+      "needsAuthorization": true,
+      "decided": false
+    },
+    {
+      "id": "EVM-D4-C",
+      "item": "是否维持现状（页内 Tab 已收敛，跨组为既定菜单结构），仅登记本核实证据",
+      "needsAuthorization": true,
+      "decided": false
+    }
+  ]
+}
